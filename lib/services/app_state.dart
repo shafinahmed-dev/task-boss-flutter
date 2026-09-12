@@ -80,6 +80,57 @@ class AppState extends ChangeNotifier {
       // offline fallback
     }
   }
+  Future<void> updateWallet({
+    required String walletId,
+    String? name,
+    String? institution,
+    String? accountNumber,
+    bool? isDefault,
+  }) async {
+    if (token == null) return;
+    final url = Uri.parse('$apiBaseUrl/wallets/$walletId');
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (institution != null) body['institution'] = institution;
+    if (accountNumber != null) body['accountNumber'] = accountNumber;
+    if (isDefault != null) body['isDefault'] = isDefault;
+
+    final resp = await http.patch(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      await refreshBalance();
+    } else {
+      final data = jsonDecode(resp.body);
+      final msg = data['message'] ?? 'Failed to update wallet';
+      throw Exception(msg is List ? msg.join(', ') : msg.toString());
+    }
+  }
+
+  Future<void> deleteWallet(String walletId) async {
+    if (token == null) return;
+    final url = Uri.parse('$apiBaseUrl/wallets/$walletId');
+    final resp = await http.delete(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      await refreshBalance();
+    } else {
+      final data = jsonDecode(resp.body);
+      final msg = data['message'] ?? 'Failed to delete wallet';
+      throw Exception(msg is List ? msg.join(', ') : msg.toString());
+    }
+  }
 
   Future<void> _fetchBalanceData() async {
     if (user == null || token == null) return;

@@ -332,6 +332,152 @@ class _WalletsScreenState extends State<WalletsScreen> {
     );
   }
 
+  void _showEditWalletModal(BuildContext context, Wallet wallet) {
+    final nameCtl = TextEditingController(text: wallet.name);
+    final instCtl = TextEditingController(text: wallet.institution ?? '');
+    final accCtl = TextEditingController(text: wallet.accountNumber ?? '');
+    bool isDefault = wallet.isDefault;
+    bool saving = false;
+    String? modalError;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.canvas,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            Future<void> submitEdit() async {
+              setModalState(() => modalError = null);
+              final name = nameCtl.text.trim();
+              if (name.isEmpty) {
+                setModalState(() => modalError = 'Wallet name is required');
+                return;
+              }
+              final app = context.read<AppState>();
+              setModalState(() => saving = true);
+              try {
+                await app.updateWallet(
+                  walletId: wallet.id,
+                  name: name,
+                  institution: instCtl.text.trim().isNotEmpty ? instCtl.text.trim() : null,
+                  accountNumber: accCtl.text.trim().isNotEmpty ? accCtl.text.trim() : null,
+                  isDefault: isDefault,
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+              } catch (e) {
+                setModalState(() {
+                  saving = false;
+                  modalError = e.toString().replaceAll('Exception: ', '');
+                });
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 20, right: 20, top: 20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Edit Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      ],
+                    ),
+                    if (modalError != null)
+                      Container(
+                        padding: const EdgeInsets.all(10), margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(color: AppTheme.expenseBg, border: Border.all(color: AppTheme.expenseBorder), borderRadius: BorderRadius.circular(8)),
+                        child: Text(modalError!, style: const TextStyle(color: AppTheme.expenseText, fontSize: 13)),
+                      ),
+                    TextField(controller: nameCtl, decoration: const InputDecoration(labelText: 'Wallet Name *', border: OutlineInputBorder())),
+                    const SizedBox(height: 12),
+                    TextField(controller: instCtl, decoration: const InputDecoration(labelText: 'Institution / Provider', border: OutlineInputBorder())),
+                    const SizedBox(height: 12),
+                    TextField(controller: accCtl, decoration: const InputDecoration(labelText: 'Account Number', border: OutlineInputBorder())),
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      title: const Text('Set as Default Wallet'),
+                      value: isDefault,
+                      onChanged: (val) => setModalState(() => isDefault = val ?? false),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGradientFallback, padding: const EdgeInsets.symmetric(vertical: 14)),
+                      onPressed: saving ? null : submitEdit,
+                      child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildWalletCard(Wallet wallet) {
+  void _confirmDeleteWallet(BuildContext context, Wallet wallet) {
+    if (wallet.isDefault) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cannot Delete Default Wallet'),
+          content: const Text('This is your primary default wallet. Set another wallet as default before deleting this one.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete / Archive ${wallet.name}'),
+        content: Text(
+          'Are you sure you want to delete "${wallet.name}"?\n\n'
+          'Note: Wallets with historical transactions will be safely archived to preserve financial records.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppTheme.expenseText),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final app = context.read<AppState>();
+              try {
+                await app.deleteWallet(wallet.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Wallet ${wallet.name} removed/archived successfully.')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  final msg = e.toString().replaceAll('Exception: ', '');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(msg), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete / Archive', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildWalletCard(Wallet wallet) {
     final typeColor = _getWalletColor(wallet.type);
     final icon = _getWalletIcon(wallet.type);
@@ -346,13 +492,45 @@ class _WalletsScreenState extends State<WalletsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(wallet.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.primaryText)),
+                Row(
+                  children: [
+                    Text(wallet.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.primaryText)),
+                    if (wallet.isDefault) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: AppTheme.primaryGradientFallback.withAlpha(30), borderRadius: BorderRadius.circular(4)),
+                        child: const Text('DEFAULT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.primaryGradientFallback)),
+                      ),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 2),
                 Text('${wallet.type}${wallet.institution != null ? " • ${wallet.institution}" : ""}', style: const TextStyle(color: AppTheme.secondaryText, fontSize: 12)),
               ],
             ),
           ),
           Text('৳${wallet.currentBalance.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppTheme.primaryText)),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: AppTheme.secondaryText, size: 20),
+            onSelected: (val) {
+              if (val == 'edit') {
+                _showEditWalletModal(context, wallet);
+              } else if (val == 'delete') {
+                _confirmDeleteWallet(context, wallet);
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(children: [Icon(Icons.edit, size: 18), SizedBox(width: 8), Text('Edit Wallet')]),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(children: [Icon(Icons.delete, size: 18, color: Colors.red), SizedBox(width: 8), Text('Delete / Archive', style: TextStyle(color: Colors.red))]),
+              ),
+            ],
+          ),
         ],
       ),
     );

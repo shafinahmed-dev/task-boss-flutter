@@ -5,6 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
+import 'package:task_boss/models/models.dart';
+import 'package:task_boss/models/wallet_model.dart';
+import 'package:task_boss/models/payment_methods.dart';
 
 class CustodyHandoverScreen extends StatefulWidget {
   const CustodyHandoverScreen({super.key});
@@ -17,7 +20,10 @@ class _HandoverState extends State<CustodyHandoverScreen> {
   final _amountCtl = TextEditingController();
   final _chargeCtl = TextEditingController();
   final _noteCtl = TextEditingController();
-  String _channel = 'cash';
+  
+  WalletModel? _selectedWallet;
+  String? _selectedPaymentMethod;
+
   bool _saving = false;
   List<dynamic> _recipients = [];
   String? _recipient;
@@ -27,7 +33,20 @@ class _HandoverState extends State<CustodyHandoverScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchRec());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final app = context.read<AppState>();
+      await app.fetchWallets();
+      if (mounted) {
+        setState(() {
+          if (app.wallets.isNotEmpty) {
+            _selectedWallet = app.wallets.firstWhere((w) => w.isDefault, orElse: () => app.wallets.first);
+            final rails = PaymentRails.getRails(_selectedWallet!.type, MovementDirection.out);
+            _selectedPaymentMethod = rails.isNotEmpty ? rails.first : 'Physical Cash';
+          }
+        });
+        _fetchRec();
+      }
+    });
   }
 
   Future<void> _fetchRec() async {
@@ -67,13 +86,15 @@ class _HandoverState extends State<CustodyHandoverScreen> {
     }
 
     final app = context.read<AppState>();
+    final available = _selectedWallet?.currentBalance ?? app.balance;
     final totalDeducted = amt + feeVal;
-    if (totalDeducted > app.balance) {
-      setState(() => _error = 'Total deducted (৳${totalDeducted.toStringAsFixed(2)}) exceeds available balance (৳${app.balance.toStringAsFixed(2)}).');
+    if (totalDeducted > available) {
+      setState(() => _error = 'Total deducted (৳${totalDeducted.toStringAsFixed(2)}) exceeds selected wallet balance (৳${available.toStringAsFixed(2)}).');
       return;
     }
 
     final noteText = _noteCtl.text.trim();
+    final paymentRail = _selectedPaymentMethod ?? 'Physical Cash';
     setState(() => _saving = true);
     try {
       final payload = {
@@ -81,13 +102,27 @@ class _HandoverState extends State<CustodyHandoverScreen> {
         'idempotencyKey': const Uuid().v4(),
         'fromCustodianId': app.user!.custodianId,
         'toCustodianId': _recipient,
+        'fromWalletId': _selectedWallet?.id,
+        'walletId': _selectedWallet?.id,
         'amount': amt,
         'fee': feeVal,
-        'channel': _channel,
+        'channel': paymentRail,
+        'paymentMethod': paymentRail,
         'notes': noteText.isNotEmpty ? noteText : null,
         'note': noteText.isNotEmpty ? noteText : null,
         'description': noteText.isNotEmpty ? noteText : null,
-        'metadata': {'baseAmount': amt, 'fee': feeVal, 'channel': _channel, 'category': 'Handover Transfer', 'note': noteText, 'notes': noteText},
+        'metadata': {
+          'baseAmount': amt,
+          'fee': feeVal,
+          'channel': paymentRail,
+          'paymentMethod': paymentRail,
+          'fromWalletId': _selectedWallet?.id,
+          'walletId': _selectedWallet?.id,
+          'walletName': _selectedWallet?.name,
+          'category': 'Handover Transfer',
+          'note': noteText,
+          'notes': noteText,
+        },
       };
 
       final res = await http.post(
@@ -164,13 +199,61 @@ class _HandoverState extends State<CustodyHandoverScreen> {
             ]),
             const SizedBox(height: 16),
 
-            const Text('Payment Channel', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const Text('From Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
-              initialValue: _channel,
-              decoration: _inputDec(''),
-              items: ['cash', 'bkash', 'nagad', 'bank', 'cheque', 'other'].map((c) => DropdownMenuItem(value: c, child: Text(c.toUpperCase()))).toList(),
-              onChanged: (v) => setState(() => _channel = v ?? 'cash'),
+            DropdownButtonFormField<WalletModel>(
+              value: app.wallets.contains(_selectedWallet) ? _selectedWallet : (app.wallets.isNotEmpty ? app.wallets.first : null),
+              decoration: _inputDec('Select Wallet'),
+              items: app.wallets.map((w) {
+                return DropdownMenuItem<WalletModel>(
+                  value: w,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(w.icon, size: 18, color: AppTheme.primaryGradientFallback),
+                          const SizedBox(width: 8),
+                          Text(w.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      Text(' (৳${w.currentBalance.toStringAsFixed(0)})', style: const TextStyle(color: AppTheme.secondaryText, fontSize: 12)),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (w) {
+                if (w == null) return;
+                setState(() {
+                  _selectedWallet = w;
+                  final rails = PaymentRails.getRails(w.type, MovementDirection.out);
+                  _selectedPaymentMethod = rails.contains(_selectedPaymentMethod)
+                      ? _selectedPaymentMethod
+                      : (rails.isNotEmpty ? rails.first : 'Physical Cash');
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            const Text('Payment Method / Rail', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 6),
+            Builder(
+              builder: (context) {
+                final walletType = _selectedWallet?.type ?? WalletType.cash;
+                final rails = PaymentRails.getRails(walletType, MovementDirection.out);
+                final currentMethod = (rails.contains(_selectedPaymentMethod))
+                    ? _selectedPaymentMethod
+                    : (rails.isNotEmpty ? rails.first : 'Physical Cash');
+
+                return DropdownButtonFormField<String>(
+                  value: currentMethod,
+                  decoration: _inputDec('Select Rail'),
+                  items: rails.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                  onChanged: (v) {
+                    setState(() => _selectedPaymentMethod = v);
+                  },
+                );
+              },
             ),
             const SizedBox(height: 16),
 
