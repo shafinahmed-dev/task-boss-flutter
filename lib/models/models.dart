@@ -1,3 +1,6 @@
+export 'wallet_model.dart';
+export 'payment_methods.dart';
+
 class AuthUser {
   final String userId;
   final String role;
@@ -53,6 +56,9 @@ class HistoryItem {
   final String? transferStatus;
   final bool? isOutgoing;
   final String? counterpartyName;
+  final String? walletId;
+  final String? walletName;
+  final String? paymentMethod;
 
   HistoryItem({
     required this.id,
@@ -69,5 +75,8 @@ class HistoryItem {
     this.transferStatus,
     this.isOutgoing,
     this.counterpartyName,
+    this.walletId,
+    this.walletName,
+    this.paymentMethod,
   });
 }

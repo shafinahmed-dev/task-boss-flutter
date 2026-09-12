@@ -175,7 +175,19 @@ String? _parseNote(dynamic item) {
     final bool isCashIn = dir == 'in' || dirTab == 'in' || movementType == 'cash in';
 
     String badgeLabel = isCashIn ? 'CASH IN' : (isCashOut ? 'CASH OUT' : 'EXPENSE');
-    if (channel.isNotEmpty) badgeLabel += ' • $channel';
+    final walletName = (it['wallet']?['name'] ?? it['metadata']?['walletName'] ?? '').toString();
+    final paymentMethod = (it['metadata']?['paymentMethod'] ?? '').toString();
+    String railInfo = '';
+    if (walletName.isNotEmpty && paymentMethod.isNotEmpty) {
+      railInfo = '$walletName • $paymentMethod';
+    } else if (walletName.isNotEmpty) {
+      railInfo = walletName;
+    } else if (paymentMethod.isNotEmpty) {
+      railInfo = paymentMethod;
+    } else if (channel.isNotEmpty) {
+      railInfo = channel;
+    }
+    if (railInfo.isNotEmpty) badgeLabel += ' • $railInfo';
 
     Color badgeBg;
     Color badgeBorder;

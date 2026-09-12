@@ -17,6 +17,7 @@ class AppState extends ChangeNotifier {
   double balance = 0.0;
   int pendingCount = 0;
   bool isReady = false;
+  List<Wallet> wallets = [];
 
   final String apiBaseUrl = 'http://localhost:3000';
 
@@ -66,16 +67,36 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> fetchWallets() async {
+    if (user == null || token == null) return;
+    try {
+      final url = Uri.parse('$apiBaseUrl/wallets?custodianId=${user!.custodianId}');
+      final resp = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+      if (resp.statusCode == 200) {
+        final List list = jsonDecode(resp.body);
+        wallets = list.map((item) => Wallet.fromJson(item)).toList();
+      }
+    } catch (e) {
+      // offline fallback
+    }
+  }
+
   Future<void> _fetchBalanceData() async {
     if (user == null || token == null) return;
     try {
+      await fetchWallets();
+
       double rawBalance = 0.0;
-      final url = Uri.parse('$apiBaseUrl/ledger/custodians/${user!.custodianId}/balance?companyId=${user!.companyId}');
-      final resp = await http.get(url, headers: {'Authorization': 'Bearer $token'});
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body);
-        final rawBal = data['balance'] ?? data['netBalance'] ?? data['currentBalance'];
-        rawBalance = _toDouble(rawBal);
+      if (wallets.isNotEmpty) {
+        rawBalance = wallets.fold(0.0, (sum, w) => sum + w.currentBalance);
+      } else {
+        final url = Uri.parse('$apiBaseUrl/ledger/custodians/${user!.custodianId}/balance?companyId=${user!.companyId}');
+        final resp = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+        if (resp.statusCode == 200) {
+          final data = jsonDecode(resp.body);
+          final rawBal = data['balance'] ?? data['netBalance'] ?? data['currentBalance'];
+          rawBalance = _toDouble(rawBal);
+        }
       }
       
       final notifUrl = Uri.parse('$apiBaseUrl/custody/notifications?custodianId=${user!.custodianId}&companyId=${user!.companyId}');

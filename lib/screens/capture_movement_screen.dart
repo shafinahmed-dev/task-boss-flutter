@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:task_boss/theme.dart';
+import 'package:task_boss/models/models.dart';
 import 'package:task_boss/services/app_state.dart';
 
 class CaptureMovementScreen extends StatefulWidget {
@@ -17,7 +18,10 @@ class _CaptureState extends State<CaptureMovementScreen> {
   final _amtCtl = TextEditingController();
   final _chgCtl = TextEditingController();
   final _noteCtl = TextEditingController();
-  String _channel = 'cash';
+  
+  String? _selectedWalletId;
+  String? _selectedPaymentMethod;
+  
   String _tag = '';
   bool _saving = false;
   String? _error;
@@ -43,13 +47,31 @@ class _CaptureState extends State<CaptureMovementScreen> {
       if (tag == 'Loan') return 'loan_received';
       return 'client_payment';
     }
-    // Tab is 'out'
     if (tag == 'Cash Withdrawal') return 'personal_partner';
-    return 'outflow'; // Changed from 'business_expense'
+    return 'outflow';
   }
 
   Future<void> _submit() async {
     setState(() => _error = null);
+    final app = context.read<AppState>();
+    if (app.user == null) {
+      setState(() => _error = 'Session expired. Please log in again.');
+      return;
+    }
+
+    final wallets = app.wallets;
+    Wallet? selectedWallet;
+    if (_selectedWalletId != null && wallets.isNotEmpty) {
+      selectedWallet = wallets.firstWhere((w) => w.id == _selectedWalletId, orElse: () => wallets.first);
+    } else if (wallets.isNotEmpty) {
+      selectedWallet = wallets.first;
+    }
+
+    if (selectedWallet == null) {
+      setState(() => _error = 'No active wallet found. Please create a wallet first.');
+      return;
+    }
+
     final amt = double.tryParse(_amtCtl.text.trim());
     if (amt == null || amt <= 0) {
       setState(() => _error = 'Please enter a valid amount greater than 0.');
@@ -66,11 +88,12 @@ class _CaptureState extends State<CaptureMovementScreen> {
       setState(() => _error = "Note is required when selecting an 'Other' category.");
       return;
     }
-    final app = context.read<AppState>();
-    if (app.user == null) {
-      setState(() => _error = 'Session expired. Please log in again.');
-      return;
-    }
+
+    final availableMethods = PaymentRails.getMethods(selectedWallet.type, _tab);
+    final paymentMethod = (_selectedPaymentMethod != null && availableMethods.contains(_selectedPaymentMethod))
+        ? _selectedPaymentMethod!
+        : availableMethods.first;
+
     setState(() => _saving = true);
     try {
       final payload = {
@@ -78,7 +101,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
         'direction': _tab == 'in' ? 'in' : 'out',
         'amount': amt,
         'currency': 'BDT',
-        'channel': _channel,
+        'channel': selectedWallet.type.toLowerCase(),
+        'walletId': selectedWallet.id,
+        'paymentMethod': paymentMethod,
         'companyId': app.user!.companyId,
         'collectorId': app.user!.userId,
         'custodianId': app.user!.custodianId,
@@ -94,22 +119,38 @@ class _CaptureState extends State<CaptureMovementScreen> {
           'notes': noteText,
           'baseAmount': amt,
           'fee': feeVal,
-          'channel': _channel,
+          'channel': selectedWallet.type.toLowerCase(),
+          'walletId': selectedWallet.id,
+          'paymentMethod': paymentMethod,
+          'walletName': selectedWallet.name,
           'directionTab': _tab,
         },
       };
 
       final res = await http.post(
         Uri.parse('${app.apiBaseUrl}/ledger/movements'),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ${app.token}', 'x-company-id': app.user!.companyId},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${app.token}',
+          'x-company-id': app.user!.companyId
+        },
         body: jsonEncode(payload),
       );
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        _amtCtl.clear(); _chgCtl.clear(); _noteCtl.clear();
-        setState(() { _tag = _tags[_tab]![0]; });
+        _amtCtl.clear();
+        _chgCtl.clear();
+        _noteCtl.clear();
+        setState(() {
+          _tag = _tags[_tab]![0];
+        });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Record saved successfully!'), backgroundColor: AppTheme.confirmedText));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Record saved successfully!'),
+              backgroundColor: AppTheme.confirmedText,
+            ),
+          );
         }
         await app.refreshBalance();
       } else {
@@ -123,8 +164,44 @@ class _CaptureState extends State<CaptureMovementScreen> {
     }
   }
 
+  IconData _getWalletIcon(String type) {
+    switch (type.toUpperCase()) {
+      case 'MFS':
+        return Icons.phone_android;
+      case 'BANK':
+        return Icons.account_balance;
+      case 'CASH':
+      default:
+        return Icons.money;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final wallets = app.wallets;
+
+    if (_selectedWalletId == null && wallets.isNotEmpty) {
+      final defaultWallet = wallets.firstWhere((w) => w.isDefault, orElse: () => wallets.first);
+      _selectedWalletId = defaultWallet.id;
+    }
+
+    Wallet? selectedWallet;
+    if (_selectedWalletId != null && wallets.isNotEmpty) {
+      selectedWallet = wallets.firstWhere(
+        (w) => w.id == _selectedWalletId,
+        orElse: () => wallets.first,
+      );
+    }
+
+    final availableMethods = selectedWallet != null
+        ? PaymentRails.getMethods(selectedWallet.type, _tab)
+        : ['Physical Cash'];
+
+    if (_selectedPaymentMethod == null || !availableMethods.contains(_selectedPaymentMethod)) {
+      _selectedPaymentMethod = availableMethods.first;
+    }
+
     final amtVal = double.tryParse(_amtCtl.text.trim()) ?? 0.0;
     final feeVal = double.tryParse(_chgCtl.text.trim()) ?? 0.0;
     return Scaffold(
@@ -162,14 +239,72 @@ class _CaptureState extends State<CaptureMovementScreen> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 16),
-            const Text('Payment Channel', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const Text('Select Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
-              initialValue: _channel,
-              items: ['cash', 'bkash', 'nagad', 'bank', 'cheque', 'rtgs', 'npsb', 'other'].map((c) => DropdownMenuItem(value: c, child: Text(c.toUpperCase()))).toList(),
-              onChanged: (v) => setState(() => _channel = v ?? 'cash'),
+              key: ValueKey('wallet_$_selectedWalletId'),
+              initialValue: _selectedWalletId,
+              items: wallets.map((w) {
+                return DropdownMenuItem<String>(
+                  value: w.id,
+                  child: Row(
+                    children: [
+                      Icon(_getWalletIcon(w.type), size: 18, color: AppTheme.primaryGradientFallback),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${w.name} (৳${w.currentBalance.toStringAsFixed(2)})',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() {
+                    _selectedWalletId = v;
+                    final newlySelected = wallets.firstWhere((w) => w.id == v);
+                    final methods = PaymentRails.getMethods(newlySelected.type, _tab);
+                    _selectedPaymentMethod = methods.first;
+                  });
+                }
+              },
               decoration: const InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
             ),
+            const SizedBox(height: 16),
+            const Text('Payment Method / Rail', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 6),
+            if (selectedWallet?.type.toUpperCase() == 'CASH')
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppTheme.inputBg,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.grey.shade400),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.money, size: 18, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text('Physical Cash', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                  ],
+                ),
+              )
+            else
+              DropdownButtonFormField<String>(
+                key: ValueKey('method_${selectedWallet?.id}_$_selectedPaymentMethod'),
+                initialValue: availableMethods.contains(_selectedPaymentMethod) ? _selectedPaymentMethod : availableMethods.first,
+                items: availableMethods.map((m) {
+                  return DropdownMenuItem<String>(
+                    value: m,
+                    child: Text(m, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  );
+                }).toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _selectedPaymentMethod = v);
+                },
+                decoration: const InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
+              ),
             const SizedBox(height: 16),
             Row(children: [
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -208,15 +343,38 @@ class _CaptureState extends State<CaptureMovementScreen> {
   }
 
   Widget _tabBtn(String l, String v, Color c) => Expanded(
-    child: GestureDetector(
-      onTap: () => setState(() { _tab = v; _tag = _tags[v]![0]; _error = null; }),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4), padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(color: _tab == v ? c : Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-        child: Text(l, textAlign: TextAlign.center, style: TextStyle(color: _tab == v ? Colors.white : AppTheme.secondaryText, fontWeight: FontWeight.bold)),
-      ),
-    ),
-  );
+        child: GestureDetector(
+          onTap: () => setState(() {
+            _tab = v;
+            _tag = _tags[v]![0];
+            _error = null;
+            if (_selectedWalletId != null) {
+              final app = context.read<AppState>();
+              if (app.wallets.isNotEmpty) {
+                final wallet = app.wallets.firstWhere((w) => w.id == _selectedWalletId, orElse: () => app.wallets.first);
+                final methods = PaymentRails.getMethods(wallet.type, _tab);
+                _selectedPaymentMethod = methods.first;
+              }
+            }
+          }),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: _tab == v ? c : Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              l,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _tab == v ? Colors.white : AppTheme.secondaryText,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      );
 
   Widget _banner(String t) => Container(
     padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 12),

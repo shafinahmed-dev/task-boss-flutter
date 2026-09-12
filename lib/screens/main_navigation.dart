@@ -4,6 +4,7 @@ import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/screens/account_screen.dart';
 import 'package:task_boss/screens/operations_tabs.dart';
+import 'package:task_boss/screens/wallets_screen.dart';
 import 'package:task_boss/screens/notifications_screen.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -18,6 +19,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _pages = [
     const OperationsTabs(),
+    const WalletsScreen(),
     const NotificationsScreen(),
     const AccountScreen(),
   ];
@@ -39,12 +41,17 @@ class _MainNavigationState extends State<MainNavigation> {
         selectedItemColor: AppTheme.primaryGradientFallback,
         unselectedItemColor: AppTheme.secondaryText,
         backgroundColor: AppTheme.cardBg,
+        type: BottomNavigationBarType.fixed,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
         items: [
           const BottomNavigationBarItem(
             icon: Icon(Icons.sync_alt),
             label: 'Operations',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.account_balance_wallet),
+            label: 'Wallets',
           ),
           BottomNavigationBarItem(
             icon: Badge(

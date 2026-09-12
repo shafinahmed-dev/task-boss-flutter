@@ -91,6 +91,14 @@ class _AccountScreenState extends State<AccountScreen> {
           final fee = _toDouble(m['fee'] ?? m['metadata']?['fee']);
           final dir = (m['direction'] ?? '').toString().toLowerCase();
           final tag = (m['entryTag'] ?? '').toString().toLowerCase();
+          if (tag == 'internal_transfer') {
+            // Internal transfers between sub-ledger wallets do not count toward external Inflows/Outflows
+            final fee = _toDouble(m['fee'] ?? m['metadata']?['fee']);
+            if (fee > 0 && dir == 'out') {
+              e += fee;
+            }
+            continue;
+          }
           final dirTab = (m['metadata']?['directionTab'] ?? '').toString().toLowerCase();
           final movementType = (m['metadata']?['movementType'] ?? '').toString().toLowerCase();
           final categoryStr = (m['metadata']?['category'] ?? '').toString();
