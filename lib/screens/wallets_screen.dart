@@ -424,7 +424,6 @@ class _WalletsScreenState extends State<WalletsScreen> {
     );
   }
 
-  Widget _buildWalletCard(Wallet wallet) {
   void _confirmDeleteWallet(BuildContext context, Wallet wallet) {
     if (wallet.isDefault) {
       showDialog(

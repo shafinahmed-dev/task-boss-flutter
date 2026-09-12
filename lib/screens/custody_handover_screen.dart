@@ -21,7 +21,7 @@ class _HandoverState extends State<CustodyHandoverScreen> {
   final _chargeCtl = TextEditingController();
   final _noteCtl = TextEditingController();
   
-  WalletModel? _selectedWallet;
+  Wallet? _selectedWallet;
   String? _selectedPaymentMethod;
 
   bool _saving = false;
@@ -29,6 +29,14 @@ class _HandoverState extends State<CustodyHandoverScreen> {
   String? _recipient;
   String? _error;
   String? _success;
+
+  IconData _getWalletIcon(String type) {
+    switch (type.toUpperCase()) {
+      case 'MFS': return Icons.phone_android;
+      case 'BANK': return Icons.account_balance;
+      case 'CASH': default: return Icons.money;
+    }
+  }
 
   @override
   void initState() {
@@ -40,7 +48,7 @@ class _HandoverState extends State<CustodyHandoverScreen> {
         setState(() {
           if (app.wallets.isNotEmpty) {
             _selectedWallet = app.wallets.firstWhere((w) => w.isDefault, orElse: () => app.wallets.first);
-            final rails = PaymentRails.getRails(_selectedWallet!.type, MovementDirection.out);
+            final rails = PaymentRails.getMethods(_selectedWallet!.type, 'out');
             _selectedPaymentMethod = rails.isNotEmpty ? rails.first : 'Physical Cash';
           }
         });
@@ -158,6 +166,7 @@ class _HandoverState extends State<CustodyHandoverScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
     final amtVal = double.tryParse(_amountCtl.text.trim()) ?? 0.0;
     final feeVal = double.tryParse(_chargeCtl.text.trim()) ?? 0.0;
     final totalVal = amtVal + feeVal;
@@ -201,18 +210,18 @@ class _HandoverState extends State<CustodyHandoverScreen> {
 
             const Text('From Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 6),
-            DropdownButtonFormField<WalletModel>(
+            DropdownButtonFormField<Wallet>(
               value: app.wallets.contains(_selectedWallet) ? _selectedWallet : (app.wallets.isNotEmpty ? app.wallets.first : null),
               decoration: _inputDec('Select Wallet'),
               items: app.wallets.map((w) {
-                return DropdownMenuItem<WalletModel>(
+                return DropdownMenuItem<Wallet>(
                   value: w,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
-                          Icon(w.icon, size: 18, color: AppTheme.primaryGradientFallback),
+                          Icon(_getWalletIcon(w.type), size: 18, color: AppTheme.primaryGradientFallback),
                           const SizedBox(width: 8),
                           Text(w.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                         ],
@@ -226,7 +235,7 @@ class _HandoverState extends State<CustodyHandoverScreen> {
                 if (w == null) return;
                 setState(() {
                   _selectedWallet = w;
-                  final rails = PaymentRails.getRails(w.type, MovementDirection.out);
+                  final rails = PaymentRails.getMethods(w.type, 'out');
                   _selectedPaymentMethod = rails.contains(_selectedPaymentMethod)
                       ? _selectedPaymentMethod
                       : (rails.isNotEmpty ? rails.first : 'Physical Cash');
@@ -239,8 +248,8 @@ class _HandoverState extends State<CustodyHandoverScreen> {
             const SizedBox(height: 6),
             Builder(
               builder: (context) {
-                final walletType = _selectedWallet?.type ?? WalletType.cash;
-                final rails = PaymentRails.getRails(walletType, MovementDirection.out);
+                final walletType = _selectedWallet?.type ?? 'CASH';
+                final rails = PaymentRails.getMethods(walletType, 'out');
                 final currentMethod = (rails.contains(_selectedPaymentMethod))
                     ? _selectedPaymentMethod
                     : (rails.isNotEmpty ? rails.first : 'Physical Cash');
