@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/models/models.dart';
+import 'package:task_boss/utils/show_receipt_modal.dart';
 
 class CustodyHandoverScreen extends StatefulWidget {
   const CustodyHandoverScreen({super.key});
@@ -27,6 +28,7 @@ class _HandoverState extends State<CustodyHandoverScreen> {
   String? _recipient;
   String? _error;
   String? _success;
+  Map<String, dynamic>? _lastSavedReceipt;
 
   IconData _getWalletIcon(String type) {
     switch (type.toUpperCase()) {
@@ -142,10 +144,27 @@ class _HandoverState extends State<CustodyHandoverScreen> {
       );
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        _amountCtl.clear();
-        _chargeCtl.clear();
-        _noteCtl.clear();
+        final resData = jsonDecode(res.body);
+        final receiptNo = resData['receiptNo'] ?? resData['metadata']?['voucherNumber'] ?? 'HND-${const Uuid().v4().substring(0, 8).toUpperCase()}';
+        
+        final recipientObj = _recipients.firstWhere((c) => c['id'] == _recipient, orElse: () => null);
+        final recipientName = recipientObj != null ? (recipientObj['name'] ?? 'Recipient') : 'Recipient';
+
         setState(() {
+          _lastSavedReceipt = {
+            'receiptNo': receiptNo,
+            'date': DateTime.now(),
+            'type': 'Handover Transfer',
+            'category': recipientName,
+            'wallet': _selectedWallet?.name ?? 'Wallet',
+            'method': paymentRail,
+            'note': noteText,
+            'amount': amt,
+            'fee': feeVal,
+          };
+          _amountCtl.clear();
+          _chargeCtl.clear();
+          _noteCtl.clear();
           _recipient = null;
           _success = 'Handover of ৳${amt.toStringAsFixed(2)}${feeVal > 0 ? ' (+ ৳${feeVal.toStringAsFixed(2)} fee)' : ''} submitted! Receiver must confirm.';
         });
@@ -176,73 +195,94 @@ class _HandoverState extends State<CustodyHandoverScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Custody Handover', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryGradientFallback)),
+            const Text('Transfer Funds', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryGradientFallback)),
             const SizedBox(height: 12),
             if (_error != null) _banner(_error!, AppTheme.expenseBg, AppTheme.expenseBorder, AppTheme.expenseText),
             if (_success != null) _banner(_success!, AppTheme.confirmedBg, AppTheme.confirmedBorder, AppTheme.confirmedText),
 
-            const Text('Recipient Custodian', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
-              initialValue: _recipient,
-              decoration: _inputDec('Select recipient custodian...'),
-              items: _recipients.map((c) => DropdownMenuItem(value: c['id'] as String, child: Text(c['name'] ?? 'Unknown'))).toList(),
-              onChanged: (v) => setState(() => _recipient = v),
-            ),
-            const SizedBox(height: 16),
-
-            Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Base Amount (৳)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 6),
-                TextField(controller: _amountCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: _inputDec('0.00'), onChanged: (_) => setState(() {})),
-              ])),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Fee / Charge (৳)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 6),
-                TextField(controller: _chargeCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: _inputDec('0.00'), onChanged: (_) => setState(() {})),
-              ])),
-            ]),
-            const SizedBox(height: 16),
-
-            const Text('From Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 6),
-            DropdownButtonFormField<Wallet>(
-              initialValue: app.wallets.contains(_selectedWallet) ? _selectedWallet : (app.wallets.isNotEmpty ? app.wallets.first : null),
-              decoration: _inputDec('Select Wallet'),
-              items: app.wallets.map((w) {
-                return DropdownMenuItem<Wallet>(
-                  value: w,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Symmetrical 2x2 Layout - Row 1: Wallet & Recipient Custodian
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Icon(_getWalletIcon(w.type), size: 18, color: AppTheme.primaryGradientFallback),
-                          const SizedBox(width: 8),
-                          Text(w.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ],
+                      const Text('Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<Wallet>(
+                        initialValue: app.wallets.contains(_selectedWallet) ? _selectedWallet : (app.wallets.isNotEmpty ? app.wallets.first : null),
+                        decoration: _inputDec('Select Wallet'),
+                        items: app.wallets.map((w) {
+                          return DropdownMenuItem<Wallet>(
+                            value: w,
+                            child: Text('${w.name} (৳${w.currentBalance.toStringAsFixed(0)})', overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          );
+                        }).toList(),
+                        onChanged: (w) {
+                          if (w == null) return;
+                          setState(() {
+                            _selectedWallet = w;
+                            final rails = PaymentRails.getMethods(w.type, 'out');
+                            _selectedPaymentMethod = rails.contains(_selectedPaymentMethod)
+                                ? _selectedPaymentMethod
+                                : (rails.isNotEmpty ? rails.first : 'Physical Cash');
+                          });
+                        },
                       ),
-                      Text(' (৳${w.currentBalance.toStringAsFixed(0)})', style: const TextStyle(color: AppTheme.secondaryText, fontSize: 12)),
                     ],
                   ),
-                );
-              }).toList(),
-              onChanged: (w) {
-                if (w == null) return;
-                setState(() {
-                  _selectedWallet = w;
-                  final rails = PaymentRails.getMethods(w.type, 'out');
-                  _selectedPaymentMethod = rails.contains(_selectedPaymentMethod)
-                      ? _selectedPaymentMethod
-                      : (rails.isNotEmpty ? rails.first : 'Physical Cash');
-                });
-              },
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Recipient Custodian', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        initialValue: _recipient,
+                        decoration: _inputDec('Select...'),
+                        items: _recipients.map((c) => DropdownMenuItem(value: c['id'] as String, child: Text(c['name'] ?? 'Unknown', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)))).toList(),
+                        onChanged: (v) => setState(() => _recipient = v),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
 
-            const Text('Payment Method / Rail', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            // Symmetrical 2x2 Layout - Row 2: Amount & Fee
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      TextField(controller: _amountCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: _inputDec('0.00'), onChanged: (_) => setState(() {})),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Fee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      TextField(controller: _chargeCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: _inputDec('0.00'), onChanged: (_) => setState(() {})),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            const Text('Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 6),
             Builder(
               builder: (context) {
@@ -254,8 +294,8 @@ class _HandoverState extends State<CustodyHandoverScreen> {
 
                 return DropdownButtonFormField<String>(
                   initialValue: currentMethod,
-                  decoration: _inputDec('Select Rail'),
-                  items: rails.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                  decoration: _inputDec('Select Method'),
+                  items: rails.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(),
                   onChanged: (v) {
                     setState(() => _selectedPaymentMethod = v);
                   },
@@ -264,7 +304,7 @@ class _HandoverState extends State<CustodyHandoverScreen> {
             ),
             const SizedBox(height: 16),
 
-            const Text('Handover Note / Reason (Optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const Text('Note', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 6),
             TextField(
               controller: _noteCtl,
@@ -285,10 +325,53 @@ class _HandoverState extends State<CustodyHandoverScreen> {
             ),
             const SizedBox(height: 20),
 
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGradientFallback, minimumSize: const Size(double.infinity, 50)),
-              onPressed: _saving ? null : _submit,
-              child: _saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Send Handover Request', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            Center(
+              child: SizedBox(
+                width: 280,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryGradientFallback,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: _saving ? null : _submit,
+                  child: _saving
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('Send', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Inline Receipt Status Container
+            Center(
+              child: _lastSavedReceipt == null
+                  ? const Text(
+                      'Hit Send to Generate Receipt',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
+                    )
+                  : TextButton.icon(
+                      onPressed: () {
+                        final r = _lastSavedReceipt!;
+                        showReceiptModal(
+                          context,
+                          receiptNo: r['receiptNo'],
+                          date: r['date'],
+                          type: r['type'],
+                          categoryOrRecipient: r['category'],
+                          wallet: r['wallet'],
+                          method: r['method'],
+                          note: r['note'],
+                          amount: r['amount'],
+                          fee: r['fee'],
+                        );
+                      },
+                      icon: const Icon(Icons.download_rounded, color: Color(0xFF2563EB), size: 18),
+                      label: const Text(
+                        'Download Receipt',
+                        style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
             ),
           ],
         ),

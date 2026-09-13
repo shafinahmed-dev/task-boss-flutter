@@ -22,7 +22,7 @@ class OperationsTabs extends StatelessWidget {
               indicatorWeight: 3,
               labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
               tabs: [
-                Tab(text: 'IN/OUT'),
+                Tab(text: 'Activity'),
                 Tab(text: 'Handover'),
                 Tab(text: 'History'),
               ],

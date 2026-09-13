@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/models/models.dart';
 import 'package:task_boss/services/app_state.dart';
+import 'package:task_boss/utils/show_receipt_modal.dart';
 
 class CaptureMovementScreen extends StatefulWidget {
   const CaptureMovementScreen({super.key});
@@ -25,6 +26,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
   String _tag = '';
   bool _saving = false;
   String? _error;
+  Map<String, dynamic>? _lastSavedReceipt;
 
   final Map<String, List<String>> _tags = {
     'in': ['Client Payment', 'Vendor Collection', 'Investor / Funding', 'Loan', 'Refund Received', 'Other Inflow'],
@@ -96,6 +98,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
 
     setState(() => _saving = true);
     try {
+      final receiptNo = 'TRX-${const Uuid().v4().substring(0, 8).toUpperCase()}';
       final payload = {
         'idempotencyKey': const Uuid().v4(),
         'direction': _tab == 'in' ? 'in' : 'out',
@@ -124,6 +127,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
           'paymentMethod': paymentMethod,
           'walletName': selectedWallet.name,
           'directionTab': _tab,
+          'voucherNumber': receiptNo,
         },
       };
 
@@ -138,16 +142,30 @@ class _CaptureState extends State<CaptureMovementScreen> {
       );
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        _amtCtl.clear();
-        _chgCtl.clear();
-        _noteCtl.clear();
+        final resData = jsonDecode(res.body);
+        final returnedNo = resData['receiptNo'] ?? resData['metadata']?['voucherNumber'] ?? receiptNo;
+
         setState(() {
+          _lastSavedReceipt = {
+            'receiptNo': returnedNo,
+            'date': DateTime.now(),
+            'type': _tab == 'in' ? 'Cash In' : (_tab == 'out' ? 'Cash Out' : 'Expense'),
+            'category': _tag,
+            'wallet': selectedWallet!.name,
+            'method': paymentMethod,
+            'note': noteText,
+            'amount': amt,
+            'fee': feeVal,
+          };
+          _amtCtl.clear();
+          _chgCtl.clear();
+          _noteCtl.clear();
           _tag = _tags[_tab]![0];
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Record saved successfully!'),
+              content: Text('Transaction saved successfully!'),
               backgroundColor: AppTheme.confirmedText,
             ),
           );
@@ -211,7 +229,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Record Money Movement', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryGradientFallback)),
+            const Text('Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryGradientFallback)),
             const SizedBox(height: 12),
             if (_error != null) _banner(_error!),
             Row(children: [_tabBtn('Cash In', 'in', AppTheme.inflowText), _tabBtn('Cash Out', 'out', AppTheme.pendingAccent), _tabBtn('Expense', 'expense', AppTheme.expenseText)]),
@@ -228,8 +246,64 @@ class _CaptureState extends State<CaptureMovementScreen> {
               )).toList(),
             ),
             const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        key: ValueKey('wallet_$_selectedWalletId'),
+                        initialValue: _selectedWalletId,
+                        items: wallets.map((w) => DropdownMenuItem<String>(value: w.id, child: Text('${w.name} (৳${w.currentBalance.toStringAsFixed(0)})', overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)))).toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() {
+                              _selectedWalletId = v;
+                              final newlySelected = wallets.firstWhere((w) => w.id == v);
+                              final methods = PaymentRails.getMethods(newlySelected.type, _tab);
+                              _selectedPaymentMethod = methods.first;
+                            });
+                          }
+                        },
+                        decoration: const InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      selectedWallet?.type.toUpperCase() == 'CASH'
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                              decoration: BoxDecoration(color: AppTheme.inputBg, borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.grey.shade400)),
+                              child: const Text('Physical Cash', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 12), overflow: TextOverflow.ellipsis),
+                            )
+                          : DropdownButtonFormField<String>(
+                              key: ValueKey('method_${selectedWallet?.id}_$_selectedPaymentMethod'),
+                              initialValue: availableMethods.contains(_selectedPaymentMethod) ? _selectedPaymentMethod : availableMethods.first,
+                              items: availableMethods.map((m) => DropdownMenuItem<String>(value: m, child: Text(m, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12), overflow: TextOverflow.ellipsis))).toList(),
+                              onChanged: (v) {
+                                if (v != null) setState(() => _selectedPaymentMethod = v);
+                              },
+                              decoration: const InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
+                            ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             Row(children: [
-              const Text('Note / Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Note', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               if (_isOtherTag) const Text(' * (Required)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.expenseText)),
             ]),
             const SizedBox(height: 6),
@@ -239,86 +313,33 @@ class _CaptureState extends State<CaptureMovementScreen> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 16),
-            const Text('Select Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
-              key: ValueKey('wallet_$_selectedWalletId'),
-              initialValue: _selectedWalletId,
-              items: wallets.map((w) {
-                return DropdownMenuItem<String>(
-                  value: w.id,
-                  child: Row(
+            // Symmetrical 2x2 Layout - Row 2: Amount & Fee
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(_getWalletIcon(w.type), size: 18, color: AppTheme.primaryGradientFallback),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${w.name} (৳${w.currentBalance.toStringAsFixed(2)})',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
+                      const Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      TextField(controller: _amtCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
                     ],
                   ),
-                );
-              }).toList(),
-              onChanged: (v) {
-                if (v != null) {
-                  setState(() {
-                    _selectedWalletId = v;
-                    final newlySelected = wallets.firstWhere((w) => w.id == v);
-                    final methods = PaymentRails.getMethods(newlySelected.type, _tab);
-                    _selectedPaymentMethod = methods.first;
-                  });
-                }
-              },
-              decoration: const InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Fee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      TextField(controller: _chgCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            const Text('Payment Method / Rail', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 6),
-            if (selectedWallet?.type.toUpperCase() == 'CASH')
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppTheme.inputBg,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.grey.shade400),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.money, size: 18, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Text('Physical Cash', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
-                  ],
-                ),
-              )
-            else
-              DropdownButtonFormField<String>(
-                key: ValueKey('method_${selectedWallet?.id}_$_selectedPaymentMethod'),
-                initialValue: availableMethods.contains(_selectedPaymentMethod) ? _selectedPaymentMethod : availableMethods.first,
-                items: availableMethods.map((m) {
-                  return DropdownMenuItem<String>(
-                    value: m,
-                    child: Text(m, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  );
-                }).toList(),
-                onChanged: (v) {
-                  if (v != null) setState(() => _selectedPaymentMethod = v);
-                },
-                decoration: const InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
-              ),
-            const SizedBox(height: 16),
-            Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Base Amount (৳)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 6),
-                TextField(controller: _amtCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
-              ])),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Fee / Charge (৳)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 6),
-                TextField(controller: _chgCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
-              ])),
-            ]),
             const SizedBox(height: 16),
             if (amtVal > 0 || feeVal > 0) Container(
               padding: const EdgeInsets.all(12),
@@ -331,10 +352,46 @@ class _CaptureState extends State<CaptureMovementScreen> {
               ]),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGradientFallback, minimumSize: const Size(double.infinity, 50)),
-              onPressed: _saving ? null : _submit,
-              child: _saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save Record', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            Center(
+              child: SizedBox(
+                width: 280,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGradientFallback, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  onPressed: _saving ? null : _submit,
+                  child: _saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Center(
+              child: _lastSavedReceipt == null
+                  ? const Text(
+                      'Hit Save to Generate Receipt',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
+                    )
+                  : TextButton.icon(
+                      onPressed: () {
+                        final r = _lastSavedReceipt!;
+                        showReceiptModal(
+                          context,
+                          receiptNo: r['receiptNo'],
+                          date: r['date'],
+                          type: r['type'],
+                          categoryOrRecipient: r['category'],
+                          wallet: r['wallet'],
+                          method: r['method'],
+                          note: r['note'],
+                          amount: r['amount'],
+                          fee: r['fee'],
+                        );
+                      },
+                      icon: const Icon(Icons.download_rounded, color: Color(0xFF2563EB), size: 18),
+                      label: const Text(
+                        'Download Receipt',
+                        style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
             ),
           ],
         ),
