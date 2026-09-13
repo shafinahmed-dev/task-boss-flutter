@@ -34,23 +34,25 @@ String? _parseNote(dynamic item) {
 }
 
 
-String _formatTag(String? tag) {
-  if (tag == null || tag.isEmpty) return 'Money Movement';
-  const map = {
-    'client_payment': 'Client Payment',
-    'loan_received': 'Loan Received',
-    'other_income': 'Other Income',
-    'business_expense': 'Business Expense',
-    'personal_partner': 'Personal / Partner',
-    'loan_given': 'Loan Given',
-    'loan_repayment': 'Loan Repayment',
-    'partner_funding': 'Partner Funding',
-    'partner_reimbursement': 'Partner Reimbursement',
-    'cash_in': 'Cash In',
-    'cash_out': 'Cash Out',
-  };
-  return map[tag] ?? tag.replaceAll('_', ' ').toUpperCase();
-}
+  String _formatTag(String? tag) {
+    if (tag == null || tag.isEmpty) return 'Money Movement';
+    const map = {
+      'client_payment': 'Client Payment',
+      'loan_received': 'Loan Received',
+      'other_income': 'Other Income',
+      'business_expense': 'Business Expense',
+      'personal_partner': 'Personal / Partner',
+      'loan_given': 'Loan Given',
+      'loan_repayment': 'Loan Repayment',
+      'partner_funding': 'Partner Funding',
+      'partner_reimbursement': 'Partner Reimbursement',
+      'cash_in': 'Cash In',
+      'cash_out': 'Cash Out',
+      'handover_out': 'Handover Sent',
+      'handover_in': 'Handover Received',
+    };
+    return map[tag] ?? tag.replaceAll('_', ' ').toUpperCase();
+  }
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -107,7 +109,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
       if (res.statusCode >= 200 && res.statusCode < 300) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Handover confirmed!')));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Handover accepted & balance credited!')));
         }
         _fetchNotifs();
       } else {
@@ -115,7 +117,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error confirming transfer')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error accepting handover')));
+      }
+    } finally {
+      setState(() => _confirmingId = null);
+    }
+  }
+
+  Future<void> _disputeTransfer(String id) async {
+    final app = context.read<AppState>();
+    setState(() => _confirmingId = id);
+    try {
+      final url = Uri.parse('${app.apiBaseUrl}/custody/transfers/$id/dispute');
+      final res = await http.post(
+        url,
+        headers: {'Authorization': 'Bearer ${app.token}', 'x-company-id': app.user!.companyId},
+      );
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Handover rejected.')));
+        }
+        _fetchNotifs();
+      } else {
+        throw Exception();
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error rejecting handover')));
       }
     } finally {
       setState(() => _confirmingId = null);
@@ -209,19 +237,37 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ],
             const SizedBox(height: 12),
             if (isMine)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.confirmedBg,
-                    foregroundColor: AppTheme.confirmedText,
-                    side: const BorderSide(color: AppTheme.confirmedBorder),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.expenseText,
+                        side: const BorderSide(color: AppTheme.expenseBorder),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: _confirmingId == t['id'] ? null : () => _disputeTransfer(t['id']),
+                      icon: const Icon(Icons.cancel_outlined, size: 16),
+                      label: const Text('Reject'),
+                    ),
                   ),
-                  onPressed: _confirmingId == t['id'] ? null : () => _confirmTransfer(t['id']),
-                  icon: _confirmingId == t['id'] ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check_circle_outline, size: 18),
-                  label: Text(_confirmingId == t['id'] ? 'Confirming...' : 'Confirm Receipt'),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.confirmedBg,
+                        foregroundColor: AppTheme.confirmedText,
+                        side: const BorderSide(color: AppTheme.confirmedBorder),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: _confirmingId == t['id'] ? null : () => _confirmTransfer(t['id']),
+                      icon: _confirmingId == t['id']
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.check_circle_outline, size: 16),
+                      label: Text(_confirmingId == t['id'] ? 'Processing...' : 'Accept'),
+                    ),
+                  ),
+                ],
               ),
           ],
         ),

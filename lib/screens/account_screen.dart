@@ -99,6 +99,30 @@ class _AccountScreenState extends State<AccountScreen> {
             }
             continue;
           }
+
+          // ── Explicit Handover KPI handling ──
+          if (tag == 'handover_in') {
+            i += amt;
+            infs.add(m);
+            continue;
+          }
+          if (tag == 'handover_out') {
+            o += amt;
+            outfs.add(m);
+            if (fee > 0) {
+              e += fee;
+              exps.add({
+                'uiType': 'fee',
+                'title': 'Handover Fee',
+                'amount': fee,
+                'date': m['date'],
+                'notes': m['notes'] ?? m['note'] ?? m['metadata']?['note'] ?? m['metadata']?['notes'],
+                'channel': m['channel'] ?? m['metadata']?['channel'],
+              });
+            }
+            continue;
+          }
+
           final dirTab = (m['metadata']?['directionTab'] ?? '').toString().toLowerCase();
           final movementType = (m['metadata']?['movementType'] ?? '').toString().toLowerCase();
           final categoryStr = (m['metadata']?['category'] ?? '').toString();
@@ -154,38 +178,11 @@ class _AccountScreenState extends State<AccountScreen> {
           transfers = rawTransfers['transfers'];
         }
         for (var t in transfers) {
+          final status = (t['status'] ?? '').toString().toLowerCase();
+          // Confirmed transfers are already tracked via generated MoneyMovement records (handover_out / handover_in)
+          if (status == 'confirmed') continue;
           t['uiType'] = 'transfer';
           t['date'] = DateTime.tryParse(t['requestedAt'] ?? t['createdAt'] ?? '') ?? DateTime.now();
-
-          final status = (t['status'] ?? '').toString().toLowerCase();
-          if (status == 'confirmed') {
-            final amt = _toDouble(t['amount']);
-            final fee = _toDouble(t['fee'] ?? t['metadata']?['fee']);
-            final isOutgoing = t['fromCustodianId'] == cId || t['from_custodian_id'] == cId;
-            t['isOut'] = isOutgoing;
-
-            if (isOutgoing) {
-              o += amt;
-              outfs.add(t);
-              if (fee > 0) {
-                e += fee;
-                exps.add({
-                  'uiType': 'fee',
-                  'title': 'Handover Transfer Fee',
-                  'amount': fee,
-                  'date': t['date'],
-                  'notes': t['notes'] ?? t['note'] ?? t['metadata']?['note'] ?? t['metadata']?['notes'],
-                  'channel': t['channel'] ?? t['metadata']?['channel'],
-                });
-              }
-            } else {
-              i += amt;
-              infs.add(t);
-              if (fee > 0) {
-                e += fee;
-              }
-            }
-          }
         }
       }
 
@@ -641,6 +638,8 @@ class _AccountScreenState extends State<AccountScreen> {
       'partner_reimbursement': 'Partner Reimbursement',
       'cash_in': 'Cash In',
       'cash_out': 'Cash Out',
+      'handover_out': 'Handover Sent',
+      'handover_in': 'Handover Received',
     };
     return map[tag] ?? tag.replaceAll('_', ' ').toUpperCase();
   }

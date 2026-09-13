@@ -6,8 +6,6 @@ import 'package:uuid/uuid.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/models/models.dart';
-import 'package:task_boss/models/wallet_model.dart';
-import 'package:task_boss/models/payment_methods.dart';
 
 class CustodyHandoverScreen extends StatefulWidget {
   const CustodyHandoverScreen({super.key});
@@ -211,7 +209,7 @@ class _HandoverState extends State<CustodyHandoverScreen> {
             const Text('From Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 6),
             DropdownButtonFormField<Wallet>(
-              value: app.wallets.contains(_selectedWallet) ? _selectedWallet : (app.wallets.isNotEmpty ? app.wallets.first : null),
+              initialValue: app.wallets.contains(_selectedWallet) ? _selectedWallet : (app.wallets.isNotEmpty ? app.wallets.first : null),
               decoration: _inputDec('Select Wallet'),
               items: app.wallets.map((w) {
                 return DropdownMenuItem<Wallet>(
@@ -255,7 +253,7 @@ class _HandoverState extends State<CustodyHandoverScreen> {
                     : (rails.isNotEmpty ? rails.first : 'Physical Cash');
 
                 return DropdownButtonFormField<String>(
-                  value: currentMethod,
+                  initialValue: currentMethod,
                   decoration: _inputDec('Select Rail'),
                   items: rails.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
                   onChanged: (v) {

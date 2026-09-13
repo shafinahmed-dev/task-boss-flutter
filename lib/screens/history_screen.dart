@@ -43,6 +43,8 @@ class _HistoryState extends State<HistoryScreen> {
       'partner_reimbursement': 'Partner Reimbursement',
       'cash_in': 'Cash In',
       'cash_out': 'Cash Out',
+      'handover_out': 'Handover Sent',
+      'handover_in': 'Handover Received',
     };
     return map[tag] ?? tag.replaceAll('_', ' ').toUpperCase();
   }
@@ -107,6 +109,8 @@ String? _parseNote(dynamic item) {
           tList = rawTransfers['transfers'];
         }
         for (var tc in tList) {
+          final status = (tc['status'] ?? '').toString().toLowerCase();
+          if (status == 'confirmed') continue;
           tc['uiType'] = 'transfer';
           tc['date'] = DateTime.tryParse(tc['requestedAt'] ?? tc['createdAt'] ?? '') ?? DateTime.now();
           tc['isOut'] = tc['fromCustodianId'] == cId || tc['from_custodian_id'] == cId;
@@ -117,6 +121,7 @@ String? _parseNote(dynamic item) {
       final sorted = mergedMap.values.toList()..sort((a, b) => b['date'].compareTo(a['date']));
       if (mounted) {
         setState(() { _items = sorted; });
+        debugPrint('History Movements Count: ${_items.length}');
       }
     } catch (_) {
     } finally {
@@ -163,6 +168,162 @@ String? _parseNote(dynamic item) {
 
     final tagLabel = _formatTag(tag);
 
+    final bool isHandoverOut = tag == 'handover_out';
+    final meta = it['metadata'] is Map ? it['metadata'] : {};
+    final refNo = meta['voucherNumber'] ?? it['receiptNo'] ?? '';
+    final senderName = meta['senderName'] ?? '';
+    final recipientName = meta['recipientName'] ?? '';
+    final paymentMethod = (meta['paymentMethod'] ?? it['paymentMethod'] ?? it['channel'] ?? '').toString().toUpperCase();
+
+    if (isHandoverOut) {
+      final title = recipientName.isNotEmpty ? recipientName : 'Handover Sent';
+      final badgeText = 'CASH OUT • ${paymentMethod.isNotEmpty ? paymentMethod : "CASH"}';
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppTheme.cardBorder)),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                    ),
+                  ),
+                  if (refNo.isNotEmpty)
+                    Text('Ref: $refNo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.secondaryText)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryText),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '-৳${amt.toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFFB45309)),
+                      ),
+                      if (fee > 0)
+                        Text(
+                          'Fee: ৳${fee.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 11, color: AppTheme.expenseText, fontStyle: FontStyle.italic, fontWeight: FontWeight.bold),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              if (note != null && note.toString().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: AppTheme.inputBg, borderRadius: BorderRadius.circular(6)),
+                  child: Text('Note: ${note.toString()}', style: const TextStyle(fontSize: 12, color: AppTheme.primaryText)),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    final bool isHandoverIn = tag == 'handover_in';
+    if (isHandoverIn) {
+      final title = senderName.isNotEmpty ? senderName : 'Handover Received';
+      final badgeText = 'CASH IN • ${paymentMethod.isNotEmpty ? paymentMethod : "CASH"}';
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppTheme.cardBorder)),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.inflowBg,
+                      border: Border.all(color: AppTheme.inflowBorder),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.inflowText),
+                    ),
+                  ),
+                  if (refNo.isNotEmpty)
+                    Text('Ref: $refNo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.secondaryText)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryText),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '+৳${amt.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppTheme.inflowText),
+                  ),
+                ],
+              ),
+              if (note != null && note.toString().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: AppTheme.inputBg, borderRadius: BorderRadius.circular(6)),
+                  child: Text('Note: ${note.toString()}', style: const TextStyle(fontSize: 12, color: AppTheme.primaryText)),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
     final bool isExpense = dirTab == 'expense' ||
                            movementType == 'expense' ||
                            (tag == 'business_expense' && dirTab != 'out' && movementType != 'cash out');
@@ -176,7 +337,6 @@ String? _parseNote(dynamic item) {
 
     String badgeLabel = isCashIn ? 'CASH IN' : (isCashOut ? 'CASH OUT' : 'EXPENSE');
     final walletName = (it['wallet']?['name'] ?? it['metadata']?['walletName'] ?? '').toString();
-    final paymentMethod = (it['metadata']?['paymentMethod'] ?? '').toString();
     String railInfo = '';
     if (walletName.isNotEmpty && paymentMethod.isNotEmpty) {
       railInfo = '$walletName • $paymentMethod';
