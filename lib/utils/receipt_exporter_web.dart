@@ -15,7 +15,7 @@ Future<void> exportReceiptImage(GlobalKey key, String filename) async {
     final pngBytes = byteData.buffer.asUint8List();
     final blob = html.Blob([pngBytes]);
     final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
+    html.AnchorElement(href: url)
       ..setAttribute('download', '$filename.png')
       ..click();
     html.Url.revokeObjectUrl(url);

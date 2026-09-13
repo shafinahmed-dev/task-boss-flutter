@@ -182,18 +182,6 @@ class _CaptureState extends State<CaptureMovementScreen> {
     }
   }
 
-  IconData _getWalletIcon(String type) {
-    switch (type.toUpperCase()) {
-      case 'MFS':
-        return Icons.phone_android;
-      case 'BANK':
-        return Icons.account_balance;
-      case 'CASH':
-      default:
-        return Icons.money;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();

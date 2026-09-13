@@ -140,10 +140,10 @@ class TransactionReceiptTicket extends StatelessWidget {
             shape: BoxShape.circle,
             border: Border.all(color: const Color(0x331D4ED8), width: 1),
           ),
-          child: Center(
+          child: const Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: const [
+              children: [
                 Text(
                   'TASK DNC',
                   style: TextStyle(color: Color(0x551D4ED8), fontSize: 8, fontWeight: FontWeight.w800, letterSpacing: 0.8),

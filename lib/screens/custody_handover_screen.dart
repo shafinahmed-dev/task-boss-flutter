@@ -30,14 +30,6 @@ class _HandoverState extends State<CustodyHandoverScreen> {
   String? _success;
   Map<String, dynamic>? _lastSavedReceipt;
 
-  IconData _getWalletIcon(String type) {
-    switch (type.toUpperCase()) {
-      case 'MFS': return Icons.phone_android;
-      case 'BANK': return Icons.account_balance;
-      case 'CASH': default: return Icons.money;
-    }
-  }
-
   @override
   void initState() {
     super.initState();

@@ -427,12 +427,12 @@ String? _parseNote(dynamic item) {
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: const BorderRadius.all(Radius.circular(6)),
                       border: Border.all(color: const Color(0xFFBFDBFE)),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
+                      children: [
                         Icon(Icons.download_rounded, size: 14, color: Color(0xFF2563EB)),
                         SizedBox(width: 4),
                         Text('Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
@@ -562,12 +562,12 @@ String? _parseNote(dynamic item) {
                         margin: const EdgeInsets.only(right: 6),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: const BorderRadius.all(Radius.circular(6)),
                           border: Border.all(color: const Color(0xFFBFDBFE)),
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
+                          children: [
                             Icon(Icons.download_rounded, size: 14, color: Color(0xFF2563EB)),
                             SizedBox(width: 4),
                             Text('Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
