@@ -34,82 +34,86 @@ class TransactionReceiptTicket extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
         boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 16, offset: Offset(0, 4))],
       ),
-      child: Stack(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Positioned.fill(
-            child: Center(
-              child: Transform.rotate(
-                angle: -12 * (math.pi / 180),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0x331E40AF), width: 3),
-                    borderRadius: BorderRadius.circular(8),
-                    color: const Color(0x0C1E40AF),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Text('TASK DESIGN & CONSULTANCY', style: TextStyle(color: Color(0x441E40AF), fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-                      Text('VERIFIED & RECORDED', style: TextStyle(color: Color(0x441E40AF), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 2.0)),
-                      Text('TASK DNC', style: TextStyle(color: Color(0x441E40AF), fontSize: 9, fontWeight: FontWeight.w900)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          const Text(
+            'TASK DESIGN & CONSULTANCY',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
           ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          const SizedBox(height: 2),
+          const Text(
+            'Transaction Receipt',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('TASK DESIGN & CONSULTANCY', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              const Text('Task DNC • Financial Transaction Voucher', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Receipt No: #${receiptNo.startsWith('#') ? receiptNo.substring(1) : receiptNo}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
-                  Text('Date: $formattedDate', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                ],
+              Text(
+                'Receipt No: #${receiptNo.startsWith('#') ? receiptNo.substring(1) : receiptNo}',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
               ),
-              const SizedBox(height: 10),
-              _dashedDivider(),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(child: _gridItem('Transaction Type', type)),
-                  Expanded(child: _gridItem(type.contains('Transfer') || type.contains('Handover') ? 'Recipient / Sender' : 'Category', categoryOrRecipient)),
-                ],
+              Text(
+                'Date: $formattedDate',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF334155)),
               ),
-              const SizedBox(height: 10),
-              Row(
+            ],
+          ),
+          const SizedBox(height: 10),
+          _dashedDivider(),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _gridItem('Transaction Type', type)),
+              Expanded(child: _gridItem(type.contains('Transfer') || type.contains('Handover') ? 'Recipient / Sender' : 'Category', categoryOrRecipient)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _gridItem('Wallet / Account', wallet)),
+              Expanded(child: _gridItem('Method', method)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _gridItem('Note', note.isEmpty ? 'N/A' : note),
+          const SizedBox(height: 10),
+          _dashedDivider(),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _gridItem('Wallet / Account', wallet)),
-                  Expanded(child: _gridItem('Method', method)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _gridItem('Note', note.isEmpty ? 'N/A' : note),
-              const SizedBox(height: 10),
-              _dashedDivider(),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Amount: ৳${amount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
-                      Text('Fee: ৳${fee.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
-                    ],
+                  Text(
+                    'Amount: ৳${amount.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1E293B)),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text('TOTAL AMOUNT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-                      Text('৳${total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                    ],
+                  const SizedBox(height: 2),
+                  Text(
+                    'Fee: ৳${fee.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1E293B)),
+                  ),
+                ],
+              ),
+              _buildCircularStamp(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    'TOTAL AMOUNT',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '৳${total.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                   ),
                 ],
               ),
@@ -120,10 +124,55 @@ class TransactionReceiptTicket extends StatelessWidget {
     );
   }
 
+  Widget _buildCircularStamp() {
+    return Transform.rotate(
+      angle: -12 * (math.pi / 180),
+      child: Container(
+        width: 86,
+        height: 86,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0x441D4ED8), width: 2),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0x331D4ED8), width: 1),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  'TASK DNC',
+                  style: TextStyle(color: Color(0x551D4ED8), fontSize: 8, fontWeight: FontWeight.w800, letterSpacing: 0.8),
+                ),
+                SizedBox(height: 1),
+                Text(
+                  'VERIFIED',
+                  style: TextStyle(color: Color(0x661D4ED8), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                ),
+                SizedBox(height: 1),
+                Text(
+                  'OFFICIAL',
+                  style: TextStyle(color: Color(0x551D4ED8), fontSize: 7.5, fontWeight: FontWeight.w800, letterSpacing: 1.0),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _gridItem(String l, String v) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+          Text(
+            l.toUpperCase(),
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+          ),
           const SizedBox(height: 2),
           Text(v, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
         ],
