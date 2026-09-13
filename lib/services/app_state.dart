@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -19,7 +20,12 @@ class AppState extends ChangeNotifier {
   bool isReady = false;
   List<Wallet> wallets = [];
 
-  final String apiBaseUrl = 'http://localhost:3000';
+  static const String _defaultApiUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: kIsWeb ? 'http://localhost:3000' : 'http://192.168.1.45:3000',
+  );
+
+  final String apiBaseUrl = _defaultApiUrl;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
