@@ -31,7 +31,7 @@ class _HistoryState extends State<HistoryScreen> {
   }
 
   String _formatTag(String? tag) {
-    if (tag == null || tag.isEmpty) return 'Money Movement';
+    if (tag == null || tag.isEmpty) return 'Movement';
     const map = {
       'client_payment': 'Client Payment',
       'loan_received': 'Loan Received',
@@ -49,28 +49,33 @@ class _HistoryState extends State<HistoryScreen> {
     };
     return map[tag] ?? tag.replaceAll('_', ' ').toUpperCase();
   }
-String? _parseNote(dynamic item) {
-  if (item == null) return null;
-  dynamic raw = item['notes'] ?? item['note'] ?? item['description'] ?? item['metadata']?['note'] ?? item['metadata']?['notes'];
-  if (raw == null) return null;
-  final str = raw.toString().trim();
-  if (str.isEmpty) return null;
-  
-  if (str.startsWith('{') && str.endsWith('}')) {
-    try {
-      final decoded = jsonDecode(str);
-      if (decoded is Map) {
-        final inner = decoded['note'] ?? decoded['notes'] ?? decoded['description'];
-        if (inner != null && inner.toString().trim().isNotEmpty) {
-          return inner.toString().trim();
-        }
-        return null;
-      }
-    } catch (_) {}
-  }
-  return str;
-}
 
+  String? _parseNote(dynamic item) {
+    if (item == null) return null;
+    dynamic raw = item['notes'] ??
+        item['note'] ??
+        item['description'] ??
+        item['metadata']?['note'] ??
+        item['metadata']?['notes'];
+    if (raw == null) return null;
+    final str = raw.toString().trim();
+    if (str.isEmpty) return null;
+
+    if (str.startsWith('{') && str.endsWith('}')) {
+      try {
+        final decoded = jsonDecode(str);
+        if (decoded is Map) {
+          final inner =
+              decoded['note'] ?? decoded['notes'] ?? decoded['description'];
+          if (inner != null && inner.toString().trim().isNotEmpty) {
+            return inner.toString().trim();
+          }
+          return null;
+        }
+      } catch (_) {}
+    }
+    return str;
+  }
 
   Future<void> _fetch() async {
     final app = context.read<AppState>();
@@ -79,10 +84,11 @@ String? _parseNote(dynamic item) {
     try {
       final cId = app.user!.custodianId;
       final cmp = app.user!.companyId;
-      final headers = {'Authorization': 'Bearer ${app.token}', 'x-company-id': cmp};
 
-      final mUri = Uri.parse('${app.apiBaseUrl}/ledger/custodians/$cId/movements?companyId=$cmp');
-      final tUri = Uri.parse('${app.apiBaseUrl}/custody/transfers?custodianId=$cId&companyId=$cmp');
+      final mUri = Uri.parse(
+          '${app.apiBaseUrl}/ledger/custodians/$cId/movements?companyId=$cmp');
+      final tUri = Uri.parse(
+          '${app.apiBaseUrl}/custody/transfers?custodianId=$cId&companyId=$cmp');
 
       final results = await Future.wait([
         app.authRequest('GET', mUri).catchError((_) => http.Response('{}', 500)),
@@ -96,7 +102,9 @@ String? _parseNote(dynamic item) {
         final items = mData['items'] as List? ?? [];
         for (var mc in items) {
           mc['uiType'] = 'movement';
-          mc['date'] = DateTime.tryParse(mc['occurredAt'] ?? mc['createdAt'] ?? '') ?? DateTime.now();
+          mc['date'] = DateTime.tryParse(
+                  mc['occurredAt'] ?? mc['createdAt'] ?? '') ??
+              DateTime.now();
           mergedMap[mc['id']] = mc;
         }
       }
@@ -113,19 +121,24 @@ String? _parseNote(dynamic item) {
           final status = (tc['status'] ?? '').toString().toLowerCase();
           if (status == 'confirmed') continue;
           tc['uiType'] = 'transfer';
-          tc['date'] = DateTime.tryParse(tc['requestedAt'] ?? tc['createdAt'] ?? '') ?? DateTime.now();
-          tc['isOut'] = tc['fromCustodianId'] == cId || tc['from_custodian_id'] == cId;
+          tc['date'] = DateTime.tryParse(
+                  tc['requestedAt'] ?? tc['createdAt'] ?? '') ??
+              DateTime.now();
+          tc['isOut'] =
+              tc['fromCustodianId'] == cId || tc['from_custodian_id'] == cId;
           mergedMap[tc['id']] = tc;
         }
       }
 
-      final sorted = mergedMap.values.toList()..sort((a, b) => b['date'].compareTo(a['date']));
+      final sorted = mergedMap.values.toList()
+        ..sort((a, b) => b['date'].compareTo(a['date']));
       if (mounted) {
-        setState(() { _items = sorted; });
-        debugPrint('History Movements Count: ${_items.length}');
+        setState(() {
+          _items = sorted;
+          _loading = false;
+        });
       }
     } catch (_) {
-    } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -133,540 +146,397 @@ String? _parseNote(dynamic item) {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.canvas,
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Transaction History'),
+        backgroundColor: Colors.white,
+        foregroundColor: AppTheme.primaryText,
+        elevation: 0,
+      ),
       body: RefreshIndicator(
         onRefresh: _fetch,
         child: _loading && _items.isEmpty
             ? const Center(child: CircularProgressIndicator())
             : _items.isEmpty
-                ? const Center(child: Text('No transaction history found.', style: TextStyle(color: AppTheme.secondaryText)))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                ? const Center(
+                    child: Text(
+                      'No transaction history found.',
+                      style: TextStyle(color: AppTheme.secondaryText),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: _items.length,
-                    itemBuilder: (c, i) {
-                      final it = _items[i];
-                      if (it['uiType'] == 'transfer') return _buildTransfer(it);
-                      return _buildMovement(it);
+                    separatorBuilder: (context, index) =>
+                        Divider(height: 1, color: Colors.grey.shade200),
+                    itemBuilder: (context, index) {
+                      final it = _items[index];
+                      return _HistoryTransactionRow(
+                        item: it,
+                        formatTag: _formatTag,
+                        parseNote: _parseNote,
+                      );
                     },
                   ),
       ),
     );
   }
+}
 
-  Widget _buildMovement(dynamic it) {
-    final dir = (it['direction'] ?? '').toString().toLowerCase();
-    final tag = (it['entryTag'] ?? '').toString().toLowerCase();
-    final dirTab = (it['metadata']?['directionTab'] ?? '').toString().toLowerCase();
-    final movementType = (it['metadata']?['movementType'] ?? '').toString().toLowerCase();
-    final category = it['metadata']?['category'] ?? it['category'] ?? it['metadata']?['rawTag'];
-    final categoryStr = (category ?? '').toString();
+class _HistoryTransactionRow extends StatefulWidget {
+  final dynamic item;
+  final String Function(String?) formatTag;
+  final String? Function(dynamic) parseNote;
+
+  const _HistoryTransactionRow({
+    required this.item,
+    required this.formatTag,
+    required this.parseNote,
+  });
+
+  @override
+  State<_HistoryTransactionRow> createState() => _HistoryTransactionRowState();
+}
+
+class _HistoryTransactionRowState extends State<_HistoryTransactionRow> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final it = widget.item;
+    final isTransfer = it['uiType'] == 'transfer';
     final amt = _toDouble(it['amount']);
     final fee = _toDouble(it['fee'] ?? it['metadata']?['fee']);
-    final channel = (it['channel'] ?? it['metadata']?['channel'] ?? '').toString().toUpperCase();
-    final note = _parseNote(it);
     final date = (it['date'] as DateTime).toLocal();
-    final dateStr = "${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')} ${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}";
+    final dateStr =
+        "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
 
-    final tagLabel = _formatTag(tag);
+    final note = widget.parseNote(it);
 
-    final bool isHandoverOut = tag == 'handover_out';
-    final meta = it['metadata'] is Map ? it['metadata'] : {};
-    final refNo = meta['voucherNumber'] ?? it['receiptNo'] ?? '';
-    final senderName = meta['senderName'] ?? '';
-    final recipientName = meta['recipientName'] ?? '';
-    final paymentMethod = (meta['paymentMethod'] ?? it['paymentMethod'] ?? it['channel'] ?? '').toString().toUpperCase();
+    bool isOutflow = false;
+    bool isHandover = false;
+    String title = '';
+    String sourceBank = '';
+    String paymentMethod = '';
+    String fullRef = '';
+    String categoryOrRecipient = '';
+    String receiptType = '';
 
-    if (isHandoverOut) {
-      final title = recipientName.isNotEmpty ? recipientName : 'Handover Sent';
-      final badgeText = 'CASH OUT • ${paymentMethod.isNotEmpty ? paymentMethod : "CASH"}';
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppTheme.cardBorder)),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    if (isTransfer) {
+      isHandover = true;
+      isOutflow = it['isOut'] == true;
+      final cp = isOutflow
+          ? (it['toCustodian'] ?? it['to_custodian'])
+          : (it['fromCustodian'] ?? it['from_custodian']);
+      final cpName = cp?['name'] ?? 'Custodian Account';
+
+      title = isOutflow ? 'Handover: $cpName' : 'Handover: $cpName';
+      categoryOrRecipient = cpName;
+      receiptType = isOutflow ? 'Handover Sent' : 'Handover Received';
+
+      sourceBank =
+          it['walletName'] ?? it['metadata']?['walletName'] ?? 'Main Wallet';
+      paymentMethod = (it['channel'] ?? it['metadata']?['channel'] ?? 'TRANSFER')
+          .toString()
+          .toUpperCase();
+
+      fullRef = it['receiptNo'] ??
+          'HND-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : (it['id'] ?? '')}';
+    } else {
+      final dir = (it['direction'] ?? '').toString().toLowerCase();
+      final tag = (it['entryTag'] ?? '').toString().toLowerCase();
+      isOutflow = dir == 'out';
+      isHandover = tag == 'handover_out' || tag == 'handover_in';
+
+      final meta = it['metadata'] is Map ? it['metadata'] : {};
+      final category = meta['category'] ?? it['category'] ?? meta['rawTag'];
+      final tagLabel = widget.formatTag(tag);
+
+      final senderName = meta['senderName'] ?? '';
+      final recipientName = meta['recipientName'] ?? '';
+
+      if (tag == 'handover_out') {
+        title = recipientName.isNotEmpty
+            ? 'Handover: $recipientName'
+            : 'Handover Sent';
+        categoryOrRecipient = recipientName.isNotEmpty ? recipientName : 'Handover';
+      } else if (tag == 'handover_in') {
+        title = senderName.isNotEmpty
+            ? 'Handover: $senderName'
+            : 'Handover Received';
+        categoryOrRecipient = senderName.isNotEmpty ? senderName : 'Handover';
+      } else {
+        title = (category != null && category.toString().trim().isNotEmpty)
+            ? category.toString().trim()
+            : tagLabel;
+        categoryOrRecipient = (category != null && category.toString().trim().isNotEmpty)
+            ? category.toString().trim()
+            : (senderName.isNotEmpty
+                ? senderName
+                : (recipientName.isNotEmpty ? recipientName : tagLabel));
+      }
+
+      sourceBank = meta['walletName'] ?? it['walletName'] ?? 'Main Wallet';
+      paymentMethod = (meta['paymentMethod'] ??
+              it['paymentMethod'] ??
+              it['channel'] ??
+              'CASH')
+          .toString()
+          .toUpperCase();
+
+      fullRef = it['receiptNo'] ??
+          meta['voucherNumber'] ??
+          'TRX-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : (it['id'] ?? '')}';
+
+      receiptType = isHandover
+          ? (isOutflow ? 'Handover Sent' : 'Handover Received')
+          : (!isOutflow
+              ? 'Cash In'
+              : (tagLabel.toLowerCase().contains('expense')
+                  ? 'Expense'
+                  : 'Cash Out'));
+    }
+
+    final Color avatarBg;
+    final Color avatarIconColor;
+    final IconData avatarIcon;
+
+    if (isHandover) {
+      avatarBg = const Color(0xFFEFF6FF);
+      avatarIconColor = const Color(0xFF2563EB);
+      avatarIcon = Icons.swap_horiz_rounded;
+    } else if (isOutflow) {
+      avatarBg = const Color(0xFFFEF2F2);
+      avatarIconColor = const Color(0xFFDC2626);
+      avatarIcon = Icons.arrow_upward_rounded;
+    } else {
+      avatarBg = const Color(0xFFF0FDF4);
+      avatarIconColor = const Color(0xFF16A34A);
+      avatarIcon = Icons.arrow_downward_rounded;
+    }
+
+    String shortRef = fullRef;
+    if (shortRef.startsWith('TRX-') && shortRef.length > 10) {
+      shortRef = shortRef.substring(4);
+    } else if (shortRef.startsWith('HND-') && shortRef.length > 10) {
+      shortRef = shortRef.substring(4);
+    }
+    if (shortRef.length > 8) {
+      shortRef = shortRef.substring(0, 8);
+    }
+
+    final metaSubtitle = '$sourceBank • $paymentMethod • $dateStr';
+
+    return Material(
+      color: Colors.white,
+      child: InkWell(
+        onTap: () => setState(() => _expanded = !_expanded),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      border: Border.all(color: const Color(0xFFFDE68A)),
-                      borderRadius: BorderRadius.circular(6),
+                      color: avatarBg,
+                      shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      badgeText,
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
-                    ),
+                    alignment: Alignment.center,
+                    child: Icon(avatarIcon, color: avatarIconColor, size: 22),
                   ),
-                  if (refNo.isNotEmpty)
-                    Text('Ref: $refNo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.secondaryText)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryText),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primaryText,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
-                        Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
+                        const SizedBox(height: 3),
+                        Text(
+                          metaSubtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '-৳${amt.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFFB45309)),
+                        '${isOutflow ? '-' : '+'}৳${amt.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: isOutflow
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFF16A34A),
+                        ),
                       ),
-                      if (fee > 0)
-                        Text(
-                          'Fee: ৳${fee.toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 11, color: AppTheme.expenseText, fontStyle: FontStyle.italic, fontWeight: FontWeight.bold),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-              if (note != null && note.toString().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: AppTheme.inputBg, borderRadius: BorderRadius.circular(6)),
-                  child: Text('Note: ${note.toString()}', style: const TextStyle(fontSize: 12, color: AppTheme.primaryText)),
-                ),
-              ],
-            ],
-          ),
-        ),
-      );
-    }
-
-    final bool isHandoverIn = tag == 'handover_in';
-    if (isHandoverIn) {
-      final title = senderName.isNotEmpty ? senderName : 'Handover Received';
-      final badgeText = 'CASH IN • ${paymentMethod.isNotEmpty ? paymentMethod : "CASH"}';
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppTheme.cardBorder)),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.inflowBg,
-                      border: Border.all(color: AppTheme.inflowBorder),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      badgeText,
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.inflowText),
-                    ),
-                  ),
-                  if (refNo.isNotEmpty)
-                    Text('Ref: $refNo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.secondaryText)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryText),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '+৳${amt.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppTheme.inflowText),
-                  ),
-                ],
-              ),
-              if (note != null && note.toString().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: AppTheme.inputBg, borderRadius: BorderRadius.circular(6)),
-                  child: Text('Note: ${note.toString()}', style: const TextStyle(fontSize: 12, color: AppTheme.primaryText)),
-                ),
-              ],
-            ],
-          ),
-        ),
-      );
-    }
-
-    final bool isExpense = dirTab == 'expense' ||
-                           movementType == 'expense' ||
-                           (tag == 'business_expense' && dirTab != 'out' && movementType != 'cash out');
-
-    final bool isCashOut = (dir == 'out' && !isExpense) ||
-                           dirTab == 'out' ||
-                           movementType == 'cash out' ||
-                           tag == 'outflow';
-
-    final bool isCashIn = dir == 'in' || dirTab == 'in' || movementType == 'cash in';
-
-    String badgeLabel = isCashIn ? 'CASH IN' : (isCashOut ? 'CASH OUT' : 'EXPENSE');
-    final walletName = (it['wallet']?['name'] ?? it['metadata']?['walletName'] ?? '').toString();
-    String railInfo = '';
-    if (walletName.isNotEmpty && paymentMethod.isNotEmpty) {
-      railInfo = '$walletName • $paymentMethod';
-    } else if (walletName.isNotEmpty) {
-      railInfo = walletName;
-    } else if (paymentMethod.isNotEmpty) {
-      railInfo = paymentMethod;
-    } else if (channel.isNotEmpty) {
-      railInfo = channel;
-    }
-    if (railInfo.isNotEmpty) badgeLabel += ' • $railInfo';
-
-    Color badgeBg;
-    Color badgeBorder;
-    Color badgeText;
-    Color amtColor;
-
-    if (isCashIn) {
-      badgeBg = AppTheme.inflowBg;
-      badgeBorder = AppTheme.inflowBorder;
-      badgeText = AppTheme.inflowText;
-      amtColor = AppTheme.inflowText;
-    } else if (isCashOut) {
-      badgeBg = const Color(0xFFFEF3C7);
-      badgeBorder = const Color(0xFFFDE68A);
-      badgeText = const Color(0xFFB45309);
-      amtColor = const Color(0xFFB45309);
-    } else {
-      badgeBg = const Color(0xFFFEE2E2);
-      badgeBorder = const Color(0xFFFCA5A5);
-      badgeText = const Color(0xFFB91C1C);
-      amtColor = const Color(0xFFB91C1C);
-    }
-
-    final displayTitle = categoryStr.isNotEmpty ? categoryStr : tagLabel;
-    String subTag = categoryStr.isNotEmpty ? tagLabel : '';
-    if (isCashOut && subTag.toLowerCase() == 'business expense') {
-      subTag = '';
-    }
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppTheme.cardBorder)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: badgeBg,
-                    border: Border.all(color: badgeBorder),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    badgeLabel,
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeText),
-                  ),
-                ),
-                Flexible(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InkWell(
-                        onTap: () {
-                          final recNo = it['receiptNo'] ?? it['metadata']?['voucherNumber'] ?? 'TRX-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : (it['id'] ?? '')}';
-                          showReceiptModal(
-                            context,
-                            receiptNo: recNo,
-                            date: date,
-                            type: dir == 'in' ? 'Cash In' : (tagLabel.contains('Expense') ? 'Expense' : 'Cash Out'),
-                            categoryOrRecipient: displayTitle,
-                            wallet: walletName.isNotEmpty ? walletName : 'Wallet',
-                            method: paymentMethod.isNotEmpty ? paymentMethod : (channel.isNotEmpty ? channel : 'Cash'),
-                            note: note ?? '',
-                            amount: amt,
-                            fee: fee,
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
-                            borderRadius: const BorderRadius.all(Radius.circular(6)),
-                            border: Border.all(color: const Color(0xFFBFDBFE)),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.download_rounded, size: 14, color: Color(0xFF2563EB)),
-                              SizedBox(width: 4),
-                              Text('Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                            ],
-                          ),
+                      const SizedBox(height: 3),
+                      Text(
+                        fee > 0
+                            ? 'Fee: ৳${fee.toStringAsFixed(2)}'
+                            : 'Ref: $shortRef',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                          fontStyle:
+                              fee > 0 ? FontStyle.italic : FontStyle.normal,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  padding: const EdgeInsets.all(14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        displayTitle,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryText),
-                      ),
-                      if (subTag.isNotEmpty && subTag.toLowerCase() != displayTitle.toLowerCase()) ...[
-                        const SizedBox(height: 2),
-                        Text('Tag: $subTag', style: const TextStyle(fontSize: 11, color: AppTheme.secondaryText)),
-                      ],
-                      const SizedBox(height: 2),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
-                          const Text(' • ', style: TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
+                          const Text(
+                            'Full Ref: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryText,
+                            ),
+                          ),
                           Expanded(
-                            child: Text(
-                              'Ref: ${it['receiptNo'] ?? it['metadata']?['voucherNumber'] ?? 'TRX-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : ''}'}',
-                              style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11),
-                              overflow: TextOverflow.ellipsis,
+                            child: SelectableText(
+                              fullRef,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade700,
+                                fontFamily: 'monospace',
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${isCashIn ? '+' : '-'}৳${amt.toStringAsFixed(2)}',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: amtColor),
-                    ),
-                    if (fee > 0)
-                      Text(
-                        'Fee: ৳${fee.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 11, color: AppTheme.expenseText, fontStyle: FontStyle.italic),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-            if (note != null && note.toString().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppTheme.inputBg, borderRadius: BorderRadius.circular(6)),
-                child: Text('Note: ${note.toString()}', style: const TextStyle(fontSize: 12, color: AppTheme.primaryText)),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTransfer(dynamic it) {
-    final isOut = it['isOut'] == true;
-    final amt = _toDouble(it['amount']);
-    final fee = _toDouble(it['fee'] ?? it['metadata']?['fee']);
-    final status = (it['status'] ?? 'pending').toString().toUpperCase();
-    final channel = (it['channel'] ?? it['metadata']?['channel'] ?? '').toString().toUpperCase();
-    final counterparty = isOut ? (it['toCustodian'] ?? it['to_custodian']) : (it['fromCustodian'] ?? it['from_custodian']);
-    final cpName = counterparty?['name'] ?? 'Custodian Account';
-    final cpEmail = counterparty?['linkedUser']?['email'] ?? counterparty?['email'] ?? '';
-    final note = _parseNote(it);
-    final date = (it['date'] as DateTime).toLocal();
-    final dateStr = "${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')} ${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}";
-
-    final isConfirmed = status == 'CONFIRMED';
-    final isPending = status == 'PENDING';
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppTheme.cardBorder)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isOut ? AppTheme.pendingBg : AppTheme.inflowBg,
-                    border: Border.all(color: isOut ? AppTheme.pendingBorder : AppTheme.inflowBorder),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    (channel.isNotEmpty ? channel : "CASH").toUpperCase(),
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isOut ? AppTheme.pendingAccent : AppTheme.inflowText),
-                  ),
-                ),
-                Flexible(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InkWell(
-                        onTap: () {
-                          final recNo = it['receiptNo'] ?? 'HND-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : (it['id'] ?? '')}';
-                          showReceiptModal(
-                            context,
-                            receiptNo: recNo,
-                            date: date,
-                            type: isOut ? 'Handover Sent' : 'Handover Received',
-                            categoryOrRecipient: cpName,
-                            wallet: it['walletName'] ?? (it['metadata']?['walletName'] ?? 'Wallet'),
-                            method: channel.isNotEmpty ? channel : 'CASH',
-                            note: note ?? '',
-                            amount: amt,
-                            fee: fee,
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          margin: const EdgeInsets.only(right: 6),
+                      if (fee > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Text(
+                              'Fee Charged: ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.primaryText,
+                              ),
+                            ),
+                            Text(
+                              '৳${fee.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFFDC2626),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (note != null && note.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
-                            borderRadius: const BorderRadius.all(Radius.circular(6)),
-                            border: Border.all(color: const Color(0xFFBFDBFE)),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.download_rounded, size: 14, color: Color(0xFF2563EB)),
-                              SizedBox(width: 4),
-                              Text('Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: isConfirmed ? AppTheme.confirmedBg : isPending ? AppTheme.pendingBg : AppTheme.expenseBg,
-                          border: Border.all(color: isConfirmed ? AppTheme.confirmedBorder : isPending ? AppTheme.pendingBorder : AppTheme.expenseBorder),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          status,
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isConfirmed ? AppTheme.confirmedText : isPending ? AppTheme.pendingAccent : AppTheme.expenseText),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isOut ? 'Handover Sent' : 'Handover Received',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryText),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isOut ? 'To: $cpName' : 'From: $cpName',
-                        style: const TextStyle(color: AppTheme.secondaryText, fontSize: 12),
-                      ),
-                      if (cpEmail.isNotEmpty)
-                        Text(cpEmail, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
-                      Row(
-                        children: [
-                          Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
-                          const Text(' • ', style: TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
-                          Expanded(
-                            child: Text(
-                              'Ref: ${it['receiptNo'] ?? 'HND-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : ''}'}',
-                              style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11),
-                              overflow: TextOverflow.ellipsis,
+                          child: Text(
+                            'Notes: $note',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade800,
                             ),
                           ),
-                        ],
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            side: BorderSide(color: Colors.grey.shade300),
+                            padding: const EdgeInsets.symmetric(vertical: 11),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onPressed: () {
+                            showReceiptModal(
+                              context,
+                              receiptNo: fullRef,
+                              date: date,
+                              type: receiptType,
+                              categoryOrRecipient: categoryOrRecipient,
+                              wallet: sourceBank,
+                              method: paymentMethod,
+                              note: note ?? '',
+                              amount: amt,
+                              fee: fee,
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.receipt_long_rounded,
+                            size: 18,
+                            color: AppTheme.primaryText,
+                          ),
+                          label: const Text(
+                            'View & Download Digital Receipt',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryText,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${isOut ? '-' : '+'}৳${amt.toStringAsFixed(2)}',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isOut ? AppTheme.expenseText : AppTheme.inflowText),
-                    ),
-                    if (fee > 0)
-                      Text(
-                        'Fee: ৳${fee.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 11, color: AppTheme.expenseText, fontStyle: FontStyle.italic),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-            if (note != null && note.toString().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppTheme.inputBg, borderRadius: BorderRadius.circular(6)),
-                child: Text('Note: ${note.toString()}', style: const TextStyle(fontSize: 12, color: AppTheme.primaryText)),
               ),
-            ],
+              crossFadeState: _expanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+            ),
           ],
         ),
       ),
