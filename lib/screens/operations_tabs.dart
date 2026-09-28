@@ -39,27 +39,15 @@ class OperationsTabs extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Hello,', style: TextStyle(fontSize: 12, color: AppTheme.secondaryText)),
-                        Text(
-                          userName,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.primaryText),
-                        ),
-                      ],
+                    Text(
+                      userName,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.primaryText),
                     ),
                   ],
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('Total Balance', style: TextStyle(fontSize: 12, color: AppTheme.secondaryText)),
-                    Text(
-                      '৳${balance.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppTheme.primaryText),
-                    ),
-                  ],
+                Text(
+                  '৳${balance.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primaryText),
                 ),
               ],
             ),

@@ -407,14 +407,6 @@ String? _parseNote(dynamic item) {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
-                        child: Text(
-                          'Ref: ${it['receiptNo'] ?? it['metadata']?['voucherNumber'] ?? 'TRX-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : ''}'}',
-                          style: const TextStyle(fontSize: 10, color: AppTheme.secondaryText, fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       InkWell(
                         onTap: () {
                           final recNo = it['receiptNo'] ?? it['metadata']?['voucherNumber'] ?? 'TRX-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : (it['id'] ?? '')}';
@@ -471,7 +463,19 @@ String? _parseNote(dynamic item) {
                         Text('Tag: $subTag', style: const TextStyle(fontSize: 11, color: AppTheme.secondaryText)),
                       ],
                       const SizedBox(height: 2),
-                      Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
+                      Row(
+                        children: [
+                          Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
+                          const Text(' • ', style: TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
+                          Expanded(
+                            child: Text(
+                              'Ref: ${it['receiptNo'] ?? it['metadata']?['voucherNumber'] ?? 'TRX-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : ''}'}',
+                              style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -551,14 +555,6 @@ String? _parseNote(dynamic item) {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
-                        child: Text(
-                          'Ref: ${it['receiptNo'] ?? 'HND-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : ''}'}',
-                          style: const TextStyle(fontSize: 10, color: AppTheme.secondaryText, fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       InkWell(
                         onTap: () {
                           final recNo = it['receiptNo'] ?? 'HND-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : (it['id'] ?? '')}';
@@ -630,7 +626,19 @@ String? _parseNote(dynamic item) {
                       ),
                       if (cpEmail.isNotEmpty)
                         Text(cpEmail, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
-                      Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
+                      Row(
+                        children: [
+                          Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
+                          const Text(' • ', style: TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
+                          Expanded(
+                            child: Text(
+                              'Ref: ${it['receiptNo'] ?? 'HND-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : ''}'}',
+                              style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
