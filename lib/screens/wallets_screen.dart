@@ -83,7 +83,7 @@ class _WalletsScreenState extends State<WalletsScreen> {
                   'initialBalance': double.tryParse(initBalCtl.text.trim()) ?? 0.0,
                   'isDefault': isDefault,
                 };
-                final resp = await http.post(
+                final resp = await app.authRequest('POST',
                   Uri.parse('${app.apiBaseUrl}/wallets'),
                   headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ${app.token}'},
                   body: jsonEncode(payload),
@@ -195,7 +195,7 @@ class _WalletsScreenState extends State<WalletsScreen> {
                   'fee': double.tryParse(feeCtl.text.trim()) ?? 0.0,
                   'note': noteCtl.text.trim().isNotEmpty ? noteCtl.text.trim() : 'Internal Transfer',
                 };
-                final resp = await http.post(
+                final resp = await app.authRequest('POST',
                   Uri.parse('${app.apiBaseUrl}/wallets/transfer'),
                   headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ${app.token}'},
                   body: jsonEncode(payload),

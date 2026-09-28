@@ -85,8 +85,8 @@ String? _parseNote(dynamic item) {
       final tUri = Uri.parse('${app.apiBaseUrl}/custody/transfers?custodianId=$cId&companyId=$cmp');
 
       final results = await Future.wait([
-        http.get(mUri, headers: headers).catchError((_) => http.Response('{}', 500)),
-        http.get(tUri, headers: headers).catchError((_) => http.Response('[]', 500)),
+        app.authRequest('GET', mUri).catchError((_) => http.Response('{}', 500)),
+        app.authRequest('GET', tUri).catchError((_) => http.Response('[]', 500)),
       ]);
 
       final Map<String, dynamic> mergedMap = {};
@@ -389,55 +389,67 @@ String? _parseNote(dynamic item) {
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: badgeBg,
-                      border: Border.all(color: badgeBorder),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      badgeLabel,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeText),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    border: Border.all(color: badgeBorder),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    badgeLabel,
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeText),
                   ),
                 ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () {
-                    final recNo = it['receiptNo'] ?? it['metadata']?['voucherNumber'] ?? 'TRX-${(it['id'] ?? '').toString().substring(0, 8).toUpperCase()}';
-                    showReceiptModal(
-                      context,
-                      receiptNo: recNo,
-                      date: date,
-                      type: dir == 'in' ? 'Cash In' : (tagLabel.contains('Expense') ? 'Expense' : 'Cash Out'),
-                      categoryOrRecipient: displayTitle,
-                      wallet: walletName.isNotEmpty ? walletName : 'Wallet',
-                      method: paymentMethod.isNotEmpty ? paymentMethod : (channel.isNotEmpty ? channel : 'Cash'),
-                      note: note ?? '',
-                      amount: amt,
-                      fee: fee,
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: const BorderRadius.all(Radius.circular(6)),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.download_rounded, size: 14, color: Color(0xFF2563EB)),
-                        SizedBox(width: 4),
-                        Text('Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                      ],
-                    ),
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Ref: ${it['receiptNo'] ?? it['metadata']?['voucherNumber'] ?? 'TRX-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : ''}'}',
+                          style: const TextStyle(fontSize: 10, color: AppTheme.secondaryText, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () {
+                          final recNo = it['receiptNo'] ?? it['metadata']?['voucherNumber'] ?? 'TRX-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : (it['id'] ?? '')}';
+                          showReceiptModal(
+                            context,
+                            receiptNo: recNo,
+                            date: date,
+                            type: dir == 'in' ? 'Cash In' : (tagLabel.contains('Expense') ? 'Expense' : 'Cash Out'),
+                            categoryOrRecipient: displayTitle,
+                            wallet: walletName.isNotEmpty ? walletName : 'Wallet',
+                            method: paymentMethod.isNotEmpty ? paymentMethod : (channel.isNotEmpty ? channel : 'Cash'),
+                            note: note ?? '',
+                            amount: amt,
+                            fee: fee,
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: const BorderRadius.all(Radius.circular(6)),
+                            border: Border.all(color: const Color(0xFFBFDBFE)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.download_rounded, size: 14, color: Color(0xFF2563EB)),
+                              SizedBox(width: 4),
+                              Text('Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -521,73 +533,81 @@ String? _parseNote(dynamic item) {
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: isOut ? AppTheme.pendingBg : AppTheme.inflowBg,
-                      border: Border.all(color: isOut ? AppTheme.pendingBorder : AppTheme.inflowBorder),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '${channel.isNotEmpty ? channel : "CASH"} • Ref: ${it['receiptNo'] ?? ''}'.toUpperCase(),
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isOut ? AppTheme.pendingAccent : AppTheme.inflowText),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isOut ? AppTheme.pendingBg : AppTheme.inflowBg,
+                    border: Border.all(color: isOut ? AppTheme.pendingBorder : AppTheme.inflowBorder),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    (channel.isNotEmpty ? channel : "CASH").toUpperCase(),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isOut ? AppTheme.pendingAccent : AppTheme.inflowText),
                   ),
                 ),
-                const SizedBox(width: 6),
-                Row(
-                  children: [
-                    InkWell(
-                      onTap: () {
-                        final recNo = it['receiptNo'] ?? 'HND-${(it['id'] ?? '').toString().substring(0, 8).toUpperCase()}';
-                        showReceiptModal(
-                          context,
-                          receiptNo: recNo,
-                          date: date,
-                          type: isOut ? 'Handover Sent' : 'Handover Received',
-                          categoryOrRecipient: cpName,
-                          wallet: it['walletName'] ?? (it['metadata']?['walletName'] ?? 'Wallet'),
-                          method: channel.isNotEmpty ? channel : 'CASH',
-                          note: note ?? '',
-                          amount: amt,
-                          fee: fee,
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                        margin: const EdgeInsets.only(right: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: const BorderRadius.all(Radius.circular(6)),
-                          border: Border.all(color: const Color(0xFFBFDBFE)),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.download_rounded, size: 14, color: Color(0xFF2563EB)),
-                            SizedBox(width: 4),
-                            Text('Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                          ],
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Ref: ${it['receiptNo'] ?? 'HND-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : ''}'}',
+                          style: const TextStyle(fontSize: 10, color: AppTheme.secondaryText, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isConfirmed ? AppTheme.confirmedBg : isPending ? AppTheme.pendingBg : AppTheme.expenseBg,
-                        border: Border.all(color: isConfirmed ? AppTheme.confirmedBorder : isPending ? AppTheme.pendingBorder : AppTheme.expenseBorder),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () {
+                          final recNo = it['receiptNo'] ?? 'HND-${(it['id'] ?? '').toString().length >= 8 ? (it['id'] ?? '').toString().substring(0, 8).toUpperCase() : (it['id'] ?? '')}';
+                          showReceiptModal(
+                            context,
+                            receiptNo: recNo,
+                            date: date,
+                            type: isOut ? 'Handover Sent' : 'Handover Received',
+                            categoryOrRecipient: cpName,
+                            wallet: it['walletName'] ?? (it['metadata']?['walletName'] ?? 'Wallet'),
+                            method: channel.isNotEmpty ? channel : 'CASH',
+                            note: note ?? '',
+                            amount: amt,
+                            fee: fee,
+                          );
+                        },
                         borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: const BorderRadius.all(Radius.circular(6)),
+                            border: Border.all(color: const Color(0xFFBFDBFE)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.download_rounded, size: 14, color: Color(0xFF2563EB)),
+                              SizedBox(width: 4),
+                              Text('Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        status,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isConfirmed ? AppTheme.confirmedText : isPending ? AppTheme.pendingAccent : AppTheme.expenseText),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isConfirmed ? AppTheme.confirmedBg : isPending ? AppTheme.pendingBg : AppTheme.expenseBg,
+                          border: Border.all(color: isConfirmed ? AppTheme.confirmedBorder : isPending ? AppTheme.pendingBorder : AppTheme.expenseBorder),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          status,
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isConfirmed ? AppTheme.confirmedText : isPending ? AppTheme.pendingAccent : AppTheme.expenseText),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),

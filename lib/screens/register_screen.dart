@@ -47,7 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'password': _passwordController.text,
           'role': 'company_admin',
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         widget.onSwitchToLogin();
@@ -57,8 +57,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final errStr = msg is List ? msg.join(', ') : (msg?.toString() ?? 'Registration failed');
         throw Exception(errStr);
       }
-    } catch (e) {
-      setState(() => _error = e.toString());
+    } catch (e, stack) {
+      debugPrint('Registration connection error: $e\n$stack');
+      String errorMsg = e.toString().replaceFirst('Exception: ', '');
+      if (e.toString().contains('SocketException') || e.toString().contains('ClientException') || e.toString().contains('Failed host lookup')) {
+        errorMsg = 'Unable to reach server. Please check your internet connection.';
+      } else if (e.toString().contains('TimeoutException')) {
+        errorMsg = 'Request timed out. Please try again.';
+      }
+      setState(() => _error = errorMsg);
     } finally {
       setState(() => _loading = false);
     }

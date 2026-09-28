@@ -70,8 +70,8 @@ class _AccountScreenState extends State<AccountScreen> {
       final tUri = Uri.parse('${app.apiBaseUrl}/custody/transfers?custodianId=$cId&companyId=$cmp');
 
       final results = await Future.wait([
-        http.get(mUri, headers: headers).catchError((_) => http.Response('{}', 500)),
-        http.get(tUri, headers: headers).catchError((_) => http.Response('[]', 500)),
+        app.authRequest('GET', mUri).catchError((_) => http.Response('{}', 500)),
+        app.authRequest('GET', tUri).catchError((_) => http.Response('[]', 500)),
       ]);
 
       double i = 0, o = 0, e = 0;

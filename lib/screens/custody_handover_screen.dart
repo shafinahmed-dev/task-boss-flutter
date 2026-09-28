@@ -54,7 +54,7 @@ class _HandoverState extends State<CustodyHandoverScreen> {
     if (app.user == null) return;
     try {
       final url = Uri.parse('${app.apiBaseUrl}/custody/custodians?companyId=${app.user!.companyId}');
-      final res = await http.get(url, headers: {
+      final res = await app.authRequest('GET', url, headers: {
         'Authorization': 'Bearer ${app.token}',
         'x-company-id': app.user!.companyId,
       });
@@ -125,7 +125,7 @@ class _HandoverState extends State<CustodyHandoverScreen> {
         },
       };
 
-      final res = await http.post(
+      final res = await app.authRequest('POST',
         Uri.parse('${app.apiBaseUrl}/custody/transfers'),
         headers: {
           'Content-Type': 'application/json',

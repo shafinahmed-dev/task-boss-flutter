@@ -8,6 +8,7 @@ import 'package:task_boss/models/models.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/utils/show_receipt_modal.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
 class CaptureMovementScreen extends StatefulWidget {
   const CaptureMovementScreen({super.key});
   @override
@@ -38,6 +39,38 @@ class _CaptureState extends State<CaptureMovementScreen> {
   void initState() {
     super.initState();
     _tag = _tags['in']![0];
+    _loadDraft();
+  }
+
+  Future<void> _loadDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _tab = prefs.getString('draft_tab') ?? 'in';
+        _tag = prefs.getString('draft_tag') ?? _tags[_tab]![0];
+        _amtCtl.text = prefs.getString('draft_amt') ?? '';
+        _chgCtl.text = prefs.getString('draft_chg') ?? '';
+        _noteCtl.text = prefs.getString('draft_note') ?? '';
+      });
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('draft_tab', _tab);
+    await prefs.setString('draft_tag', _tag);
+    await prefs.setString('draft_amt', _amtCtl.text);
+    await prefs.setString('draft_chg', _chgCtl.text);
+    await prefs.setString('draft_note', _noteCtl.text);
+  }
+
+  Future<void> _clearDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('draft_tab');
+    await prefs.remove('draft_tag');
+    await prefs.remove('draft_amt');
+    await prefs.remove('draft_chg');
+    await prefs.remove('draft_note');
   }
 
   bool get _isOtherTag => _tag.startsWith('Other');
@@ -131,11 +164,11 @@ class _CaptureState extends State<CaptureMovementScreen> {
         },
       };
 
-      final res = await http.post(
+      final res = await app.authRequest(
+        'POST',
         Uri.parse('${app.apiBaseUrl}/ledger/movements'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${app.token}',
           'x-company-id': app.user!.companyId
         },
         body: jsonEncode(payload),
@@ -159,7 +192,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
           };
           _amtCtl.clear();
           _chgCtl.clear();
-          _noteCtl.clear();
+          _noteCtl.clear(); _clearDraft();
           _tag = _tags[_tab]![0];
         });
         if (mounted) {
@@ -296,7 +329,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
             ]),
             const SizedBox(height: 6),
             TextField(
-              controller: _noteCtl,
+              controller: _noteCtl, onChanged: (_) => _saveDraft(),
               decoration: InputDecoration(hintText: _isOtherTag ? "Required for 'Other'..." : "Note...", filled: true, fillColor: AppTheme.inputBg, border: const OutlineInputBorder()),
               onChanged: (_) => setState(() {}),
             ),
@@ -311,7 +344,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                     children: [
                       const Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 6),
-                      TextField(controller: _amtCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
+                      TextField(controller: _amtCtl, onChanged: (_) => _saveDraft(), keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
                     ],
                   ),
                 ),
@@ -322,7 +355,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                     children: [
                       const Text('Fee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 6),
-                      TextField(controller: _chgCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
+                      TextField(controller: _chgCtl, onChanged: (_) => _saveDraft(), keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
                     ],
                   ),
                 ),

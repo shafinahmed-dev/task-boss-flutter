@@ -39,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
           'email': _emailCtl.text.trim(),
           'password': _passCtl.text,
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         final data = jsonDecode(resp.body);
@@ -83,7 +83,13 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e, stack) {
       debugPrint('Login connection error: $e\n$stack');
-      setState(() => _error = 'Login failed. Network or server error: ${e.toString()}');
+      String errorMsg = 'Login failed. Network or server error: ${e.toString()}';
+      if (e.toString().contains('SocketException') || e.toString().contains('ClientException') || e.toString().contains('Failed host lookup')) {
+        errorMsg = 'Unable to reach server. Please check your internet connection.';
+      } else if (e.toString().contains('TimeoutException')) {
+        errorMsg = 'Request timed out. Please try again.';
+      }
+      setState(() => _error = errorMsg);
     } finally {
       setState(() => _loading = false);
     }

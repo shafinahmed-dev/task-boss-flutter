@@ -80,7 +80,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final url = Uri.parse('${app.apiBaseUrl}/custody/notifications?custodianId=${app.user!.custodianId}&companyId=${app.user!.companyId}');
-      final res = await http.get(url, headers: {'Authorization': 'Bearer ${app.token}'});
+      final res = await app.authRequest('GET', url, headers: {'Authorization': 'Bearer ${app.token}'});
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         setState(() {
@@ -103,7 +103,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     setState(() => _confirmingId = id);
     try {
       final url = Uri.parse('${app.apiBaseUrl}/custody/transfers/$id/confirm');
-      final res = await http.post(
+      final res = await app.authRequest('POST',
         url,
         headers: {'Authorization': 'Bearer ${app.token}', 'x-company-id': app.user!.companyId},
       );
@@ -129,7 +129,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     setState(() => _confirmingId = id);
     try {
       final url = Uri.parse('${app.apiBaseUrl}/custody/transfers/$id/dispute');
-      final res = await http.post(
+      final res = await app.authRequest('POST',
         url,
         headers: {'Authorization': 'Bearer ${app.token}', 'x-company-id': app.user!.companyId},
       );

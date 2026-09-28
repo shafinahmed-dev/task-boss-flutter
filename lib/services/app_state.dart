@@ -46,6 +46,49 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<http.Response> authRequest(
+    String method,
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+  }) async {
+    final Map<String, String> mergedHeaders = {
+      if (token != null) 'Authorization': 'Bearer $token',
+      if (headers != null) ...headers,
+    };
+
+    try {
+      http.Response response;
+      if (method == 'GET') {
+        response = await http.get(url, headers: mergedHeaders).timeout(const Duration(seconds: 15));
+      } else if (method == 'POST') {
+        response = await http.post(url, headers: mergedHeaders, body: body).timeout(const Duration(seconds: 15));
+      } else if (method == 'PATCH') {
+        response = await http.patch(url, headers: mergedHeaders, body: body).timeout(const Duration(seconds: 15));
+      } else if (method == 'DELETE') {
+        response = await http.delete(url, headers: mergedHeaders, body: body).timeout(const Duration(seconds: 15));
+      } else {
+        throw Exception('Unsupported method');
+      }
+
+      if (response.statusCode == 401) {
+        await logout();
+        throw Exception('Session expired. Please log in again.');
+      }
+
+      return response;
+    } on Exception catch (e) {
+      if (e.toString().contains('SocketException') || e.toString().contains('ClientException') || e.toString().contains('Failed host lookup')) {
+        throw Exception('Unable to reach server. Please check your internet connection.');
+      }
+      if (e.toString().contains('TimeoutException')) {
+        throw Exception('Request timed out. Please try again.');
+      }
+      rethrow;
+    }
+  }
+
+
   Future<void> login(String newToken, AuthUser newUser) async {
     token = newToken;
     user = newUser;
@@ -77,7 +120,7 @@ class AppState extends ChangeNotifier {
     if (user == null || token == null) return;
     try {
       final url = Uri.parse('$apiBaseUrl/wallets?custodianId=${user!.custodianId}');
-      final resp = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+      final resp = await authRequest('GET', url);
       if (resp.statusCode == 200) {
         final List list = jsonDecode(resp.body);
         wallets = list.map((item) => Wallet.fromJson(item)).toList();
@@ -101,11 +144,11 @@ class AppState extends ChangeNotifier {
     if (accountNumber != null) body['accountNumber'] = accountNumber;
     if (isDefault != null) body['isDefault'] = isDefault;
 
-    final resp = await http.patch(
+    final resp = await authRequest(
+      'PATCH',
       url,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
       },
       body: jsonEncode(body),
     );
@@ -122,12 +165,7 @@ class AppState extends ChangeNotifier {
   Future<void> deleteWallet(String walletId) async {
     if (token == null) return;
     final url = Uri.parse('$apiBaseUrl/wallets/$walletId');
-    final resp = await http.delete(
-      url,
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
-    );
+    final resp = await authRequest('DELETE', url);
 
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       await refreshBalance();
@@ -148,7 +186,7 @@ class AppState extends ChangeNotifier {
         rawBalance = wallets.fold(0.0, (sum, w) => sum + w.currentBalance);
       } else {
         final url = Uri.parse('$apiBaseUrl/ledger/custodians/${user!.custodianId}/balance?companyId=${user!.companyId}');
-        final resp = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+        final resp = await authRequest('GET', url);
         if (resp.statusCode == 200) {
           final data = jsonDecode(resp.body);
           final rawBal = data['balance'] ?? data['netBalance'] ?? data['currentBalance'];
@@ -157,7 +195,7 @@ class AppState extends ChangeNotifier {
       }
       
       final notifUrl = Uri.parse('$apiBaseUrl/custody/notifications?custodianId=${user!.custodianId}&companyId=${user!.companyId}');
-      final notifResp = await http.get(notifUrl, headers: {'Authorization': 'Bearer $token'});
+      final notifResp = await authRequest('GET', notifUrl);
       double pendingDeductions = 0.0;
       if (notifResp.statusCode == 200) {
         final data = jsonDecode(notifResp.body);

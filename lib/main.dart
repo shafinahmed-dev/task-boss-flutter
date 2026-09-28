@@ -23,6 +23,7 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Task BOS',
       theme: AppTheme.themeData,
       home: const AuthWrapper(),
