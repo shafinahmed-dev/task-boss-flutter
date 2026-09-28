@@ -329,9 +329,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
             ]),
             const SizedBox(height: 6),
             TextField(
-              controller: _noteCtl, onChanged: (_) => _saveDraft(),
+              controller: _noteCtl,
               decoration: InputDecoration(hintText: _isOtherTag ? "Required for 'Other'..." : "Note...", filled: true, fillColor: AppTheme.inputBg, border: const OutlineInputBorder()),
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) { _saveDraft(); setState(() {}); },
             ),
             const SizedBox(height: 16),
             // Symmetrical 2x2 Layout - Row 2: Amount & Fee
@@ -344,7 +344,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                     children: [
                       const Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 6),
-                      TextField(controller: _amtCtl, onChanged: (_) => _saveDraft(), keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
+                      TextField(controller: _amtCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) { _saveDraft(); setState(() {}); }),
                     ],
                   ),
                 ),
@@ -355,7 +355,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                     children: [
                       const Text('Fee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 6),
-                      TextField(controller: _chgCtl, onChanged: (_) => _saveDraft(), keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
+                      TextField(controller: _chgCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) { _saveDraft(); setState(() {}); }),
                     ],
                   ),
                 ),
