@@ -64,10 +64,6 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       final cId = app.user!.custodianId;
       final cmp = app.user!.companyId;
-      final headers = {
-        'Authorization': 'Bearer ${app.token}',
-        'x-company-id': cmp,
-      };
 
       final mUri = Uri.parse('${app.apiBaseUrl}/ledger/custodians/$cId/movements?companyId=$cmp');
       final tUri = Uri.parse('${app.apiBaseUrl}/custody/transfers?custodianId=$cId&companyId=$cmp');
@@ -228,9 +224,44 @@ class _AccountScreenState extends State<AccountScreen> {
             if (_loading) const Center(child: Padding(padding: EdgeInsets.only(bottom: 20), child: CircularProgressIndicator(strokeWidth: 2))),
             _buildStatementCard(u, app.balance),
             const SizedBox(height: 24),
-            const Padding(
-              padding: EdgeInsets.only(left: 4),
-              child: Text('WORKSPACE PROFILE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: AppTheme.secondaryText)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'WORKSPACE PROFILE',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                      color: AppTheme.secondaryText,
+                    ),
+                  ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => _showEditWorkspaceDetails(u),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit_outlined, size: 14, color: Color(0xFF475569)),
+                          SizedBox(width: 4),
+                          Text(
+                            'Edit',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF475569),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             _buildWorkspaceProfile(u),
@@ -292,7 +323,7 @@ class _AccountScreenState extends State<AccountScreen> {
       decoration: BoxDecoration(
         gradient: AppTheme.slateCardGradient,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
       ),
       child: Column(
         children: [
@@ -677,51 +708,27 @@ class _AccountScreenState extends State<AccountScreen> {
           _buildProfileTile(
             icon: Icons.badge_outlined,
             title: 'Designation',
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  u.designation.isNotEmpty ? u.designation : 'Not Set',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.primaryText,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppTheme.secondaryText,
-                  size: 20,
-                ),
-              ],
+            trailing: Text(
+              u.designation.isNotEmpty ? u.designation : 'Not Set',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryText,
+              ),
             ),
-            onTap: () => _showEditWorkspaceDetails(u),
           ),
           const Divider(height: 1),
           _buildProfileTile(
             icon: Icons.business_outlined,
             title: 'Department',
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  u.department.isNotEmpty ? u.department : 'General',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.primaryText,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppTheme.secondaryText,
-                  size: 20,
-                ),
-              ],
+            trailing: Text(
+              u.department.isNotEmpty ? u.department : 'General',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryText,
+              ),
             ),
-            onTap: () => _showEditWorkspaceDetails(u),
           ),
           const Divider(height: 1),
           _buildProfileTile(
@@ -797,7 +804,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Edit Workspace Details',
+                    'Edit Profile & Security',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText),
                   ),
                   const SizedBox(height: 6),
@@ -853,13 +860,14 @@ class _AccountScreenState extends State<AccountScreen> {
                           setModalState(() => saving = true);
                           final newDes = desCtl.text.trim();
                           final newDep = depCtl.text.trim();
+                          final messenger = ScaffoldMessenger.of(context);
                           await context.read<AppState>().updateProfileMeta(
                                 designation: newDes,
                                 department: newDep,
                               );
                           if (ctx.mounted) Navigator.pop(ctx);
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            messenger.showSnackBar(
                               const SnackBar(
                                 content: Text('Profile details updated'),
                                 backgroundColor: AppTheme.confirmedText,
@@ -954,7 +962,7 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 }
 class _SecuritySheet extends StatefulWidget {
-  const _SecuritySheet({Key? key}) : super(key: key);
+  const _SecuritySheet();
 
   @override
   State<_SecuritySheet> createState() => _SecuritySheetState();
@@ -1219,7 +1227,7 @@ class _SecuritySheetState extends State<_SecuritySheet> {
                         const Expanded(child: Text('Require PIN for Handovers & Cash Movements', style: TextStyle(fontSize: 13, color: AppTheme.primaryText))),
                         Switch(
                           value: _requirePin,
-                          activeColor: AppTheme.primaryGradientFallback,
+                          activeThumbColor: AppTheme.primaryGradientFallback,
                           onChanged: (val) async {
                             await context.read<AppState>().setPinRequiredForTransactions(val);
                             _loadSec();

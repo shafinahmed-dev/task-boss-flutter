@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -470,7 +469,7 @@ class _WalletsScreenState extends State<WalletsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('My Sub-Ledger Wallets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
+                const Text('All Wallets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
                 TextButton.icon(
                   onPressed: () => _showCreateWalletModal(context),
                   icon: const Icon(Icons.add_circle_outline, size: 18),

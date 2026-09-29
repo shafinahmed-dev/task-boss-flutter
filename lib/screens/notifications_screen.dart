@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
 
@@ -325,7 +324,7 @@ class _NotificationRowState extends State<_NotificationRow> {
       expandedRef = r['id']?.toString().toUpperCase() ?? '';
     }
     
-    final Color rowBgColor = isPending ? Colors.blue.withOpacity(0.04) : Colors.white;
+    final Color rowBgColor = isPending ? Colors.blue.withValues(alpha: 0.04) : Colors.white;
 
     return Material(
       color: rowBgColor,

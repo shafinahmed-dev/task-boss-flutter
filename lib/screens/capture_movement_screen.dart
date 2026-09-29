@@ -266,85 +266,106 @@ class _CaptureState extends State<CaptureMovementScreen> {
             const SizedBox(height: 12),
             if (_error != null) _banner(_error!),
             _buildSegmentTrack(),
-            const SizedBox(height: 16),
-            const Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 6),
-            SizedBox(
-              height: 42,
-              child: ScrollConfiguration(
-                behavior: WebDragScrollBehavior(),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
-                    children: [
-                      ..._tags[_tab]!.asMap().entries.map((entry) {
-                        final t = entry.value;
-                        final isFirst = entry.key == 0;
-                        final isSelected = _tag == t;
-                        final Color accentColor = _tab == 'in'
-                            ? const Color(0xFF10B981)
-                            : _tab == 'out'
-                                ? const Color(0xFFF59E0B)
-                                : const Color(0xFFEF4444);
-                        return Padding(
-                          padding: EdgeInsets.only(left: isFirst ? 0 : 8),
-                          child: GestureDetector(
-                            onTap: () => setState(() => _tag = t),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              curve: Curves.easeInOut,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected ? Colors.white : Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isSelected ? accentColor : Colors.grey.shade300,
-                                  width: isSelected ? 1.5 : 1.0,
-                                ),
-                                boxShadow: isSelected
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.06),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 1),
+            const SizedBox(height: 14),
+            // Card 1: Category Selection
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryText)),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 42,
+                    child: ScrollConfiguration(
+                      behavior: WebDragScrollBehavior(),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Row(
+                          children: [
+                            ..._tags[_tab]!.asMap().entries.map((entry) {
+                              final t = entry.value;
+                              final isFirst = entry.key == 0;
+                              final isSelected = _tag == t;
+                              final Color accentColor = _tab == 'in'
+                                  ? const Color(0xFF10B981)
+                                  : _tab == 'out'
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFFEF4444);
+                              return Padding(
+                                padding: EdgeInsets.only(left: isFirst ? 0 : 8),
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _tag = t),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    curve: Curves.easeInOut,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? Colors.white : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isSelected ? accentColor : Colors.grey.shade300,
+                                        width: isSelected ? 1.5 : 1.0,
+                                      ),
+                                      boxShadow: isSelected
+                                          ? [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(alpha: 0.06),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ]
+                                          : [],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (isSelected) ...[
+                                          Icon(Icons.check_rounded, size: 13, color: accentColor),
+                                          const SizedBox(width: 4),
+                                        ],
+                                        Text(
+                                          t,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                            color: isSelected ? accentColor : const Color(0xFF4B5563),
+                                          ),
                                         ),
-                                      ]
-                                    : [],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (isSelected) ...[
-                                    Icon(Icons.check_rounded, size: 13, color: accentColor),
-                                    const SizedBox(width: 4),
-                                  ],
-                                  Text(
-                                    t,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                      color: isSelected ? accentColor : const Color(0xFF4B5563),
+                                      ],
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                      // Trailing spacer so the last pill is never flush against the edge
-                      const SizedBox(width: 16),
-                    ],
+                                ),
+                              );
+                            }),
+                            const SizedBox(width: 16),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            const SizedBox(height: 14),
+            // Card 2: Wallet & Method
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,8 +466,20 @@ class _CaptureState extends State<CaptureMovementScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Row(children: [
+          ),
+          const SizedBox(height: 14),
+          // Card 3: Financial Details & Note
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
               const Text('Note',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
@@ -604,7 +637,10 @@ class _CaptureState extends State<CaptureMovementScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
             if (amtVal > 0 || feeVal > 0) Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: AppTheme.cardBg, border: Border.all(color: AppTheme.cardBorder), borderRadius: BorderRadius.circular(10)),

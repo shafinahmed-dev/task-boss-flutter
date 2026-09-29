@@ -297,17 +297,12 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Custody Handover',
+                'Handover',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.slateDark,
                 ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Transfer funds to another user in your company.',
-                style: TextStyle(fontSize: 13, color: AppTheme.secondaryText),
               ),
               const SizedBox(height: 16),
               if (_error != null) _banner(_error!),
@@ -348,7 +343,7 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
                   size: 18, color: AppTheme.slateMid),
               const SizedBox(width: 8),
               const Text(
-                'Recipient',
+                'Select User',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
@@ -393,8 +388,8 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
             )
           else
             DropdownButtonFormField<String>(
-              value: _selectedCustodianId,
-              hint: const Text('Select recipient',
+              initialValue: _selectedCustodianId,
+              hint: const Text('Select User',
                   style: TextStyle(color: AppTheme.mutedText, fontSize: 13)),
               items: _custodians.map((c) {
                 final cId =
@@ -498,7 +493,7 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
                 key: ValueKey('wallet_$_selectedWalletId'),
-                value: _selectedWalletId,
+                initialValue: _selectedWalletId,
                 items: wallets
                     .map((w) => DropdownMenuItem<String>(
                           value: w.id,
@@ -562,7 +557,7 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
                     )
                   : DropdownButtonFormField<String>(
                       key: ValueKey('method_${selectedWallet?.type}_out'),
-                      value: _selectedPaymentMethod,
+                      initialValue: _selectedPaymentMethod,
                       items: availableMethods
                           .map((m) => DropdownMenuItem<String>(
                                 value: m,
