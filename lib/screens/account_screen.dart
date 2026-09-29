@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
@@ -222,23 +224,30 @@ class _AccountScreenState extends State<AccountScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _buildHead(u, app.balance),
-            const SizedBox(height: 20),
-            _buildGrid(),
-            const SizedBox(height: 20),
-            _buildInfo(u),
+            if (_loading) const Center(child: Padding(padding: EdgeInsets.only(bottom: 20), child: CircularProgressIndicator(strokeWidth: 2))),
+            _buildStatementCard(u, app.balance),
             const SizedBox(height: 24),
+            const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Text('WORKSPACE PROFILE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: AppTheme.secondaryText)),
+            ),
+            const SizedBox(height: 8),
+            _buildWorkspaceProfile(u),
+            const SizedBox(height: 32),
             Center(
               child: SizedBox(
                 width: 280,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.expenseText,
-                    minimumSize: const Size(double.infinity, 48),
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.expenseText,
+                    side: const BorderSide(color: AppTheme.expenseBorder),
+                    backgroundColor: AppTheme.expenseBg.withValues(alpha: 0.5),
+                    minimumSize: const Size(double.infinity, 44),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: app.logout,
-                  child: const Text('Logout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  onPressed: () => _confirmLogout(app),
+                  icon: const Icon(Icons.logout_rounded, size: 18),
+                  label: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 ),
               ),
             ),
@@ -248,94 +257,105 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  Widget _buildHead(u, double bal) {
+  void _confirmLogout(AppState app) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log Out'),
+        content: const Text('Are you sure you want to log out of your account?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.secondaryText)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.expenseText,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              app.logout();
+            },
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatementCard(u, double bal) {
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [AppTheme.primaryGradientStart, AppTheme.primaryGradientEnd]),
-        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0F172A), Color(0xFF1E293B)]),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
       ),
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 35,
-            backgroundColor: Colors.white24,
-            child: Text(
-              u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.white.withValues(alpha: 0.15),
+                  child: Text(
+                    u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(u.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                      const SizedBox(height: 2),
+                      Text(u.email, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          Text(u.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-            child: Text(u.email, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          const Text('Available Balance', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 6),
+          Text('৳${bal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white)),
+          const SizedBox(height: 24),
+          Divider(color: Colors.white.withValues(alpha: 0.15), height: 1),
+          Row(
+            children: [
+              _buildMicroStat('Inflows', _inf, const Color(0xFF4ADE80), true, () => _showDetailsModal('Inflow Transactions', _inflowItems, AppTheme.inflowText)),
+              Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.15)),
+              _buildMicroStat('Outflows', _outf, const Color(0xFFF87171), false, () => _showDetailsModal('Outflow Transactions', _outflowItems, AppTheme.pendingAccent)),
+              Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.15)),
+              _buildMicroStat('Expenses', _exp, const Color(0xFFFBBF24), false, () => _showDetailsModal('Expense Transactions', _expenseItems, AppTheme.expenseText)),
+            ],
           ),
-          const SizedBox(height: 16),
-          const Divider(color: Colors.white24),
-          const SizedBox(height: 8),
-          const Text('AVAILABLE BALANCE', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-          const SizedBox(height: 4),
-          Text('৳${bal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
         ],
       ),
     );
   }
 
-  Widget _buildGrid() {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    return Row(
-      children: [
-        Expanded(
-          child: InkWell(
-            onTap: () => _showDetailsModal('Inflow Transactions', _inflowItems, AppTheme.inflowText),
-            borderRadius: BorderRadius.circular(14),
-            child: _kpi('INFLOWS', _inf, AppTheme.inflowBg, AppTheme.inflowBorder, AppTheme.inflowText),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: InkWell(
-            onTap: () => _showDetailsModal('Outflow Transactions', _outflowItems, AppTheme.pendingAccent),
-            borderRadius: BorderRadius.circular(14),
-            child: _kpi('OUTFLOWS', _outf, AppTheme.pendingBg, AppTheme.pendingBorder, AppTheme.pendingAccent),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: InkWell(
-            onTap: () => _showDetailsModal('Expense Transactions', _expenseItems, AppTheme.expenseText),
-            borderRadius: BorderRadius.circular(14),
-            child: _kpi('EXPENSES', _exp, AppTheme.expenseBg, AppTheme.expenseBorder, AppTheme.expenseText),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _kpi(String title, double val, Color bg, Color border, Color text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
-      decoration: BoxDecoration(color: bg, border: Border.all(color: border), borderRadius: BorderRadius.circular(14)),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildMicroStat(String label, double val, Color color, bool isIn, VoidCallback onTap) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
             children: [
-              Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppTheme.primaryText, letterSpacing: 0.5)),
-              const SizedBox(width: 2),
-              Icon(Icons.touch_app_outlined, size: 10, color: text.withValues(alpha: 0.7)),
+              Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w500, letterSpacing: 0.5)),
+              const SizedBox(height: 6),
+              Text('${isIn ? '+' : '-'}৳${val.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            '৳${val.toStringAsFixed(2)}',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: text),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -644,26 +664,113 @@ class _AccountScreenState extends State<AccountScreen> {
     return map[tag] ?? tag.replaceAll('_', ' ').toUpperCase();
   }
 
-  Widget _buildInfo(u) {
+  Widget _buildWorkspaceProfile(u) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppTheme.cardBg, border: Border.all(color: AppTheme.cardBorder), borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
       child: Column(
         children: [
-          _r('User Name', u.name), const Divider(),
-          _r('Email', u.email), const Divider(),
-          _r('User ID', u.userId), const Divider(),
-          _r('Custodian ID', u.custodianId),
+          _buildProfileTile(
+            icon: Icons.badge_outlined,
+            title: 'User Role',
+            trailing: Text(u.role.isNotEmpty ? u.role : 'Custodian User', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryText)),
+          ),
+          const Divider(height: 1),
+          _buildProfileTile(
+            icon: Icons.business_outlined,
+            title: 'Department',
+            trailing: const Text('Finance & Operations', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryText)),
+          ),
+          const Divider(height: 1),
+          _buildProfileTile(
+            icon: Icons.lock_outline_rounded,
+            title: 'Security & Passcode',
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.secondaryText, size: 20),
+            onTap: () {},
+          ),
+          const Divider(height: 1),
+          _buildProfileTile(
+            icon: Icons.developer_mode_outlined,
+            title: 'System Diagnostics & IDs',
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.secondaryText, size: 20),
+            onTap: () => _showSystemDiagnostics(u),
+          ),
         ],
       ),
     );
   }
 
-  Widget _r(String l, String v) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(l, style: const TextStyle(fontSize: 13, color: AppTheme.secondaryText)),
-          Flexible(child: Text(v, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
-        ],
-      );
+  Widget _buildProfileTile({required IconData icon, required String title, required Widget trailing, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppTheme.secondaryText),
+            const SizedBox(width: 14),
+            Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.primaryText))),
+            trailing,
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSystemDiagnostics(u) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: AppTheme.cardBg,
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))),
+              ),
+              const SizedBox(height: 20),
+              const Text('System Diagnostics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
+              const SizedBox(height: 20),
+              _buildDiagRow('User ID', u.userId),
+              const SizedBox(height: 16),
+              _buildDiagRow('Custodian ID', u.custodianId),
+              const SizedBox(height: 32),
+              const Center(child: Text('App Version: 1.0.0 (Build 12)', style: TextStyle(fontSize: 12, color: AppTheme.mutedText))),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDiagRow(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.secondaryText, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(child: SelectableText(value, style: const TextStyle(fontSize: 13, fontFamily: 'monospace', color: AppTheme.primaryText))),
+            IconButton(
+              icon: const Icon(Icons.copy_rounded, size: 18, color: AppTheme.primaryGradientFallback),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: value));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copied!'), duration: const Duration(seconds: 1)));
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
