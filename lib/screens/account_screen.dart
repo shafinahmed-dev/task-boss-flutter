@@ -728,8 +728,64 @@ class _AccountScreenState extends State<AccountScreen> {
       builder: (ctx) => const _SecuritySheet(),
     );
   }
+
+
+  void _showSystemDiagnostics(u) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: AppTheme.cardBg,
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))),
+              ),
+              const SizedBox(height: 20),
+              const Text('System Diagnostics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
+              const SizedBox(height: 20),
+              _buildDiagRow('User ID', u.userId),
+              const SizedBox(height: 16),
+              _buildDiagRow('Custodian ID', u.custodianId),
+              const SizedBox(height: 32),
+              const Center(child: Text('App Version: 1.0.0 (Build 12)', style: TextStyle(fontSize: 12, color: AppTheme.mutedText))),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDiagRow(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.secondaryText, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(child: SelectableText(value, style: const TextStyle(fontSize: 13, fontFamily: 'monospace', color: AppTheme.primaryText))),
+            IconButton(
+              icon: const Icon(Icons.copy_rounded, size: 18, color: AppTheme.primaryGradientFallback),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: value));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copied!'), duration: const Duration(seconds: 1)));
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
 class _SecuritySheet extends StatefulWidget {
-  const _SecuritySheet();
+  const _SecuritySheet({Key? key}) : super(key: key);
 
   @override
   State<_SecuritySheet> createState() => _SecuritySheetState();
@@ -816,8 +872,6 @@ class _SecuritySheetState extends State<_SecuritySheet> {
     }
   }
 
-
-
   Future<void> _handlePinChange() async {
     final app = context.read<AppState>();
     if (_hasPin) {
@@ -894,6 +948,18 @@ class _SecuritySheetState extends State<_SecuritySheet> {
                       ),
                     );
                   }),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: AppTheme.secondaryText))),
+            ],
+          );
+        });
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
@@ -983,6 +1049,21 @@ class _SecuritySheetState extends State<_SecuritySheet> {
                       children: [
                         const Expanded(child: Text('Require PIN for Handovers & Cash Movements', style: TextStyle(fontSize: 13, color: AppTheme.primaryText))),
                         Switch(
+                          value: _requirePin,
+                          activeColor: AppTheme.primaryGradientFallback,
+                          onChanged: (val) async {
+                            await context.read<AppState>().setPinRequiredForTransactions(val);
+                            _loadSec();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
             const Text('Account Password', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primaryText)),
             const SizedBox(height: 4),
             const Text('Update backend account login password.', style: TextStyle(color: AppTheme.secondaryText, fontSize: 13)),
@@ -1032,84 +1113,3 @@ class _SecuritySheetState extends State<_SecuritySheet> {
   }
 }
 
-                          value: _requirePin,
-                          activeColor: AppTheme.primaryGradientFallback,
-                          onChanged: (val) async {
-                            await context.read<AppState>().setPinRequiredForTransactions(val);
-                            _loadSec();
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: AppTheme.secondaryText))),
-            ],
-          );
-        });
-      },
-    );
-  }
-
-  void _showSystemDiagnostics(u) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      backgroundColor: AppTheme.cardBg,
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))),
-              ),
-              const SizedBox(height: 20),
-              const Text('System Diagnostics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
-              const SizedBox(height: 20),
-              _buildDiagRow('User ID', u.userId),
-              const SizedBox(height: 16),
-              _buildDiagRow('Custodian ID', u.custodianId),
-              const SizedBox(height: 32),
-              const Center(child: Text('App Version: 1.0.0 (Build 12)', style: TextStyle(fontSize: 12, color: AppTheme.mutedText))),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDiagRow(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.secondaryText, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            Expanded(child: SelectableText(value, style: const TextStyle(fontSize: 13, fontFamily: 'monospace', color: AppTheme.primaryText))),
-            IconButton(
-              icon: const Icon(Icons.copy_rounded, size: 18, color: AppTheme.primaryGradientFallback),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: value));
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copied!'), duration: const Duration(seconds: 1)));
-              },
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
