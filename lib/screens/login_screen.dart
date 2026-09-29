@@ -62,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final userEmail = data['user']?['email'] ?? _emailCtl.text;
 
         if (custodianId.toString().isEmpty || companyId.toString().isEmpty || userId.toString().isEmpty) {
-          throw Exception('User has no assigned custodian or company account.');
+          throw Exception('User has no assigned user or company account.');
         }
 
         final user = AuthUser(

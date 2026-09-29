@@ -284,7 +284,7 @@ class _WalletsScreenState extends State<WalletsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('Internal Wallet Transfer', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
+                    const Text('Wallet Transfer', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
                     if (modalError != null) Text(modalError!, style: const TextStyle(color: AppTheme.expenseText, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     const Text('From Wallet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
@@ -374,12 +374,33 @@ class _WalletsScreenState extends State<WalletsScreen> {
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     )),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E293B), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), elevation: 8, shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.25)),
-                        onPressed: saving ? null : submitTransfer,
-                        child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Execute Transfer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Center(
+                      child: SizedBox(
+                        width: 200,
+                        height: 52,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E293B),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                            elevation: 8,
+                            shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                          ),
+                          onPressed: saving ? null : submitTransfer,
+                          child: saving
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                )
+                              : const Text(
+                                  'Transfer',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
                       ),
                     ),
                   ],
@@ -401,7 +422,7 @@ class _WalletsScreenState extends State<WalletsScreen> {
     return Scaffold(
       backgroundColor: AppTheme.canvas,
       appBar: AppBar(
-        title: const Text('Wallets & Accounts'),
+        title: const Text('Wallets'),
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _refresh)],
       ),
       body: RefreshIndicator(

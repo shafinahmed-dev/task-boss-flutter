@@ -258,7 +258,7 @@ class _NotificationRowState extends State<_NotificationRow> {
     if (isPending) {
       final toId = r['toCustodian']?['id'] ?? r['toCustodianId'] ?? r['to_custodian_id'];
       isMyActionRequired = widget.currentUserId == toId;
-      final fromName = r['fromCustodian']?['name'] ?? 'Unknown Custodian';
+      final fromName = r['fromCustodian']?['name'] ?? 'Unknown User';
       final channel = (r['channel'] ?? r['metadata']?['channel'] ?? 'TRANSFER').toString().toUpperCase();
       
       title = isMyActionRequired ? 'Handover Requested' : 'Handover Sent (Pending)';

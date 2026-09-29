@@ -121,7 +121,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
 
     final amt = double.tryParse(_amtCtl.text.trim());
     if (amt == null || amt <= 0) {
-      setState(() => _error = 'Please enter a valid amount greater than 0.');
+      setState(() => _error = 'Enter an amount to continue');
       return;
     }
     final feeText = _chgCtl.text.trim();
@@ -646,7 +646,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                           )
                         : const Text(
-                            'Record Movement',
+                            'Save',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -796,9 +796,29 @@ class _CaptureState extends State<CaptureMovementScreen> {
   }
 
   Widget _banner(String t) => Container(
-    padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 12),
-    decoration: BoxDecoration(color: AppTheme.expenseBg, border: Border.all(color: AppTheme.expenseBorder), borderRadius: BorderRadius.circular(10)),
-    child: Text(t, style: const TextStyle(color: AppTheme.expenseText, fontWeight: FontWeight.bold)),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    margin: const EdgeInsets.only(bottom: 14),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFEF2F2),
+      border: Border.all(color: const Color(0xFFFEE2E2)),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            t,
+            style: const TextStyle(
+              color: Color(0xFFDC2626),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 
   Widget _row(String l, String v, {bool bold = false}) => Padding(

@@ -228,7 +228,7 @@ class _HistoryTransactionRowState extends State<_HistoryTransactionRow> {
       final cp = isOutflow
           ? (it['toCustodian'] ?? it['to_custodian'])
           : (it['fromCustodian'] ?? it['from_custodian']);
-      final cpName = cp?['name'] ?? 'Custodian Account';
+      final cpName = cp?['name'] ?? 'User Account';
 
       title = isOutflow ? 'Handover: $cpName' : 'Handover: $cpName';
       categoryOrRecipient = cpName;

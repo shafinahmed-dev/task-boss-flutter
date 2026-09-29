@@ -92,7 +92,7 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
       setState(() {
         _custodians = [];
         _loadingCustodians = false;
-        _error = 'Could not load custodians. Please try again.';
+        _error = 'Could not load users. Please try again.';
       });
     }
   }
@@ -124,7 +124,7 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
     }
 
     if (_selectedCustodianId == null || _selectedCustodianId!.isEmpty) {
-      setState(() => _error = 'Please select a recipient custodian.');
+      setState(() => _error = 'Please select a recipient user.');
       return;
     }
 
@@ -306,7 +306,7 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Transfer funds to another custodian in your company.',
+                'Transfer funds to another user in your company.',
                 style: TextStyle(fontSize: 13, color: AppTheme.secondaryText),
               ),
               const SizedBox(height: 16),
@@ -348,7 +348,7 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
                   size: 18, color: AppTheme.slateMid),
               const SizedBox(width: 8),
               const Text(
-                'Recipient Custodian',
+                'Recipient',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
@@ -387,7 +387,7 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
                 border: Border.all(color: AppTheme.pendingBorder),
               ),
               child: const Text(
-                'No other custodians found in your company.',
+                'No other users found in your company.',
                 style: TextStyle(color: AppTheme.pendingText, fontSize: 13),
               ),
             )

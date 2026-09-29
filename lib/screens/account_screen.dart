@@ -462,7 +462,7 @@ class _AccountScreenState extends State<AccountScreen> {
       final fee = _toDouble(item['fee'] ?? item['metadata']?['fee']);
       final status = (item['status'] ?? 'pending').toString().toUpperCase();
       final counterparty = isOut ? (item['toCustodian'] ?? item['to_custodian']) : (item['fromCustodian'] ?? item['from_custodian']);
-      final cpName = counterparty?['name'] ?? 'Custodian Account';
+      final cpName = counterparty?['name'] ?? 'User Account';
       final channel = (item['channel'] ?? item['metadata']?['channel'] ?? '').toString().toUpperCase();
       final note = _parseNote(item);
       final dt = item['date'] as DateTime?;
@@ -676,7 +676,7 @@ class _AccountScreenState extends State<AccountScreen> {
           _buildProfileTile(
             icon: Icons.badge_outlined,
             title: 'User Role',
-            trailing: Text(u.role.isNotEmpty ? u.role : 'Custodian User', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryText)),
+            trailing: Text(u.role.isNotEmpty ? u.role : 'User', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryText)),
           ),
           const Divider(height: 1),
           _buildProfileTile(
@@ -748,9 +748,11 @@ class _AccountScreenState extends State<AccountScreen> {
               const SizedBox(height: 20),
               const Text('System Diagnostics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
               const SizedBox(height: 20),
-              _buildDiagRow('User ID', u.userId),
-              const SizedBox(height: 16),
-              _buildDiagRow('Custodian ID', u.custodianId),
+              _buildDiagRow('User ID', u.userId.isNotEmpty ? u.userId : u.custodianId),
+              if (u.custodianId.isNotEmpty && u.custodianId != u.userId) ...[
+                const SizedBox(height: 16),
+                _buildDiagRow('Account ID', u.custodianId),
+              ],
               const SizedBox(height: 32),
               const Center(child: Text('App Version: 1.0.0 (Build 12)', style: TextStyle(fontSize: 12, color: AppTheme.mutedText))),
             ],
