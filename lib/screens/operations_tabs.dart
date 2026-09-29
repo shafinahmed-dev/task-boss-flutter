@@ -22,7 +22,7 @@ class OperationsTabs extends StatelessWidget {
           // ── Dual Floating Pills Header ─────────────────────────────────
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: const BoxDecoration(
               color: Color(0xFF161F2E),
             ),
@@ -31,7 +31,7 @@ class OperationsTabs extends StatelessWidget {
               children: [
                 // Left Pill – User Info
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
@@ -48,8 +48,8 @@ class OperationsTabs extends StatelessWidget {
                     children: [
                       // Dark circular avatar
                       Container(
-                        width: 32,
-                        height: 32,
+                        width: 28,
+                        height: 28,
                         decoration: const BoxDecoration(
                           color: AppTheme.slateMid,
                           shape: BoxShape.circle,
@@ -60,15 +60,15 @@ class OperationsTabs extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: 13,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 7),
                       Text(
                         userName,
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF111827),
                         ),
@@ -79,7 +79,7 @@ class OperationsTabs extends StatelessWidget {
 
                 // Right Pill – Balance
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
@@ -94,7 +94,7 @@ class OperationsTabs extends StatelessWidget {
                   child: Text(
                     '৳${balance.toStringAsFixed(2)}',
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF111827),
                     ),
