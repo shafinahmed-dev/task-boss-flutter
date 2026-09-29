@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -8,6 +9,18 @@ import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/utils/show_receipt_modal.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
+/// Enables mouse-drag (and trackpad/stylus) scrolling on Flutter Web/Desktop.
+/// By default Flutter Web restricts drag-scroll to touch pointers only.
+class WebDragScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
+}
+
 class CaptureMovementScreen extends StatefulWidget {
   const CaptureMovementScreen({super.key});
   @override
@@ -259,66 +272,71 @@ class _CaptureState extends State<CaptureMovementScreen> {
             SizedBox(
               height: 42,
               child: ScrollConfiguration(
-                behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                behavior: WebDragScrollBehavior(),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Row(
-                    children: _tags[_tab]!.asMap().entries.map((entry) {
-                      final t = entry.value;
-                      final isFirst = entry.key == 0;
-                      final isSelected = _tag == t;
-                      final Color accentColor = _tab == 'in'
-                          ? const Color(0xFF10B981)
-                          : _tab == 'out'
-                              ? const Color(0xFFF59E0B)
-                              : const Color(0xFFEF4444);
-                      return Padding(
-                        padding: EdgeInsets.only(left: isFirst ? 0 : 8),
-                        child: GestureDetector(
-                          onTap: () => setState(() => _tag = t),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            curve: Curves.easeInOut,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isSelected ? Colors.white : Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isSelected ? accentColor : Colors.grey.shade300,
-                                width: isSelected ? 1.5 : 1.0,
-                              ),
-                              boxShadow: isSelected
-                                  ? [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.06),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ]
-                                  : [],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (isSelected) ...[
-                                  Icon(Icons.check_rounded, size: 13, color: accentColor),
-                                  const SizedBox(width: 4),
-                                ],
-                                Text(
-                                  t,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                    color: isSelected ? accentColor : const Color(0xFF4B5563),
-                                  ),
+                    children: [
+                      ..._tags[_tab]!.asMap().entries.map((entry) {
+                        final t = entry.value;
+                        final isFirst = entry.key == 0;
+                        final isSelected = _tag == t;
+                        final Color accentColor = _tab == 'in'
+                            ? const Color(0xFF10B981)
+                            : _tab == 'out'
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFFEF4444);
+                        return Padding(
+                          padding: EdgeInsets.only(left: isFirst ? 0 : 8),
+                          child: GestureDetector(
+                            onTap: () => setState(() => _tag = t),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeInOut,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected ? Colors.white : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isSelected ? accentColor : Colors.grey.shade300,
+                                  width: isSelected ? 1.5 : 1.0,
                                 ),
-                              ],
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ]
+                                    : [],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isSelected) ...[
+                                    Icon(Icons.check_rounded, size: 13, color: accentColor),
+                                    const SizedBox(width: 4),
+                                  ],
+                                  Text(
+                                    t,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                      color: isSelected ? accentColor : const Color(0xFF4B5563),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }),
+                      // Trailing spacer so the last pill is never flush against the edge
+                      const SizedBox(width: 16),
+                    ],
                   ),
                 ),
               ),
