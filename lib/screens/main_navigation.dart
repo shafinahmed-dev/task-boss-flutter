@@ -35,37 +35,47 @@ class _MainNavigationState extends State<MainNavigation> {
           children: _pages,
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (idx) => setState(() => _currentIndex = idx),
-        selectedItemColor: AppTheme.primaryGradientFallback,
-        unselectedItemColor: AppTheme.secondaryText,
-        backgroundColor: AppTheme.cardBg,
-        type: BottomNavigationBarType.fixed,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.sync_alt),
-            label: 'Operations',
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: Colors.grey.shade200, width: 0.8),
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.account_balance_wallet),
-            label: 'Wallets',
-          ),
-          BottomNavigationBarItem(
-            icon: Badge(
-              isLabelVisible: pendingCount > 0,
-              label: Text(pendingCount.toString()),
-              child: const Icon(Icons.notifications),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (idx) => setState(() => _currentIndex = idx),
+          selectedItemColor: AppTheme.primaryGradientFallback,
+          unselectedItemColor: Colors.grey.shade500,
+          backgroundColor: Colors.white,
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
+          selectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+          unselectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.sync_alt),
+              label: 'Operations',
             ),
-            label: 'Notifications',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Account',
-          ),
-        ],
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_wallet),
+              label: 'Wallets',
+            ),
+            BottomNavigationBarItem(
+              icon: Badge(
+                isLabelVisible: pendingCount > 0,
+                label: Text(pendingCount.toString()),
+                child: const Icon(Icons.notifications),
+              ),
+              label: 'Notifications',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.person),
+              label: 'Account',
+            ),
+          ],
+        ),
       ),
     );
   }
