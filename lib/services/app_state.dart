@@ -35,8 +35,14 @@ class AppState extends ChangeNotifier {
     if (storedToken != null && storedUserStr != null) {
       try {
         final parsedUser = AuthUser.fromJson(jsonDecode(storedUserStr));
+        final cachedDesignation = prefs.getString('@user_designation') ?? '';
+        final cachedDepartment = prefs.getString('@user_department') ?? '';
+
         token = storedToken;
-        user = parsedUser;
+        user = parsedUser.copyWith(
+          designation: parsedUser.designation.isNotEmpty ? parsedUser.designation : cachedDesignation,
+          department: parsedUser.department.isNotEmpty ? parsedUser.department : cachedDepartment,
+        );
         await _fetchBalanceData();
       } catch (e) {
         // failed to parse
@@ -128,12 +134,57 @@ class AppState extends ChangeNotifier {
 
   Future<void> login(String newToken, AuthUser newUser) async {
     token = newToken;
-    user = newUser;
     final prefs = await SharedPreferences.getInstance();
+
+    final cachedDesignation = prefs.getString('@user_designation') ?? '';
+    final cachedDepartment = prefs.getString('@user_department') ?? '';
+
+    final finalUser = newUser.copyWith(
+      designation: newUser.designation.isNotEmpty ? newUser.designation : cachedDesignation,
+      department: newUser.department.isNotEmpty ? newUser.department : cachedDepartment,
+    );
+
+    user = finalUser;
     await prefs.setString('@auth_token', newToken);
-    await prefs.setString('@auth_user', jsonEncode(newUser.toJson()));
-    
+    await prefs.setString('@auth_user', jsonEncode(finalUser.toJson()));
+    if (finalUser.designation.isNotEmpty) {
+      await prefs.setString('@user_designation', finalUser.designation);
+    }
+    if (finalUser.department.isNotEmpty) {
+      await prefs.setString('@user_department', finalUser.department);
+    }
+
     await _fetchBalanceData();
+    notifyListeners();
+  }
+
+  Future<void> updateProfileMeta({required String designation, required String department}) async {
+    if (user != null) {
+      user = user!.copyWith(designation: designation, department: department);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('@user_designation', designation);
+    await prefs.setString('@user_department', department);
+    if (user != null) {
+      await prefs.setString('@auth_user', jsonEncode(user!.toJson()));
+    }
+
+    if (token != null && user != null) {
+      try {
+        final url = Uri.parse('$apiBaseUrl/users/profile');
+        await authRequest(
+          'PATCH',
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'designation': designation,
+            'department': department,
+          }),
+        );
+      } catch (_) {
+        // Fallback gracefully to local storage
+      }
+    }
     notifyListeners();
   }
 

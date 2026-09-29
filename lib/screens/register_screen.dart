@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
@@ -16,12 +17,25 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _designationController = TextEditingController();
+  final _departmentController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _loading = false;
   String? _error;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _designationController.dispose();
+    _departmentController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleRegister() async {
     if (_passwordController.text != _confirmController.text) {
@@ -42,6 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         body: jsonEncode({
           'name': _nameController.text.trim(),
           'designation': _designationController.text.trim(),
+          'department': _departmentController.text.trim(),
           'email': _emailController.text.trim(),
           'phone': _phoneController.text.trim(),
           'password': _passwordController.text,
@@ -50,6 +65,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ).timeout(const Duration(seconds: 15));
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final prefs = await SharedPreferences.getInstance();
+        if (_designationController.text.trim().isNotEmpty) {
+          await prefs.setString('@user_designation', _designationController.text.trim());
+        }
+        if (_departmentController.text.trim().isNotEmpty) {
+          await prefs.setString('@user_department', _departmentController.text.trim());
+        }
         widget.onSwitchToLogin();
       } else {
         final data = jsonDecode(resp.body);
@@ -92,7 +114,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
                 _buildField(_nameController, 'Name'),
-                _buildField(_designationController, 'Designation (optional)'),
+                _buildField(_designationController, 'Designation (e.g., Accounts Manager)'),
+                _buildField(_departmentController, 'Department (e.g., Finance & Operations)'),
                 _buildField(_emailController, 'Email', keyboard: TextInputType.emailAddress),
                 _buildField(_phoneController, 'Phone', keyboard: TextInputType.phone),
                 _buildField(_passwordController, 'Password', obscure: true),

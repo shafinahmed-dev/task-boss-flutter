@@ -8,6 +8,8 @@ class AuthUser {
   final String email;
   final String custodianId;
   final String companyId;
+  final String designation;
+  final String department;
 
   AuthUser({
     required this.userId,
@@ -16,16 +18,42 @@ class AuthUser {
     required this.email,
     required this.custodianId,
     required this.companyId,
+    this.designation = '',
+    this.department = '',
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
-      userId: json['userId']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? json['id']?.toString() ?? '',
       role: json['role']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       custodianId: json['custodianId']?.toString() ?? '',
       companyId: json['companyId']?.toString() ?? '',
+      designation: json['designation']?.toString() ?? '',
+      department: json['department']?.toString() ?? '',
+    );
+  }
+
+  AuthUser copyWith({
+    String? userId,
+    String? role,
+    String? name,
+    String? email,
+    String? custodianId,
+    String? companyId,
+    String? designation,
+    String? department,
+  }) {
+    return AuthUser(
+      userId: userId ?? this.userId,
+      role: role ?? this.role,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      custodianId: custodianId ?? this.custodianId,
+      companyId: companyId ?? this.companyId,
+      designation: designation ?? this.designation,
+      department: department ?? this.department,
     );
   }
 
@@ -37,6 +65,8 @@ class AuthUser {
       'email': email,
       'custodianId': custodianId,
       'companyId': companyId,
+      'designation': designation,
+      'department': department,
     };
   }
 }

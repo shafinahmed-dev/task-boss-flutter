@@ -65,6 +65,9 @@ class _LoginScreenState extends State<LoginScreen> {
           throw Exception('User has no assigned user or company account.');
         }
 
+        final designation = (data['user']?['designation'] ?? decodedPayload['designation'])?.toString() ?? '';
+        final department = (data['user']?['department'] ?? decodedPayload['department'])?.toString() ?? '';
+
         final user = AuthUser(
           userId: userId.toString(),
           role: (data['user']?['role'] ?? decodedPayload['role'])?.toString() ?? 'collector',
@@ -72,6 +75,8 @@ class _LoginScreenState extends State<LoginScreen> {
           email: userEmail.toString(),
           custodianId: custodianId.toString(),
           companyId: companyId.toString(),
+          designation: designation,
+          department: department,
         );
 
         await appState.login(token, user);

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:task_boss/models/models.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
 
@@ -664,7 +665,7 @@ class _AccountScreenState extends State<AccountScreen> {
     return map[tag] ?? tag.replaceAll('_', ' ').toUpperCase();
   }
 
-  Widget _buildWorkspaceProfile(u) {
+  Widget _buildWorkspaceProfile(AuthUser u) {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.cardBg,
@@ -675,14 +676,52 @@ class _AccountScreenState extends State<AccountScreen> {
         children: [
           _buildProfileTile(
             icon: Icons.badge_outlined,
-            title: 'User Role',
-            trailing: Text(u.role.isNotEmpty ? u.role : 'User', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryText)),
+            title: 'Designation',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  u.designation.isNotEmpty ? u.designation : 'Not Set',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryText,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppTheme.secondaryText,
+                  size: 20,
+                ),
+              ],
+            ),
+            onTap: () => _showEditWorkspaceDetails(u),
           ),
           const Divider(height: 1),
           _buildProfileTile(
             icon: Icons.business_outlined,
             title: 'Department',
-            trailing: const Text('Finance & Operations', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryText)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  u.department.isNotEmpty ? u.department : 'General',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryText,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppTheme.secondaryText,
+                  size: 20,
+                ),
+              ],
+            ),
+            onTap: () => _showEditWorkspaceDetails(u),
           ),
           const Divider(height: 1),
           _buildProfileTile(
@@ -716,6 +755,134 @@ class _AccountScreenState extends State<AccountScreen> {
             trailing,
           ],
         ),
+      ),
+    );
+  }
+
+  void _showEditWorkspaceDetails(AuthUser u) {
+    final desCtl = TextEditingController(text: u.designation);
+    final depCtl = TextEditingController(text: u.department);
+    bool saving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 12,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Edit Workspace Details',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Update your designation and department information.',
+                    style: TextStyle(fontSize: 13, color: AppTheme.secondaryText),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Designation',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: desCtl,
+                    decoration: InputDecoration(
+                      hintText: 'e.g., Senior Cashier, Accounts Manager',
+                      filled: true,
+                      fillColor: const Color(0xFFF1F5F9),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Department',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: depCtl,
+                    decoration: InputDecoration(
+                      hintText: 'e.g., Operations, Finance',
+                      filled: true,
+                      fillColor: const Color(0xFFF1F5F9),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Center(
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E293B),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          elevation: 4,
+                          shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                        ),
+                        onPressed: saving ? null : () async {
+                          setModalState(() => saving = true);
+                          final newDes = desCtl.text.trim();
+                          final newDep = depCtl.text.trim();
+                          await context.read<AppState>().updateProfileMeta(
+                                designation: newDes,
+                                department: newDep,
+                              );
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Profile details updated'),
+                                backgroundColor: AppTheme.confirmedText,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        child: saving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                              )
+                            : const Text('Save Changes', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
