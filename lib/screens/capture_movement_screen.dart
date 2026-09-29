@@ -349,7 +349,12 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Text('Wallet',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          )),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
                         key: ValueKey('wallet_$_selectedWalletId'),
@@ -365,7 +370,23 @@ class _CaptureState extends State<CaptureMovementScreen> {
                             });
                           }
                         },
-                        decoration: const InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFFF1F5F9),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
                       ),
                     ],
                   ),
@@ -375,12 +396,24 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Text('Method',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          )),
                       const SizedBox(height: 6),
                       selectedWallet?.type.toUpperCase() == 'CASH'
-                          ? const InputDecorator(
-                              decoration: InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
-                              child: Text('Physical Cash', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12), overflow: TextOverflow.ellipsis),
+                          ? Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Text('Physical Cash',
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                                  overflow: TextOverflow.ellipsis),
                             )
                           : DropdownButtonFormField<String>(
                               key: ValueKey('method_${selectedWallet?.id}_$_selectedPaymentMethod'),
@@ -389,7 +422,23 @@ class _CaptureState extends State<CaptureMovementScreen> {
                               onChanged: (v) {
                                 if (v != null) setState(() => _selectedPaymentMethod = v);
                               },
-                              decoration: const InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: const Color(0xFFF1F5F9),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide.none,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              ),
                             ),
                     ],
                   ),
@@ -398,13 +447,35 @@ class _CaptureState extends State<CaptureMovementScreen> {
             ),
             const SizedBox(height: 16),
             Row(children: [
-              const Text('Note', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Note',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                  )),
               if (_isOtherTag) const Text(' * (Required)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.expenseText)),
             ]),
             const SizedBox(height: 6),
             TextField(
               controller: _noteCtl,
-              decoration: InputDecoration(hintText: _isOtherTag ? "Required for 'Other'..." : "Note...", filled: true, fillColor: AppTheme.inputBg, border: const OutlineInputBorder()),
+              decoration: InputDecoration(
+                hintText: _isOtherTag ? "Required for 'Other'..." : "Note...",
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
               onChanged: (_) { _saveDraft(); setState(() {}); },
             ),
             const SizedBox(height: 16),
@@ -416,9 +487,58 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Text('Amount',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          )),
                       const SizedBox(height: 6),
-                      TextField(controller: _amtCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) { _saveDraft(); setState(() {}); }),
+                      TextField(
+                        controller: _amtCtl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '0.00',
+                          hintStyle: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFCBD5E1),
+                          ),
+                          prefixIcon: const Padding(
+                            padding: EdgeInsets.only(left: 14, right: 6),
+                            child: Text(
+                              '৳',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(color: Color(0xFF94A3B8), width: 1.5),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                        ),
+                        onChanged: (_) { _saveDraft(); setState(() {}); },
+                      ),
                     ],
                   ),
                 ),
@@ -427,9 +547,58 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Fee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Text('Fee',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          )),
                       const SizedBox(height: 6),
-                      TextField(controller: _chgCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()), onChanged: (_) { _saveDraft(); setState(() {}); }),
+                      TextField(
+                        controller: _chgCtl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '0.00',
+                          hintStyle: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFCBD5E1),
+                          ),
+                          prefixIcon: const Padding(
+                            padding: EdgeInsets.only(left: 14, right: 6),
+                            child: Text(
+                              '৳',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(color: Color(0xFF94A3B8), width: 1.5),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                        ),
+                        onChanged: (_) { _saveDraft(); setState(() {}); },
+                      ),
                     ],
                   ),
                 ),
@@ -449,21 +618,42 @@ class _CaptureState extends State<CaptureMovementScreen> {
             const SizedBox(height: 20),
             Center(
               child: SizedBox(
-                width: 280,
-                height: 48,
+                width: double.infinity,
+                height: 52,
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: AppTheme.slateButtonGradient,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                     ),
                     onPressed: _saving ? null : _submit,
-                    child: _saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: _saving
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                          )
+                        : const Text(
+                            'Record Movement',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                   ),
                 ),
               ),

@@ -289,7 +289,7 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget _buildStatementCard(u, double bal) {
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0F172A), Color(0xFF1E293B)]),
+        gradient: AppTheme.slateCardGradient,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
       ),
