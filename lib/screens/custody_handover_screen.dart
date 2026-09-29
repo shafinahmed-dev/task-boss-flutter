@@ -1,135 +1,205 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:task_boss/theme.dart';
-import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/models/models.dart';
+import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/utils/show_receipt_modal.dart';
 
 class CustodyHandoverScreen extends StatefulWidget {
   const CustodyHandoverScreen({super.key});
 
   @override
-  State<CustodyHandoverScreen> createState() => _HandoverState();
+  State<CustodyHandoverScreen> createState() => _CustodyHandoverScreenState();
 }
 
-class _HandoverState extends State<CustodyHandoverScreen> {
-  final _amountCtl = TextEditingController();
-  final _chargeCtl = TextEditingController();
+class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
+  final _amtCtl = TextEditingController();
+  final _feeCtl = TextEditingController();
   final _noteCtl = TextEditingController();
-  
-  Wallet? _selectedWallet;
+
+  bool _loadingCustodians = true;
+  bool _saving = false;
+  String? _error;
+
+  List<dynamic> _custodians = [];
+  String? _selectedCustodianId;
+  String? _selectedWalletId;
   String? _selectedPaymentMethod;
 
-  bool _saving = false;
-  List<dynamic> _recipients = [];
-  String? _recipient;
-  String? _error;
-  String? _success;
   Map<String, dynamic>? _lastSavedReceipt;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final app = context.read<AppState>();
-      await app.fetchWallets();
-      if (mounted) {
-        setState(() {
-          if (app.wallets.isNotEmpty) {
-            _selectedWallet = app.wallets.firstWhere((w) => w.isDefault, orElse: () => app.wallets.first);
-            final rails = PaymentRails.getMethods(_selectedWallet!.type, 'out');
-            _selectedPaymentMethod = rails.isNotEmpty ? rails.first : 'Physical Cash';
-          }
-        });
-        _fetchRec();
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _init());
   }
 
-  Future<void> _fetchRec() async {
+  @override
+  void dispose() {
+    _amtCtl.dispose();
+    _feeCtl.dispose();
+    _noteCtl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _init() async {
+    final app = context.read<AppState>();
+    if (app.wallets.isEmpty) {
+      await app.refreshBalance();
+    }
+    await _fetchCustodians();
+  }
+
+  Future<void> _fetchCustodians() async {
     final app = context.read<AppState>();
     if (app.user == null) return;
+    setState(() {
+      _loadingCustodians = true;
+      _error = null;
+    });
     try {
-      final url = Uri.parse('${app.apiBaseUrl}/custody/custodians?companyId=${app.user!.companyId}');
-      final res = await app.authRequest('GET', url, headers: {
-        'Authorization': 'Bearer ${app.token}',
-        'x-company-id': app.user!.companyId,
-      });
+      final url = Uri.parse(
+          '${app.apiBaseUrl}/custody/custodians?companyId=${app.user!.companyId}');
+      final res = await app.authRequest('GET', url);
       if (res.statusCode == 200) {
-        final list = jsonDecode(res.body) as List;
+        final rawData = jsonDecode(res.body);
+        List<dynamic> allCustodians = [];
+        if (rawData is List) {
+          allCustodians = rawData;
+        } else if (rawData is Map && rawData['custodians'] is List) {
+          allCustodians = rawData['custodians'] as List;
+        } else if (rawData is Map && rawData['data'] is List) {
+          allCustodians = rawData['data'] as List;
+        }
+        final others = allCustodians.where((c) {
+          final cId =
+              c['id']?.toString() ?? c['custodianId']?.toString() ?? '';
+          return cId != app.user!.custodianId;
+        }).toList();
         setState(() {
-          _recipients = list.where((c) => c['id'] != app.user!.custodianId).toList();
+          _custodians = others;
+          _loadingCustodians = false;
+        });
+      } else {
+        setState(() {
+          _custodians = [];
+          _loadingCustodians = false;
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      setState(() {
+        _custodians = [];
+        _loadingCustodians = false;
+        _error = 'Could not load custodians. Please try again.';
+      });
+    }
   }
 
+
   Future<void> _submit() async {
-    setState(() { _error = null; _success = null; });
-    final amt = double.tryParse(_amountCtl.text.trim());
+    setState(() => _error = null);
+    final app = context.read<AppState>();
+    if (app.user == null) {
+      setState(() => _error = 'Session expired. Please log in again.');
+      return;
+    }
+
+    final wallets = app.wallets;
+    Wallet? selectedWallet;
+    if (_selectedWalletId != null && wallets.isNotEmpty) {
+      selectedWallet = wallets.firstWhere(
+        (w) => w.id == _selectedWalletId,
+        orElse: () => wallets.first,
+      );
+    } else if (wallets.isNotEmpty) {
+      selectedWallet = wallets.first;
+    }
+
+    if (selectedWallet == null) {
+      setState(
+          () => _error = 'No active wallet found. Please create a wallet first.');
+      return;
+    }
+
+    if (_selectedCustodianId == null || _selectedCustodianId!.isEmpty) {
+      setState(() => _error = 'Please select a recipient custodian.');
+      return;
+    }
+
+    final amt = double.tryParse(_amtCtl.text.trim());
     if (amt == null || amt <= 0) {
       setState(() => _error = 'Please enter a valid amount greater than 0.');
       return;
     }
-    if (_recipient == null || _recipient!.isEmpty) {
-      setState(() => _error = 'Please select a receiver custodian.');
-      return;
-    }
-    final feeText = _chargeCtl.text.trim();
+
+    final feeText = _feeCtl.text.trim();
     final feeVal = feeText.isEmpty ? 0.0 : (double.tryParse(feeText) ?? -1.0);
     if (feeVal < 0) {
-      setState(() => _error = 'Please enter a valid charge amount (0 or greater).');
-      return;
-    }
-
-    final app = context.read<AppState>();
-    final available = _selectedWallet?.currentBalance ?? app.balance;
-    final totalDeducted = amt + feeVal;
-    if (totalDeducted > available) {
-      setState(() => _error = 'Total deducted (৳${totalDeducted.toStringAsFixed(2)}) exceeds selected wallet balance (৳${available.toStringAsFixed(2)}).');
+      setState(() => _error = 'Please enter a valid fee (0 or greater).');
       return;
     }
 
     final noteText = _noteCtl.text.trim();
-    final paymentRail = _selectedPaymentMethod ?? 'Physical Cash';
+    final availableMethods = PaymentRails.getMethods(selectedWallet.type, 'out');
+    final paymentMethod =
+        (_selectedPaymentMethod != null &&
+                availableMethods.contains(_selectedPaymentMethod))
+            ? _selectedPaymentMethod!
+            : availableMethods.first;
+
+    dynamic recipientData;
+    try {
+      recipientData = _custodians.firstWhere(
+        (c) =>
+            (c['id']?.toString() ?? c['custodianId']?.toString() ?? '') ==
+            _selectedCustodianId,
+      );
+    } catch (_) {
+      recipientData = null;
+    }
+    final recipientName = recipientData != null
+        ? (recipientData['name'] ??
+                recipientData['custodianName'] ??
+                recipientData['user']?['name'] ??
+                'Unknown')
+            .toString()
+        : 'Unknown';
+
     setState(() => _saving = true);
     try {
+      final receiptNo =
+          'HND-${const Uuid().v4().substring(0, 8).toUpperCase()}';
       final payload = {
-        'companyId': app.user!.companyId,
         'idempotencyKey': const Uuid().v4(),
         'fromCustodianId': app.user!.custodianId,
-        'toCustodianId': _recipient,
-        'fromWalletId': _selectedWallet?.id,
-        'walletId': _selectedWallet?.id,
+        'toCustodianId': _selectedCustodianId,
+        'companyId': app.user!.companyId,
         'amount': amt,
         'fee': feeVal,
-        'channel': paymentRail,
-        'paymentMethod': paymentRail,
+        'currency': 'BDT',
+        'walletId': selectedWallet.id,
+        'paymentMethod': paymentMethod,
         'notes': noteText.isNotEmpty ? noteText : null,
         'note': noteText.isNotEmpty ? noteText : null,
-        'description': noteText.isNotEmpty ? noteText : null,
         'metadata': {
-          'baseAmount': amt,
+          'walletId': selectedWallet.id,
+          'walletName': selectedWallet.name,
+          'paymentMethod': paymentMethod,
           'fee': feeVal,
-          'channel': paymentRail,
-          'paymentMethod': paymentRail,
-          'fromWalletId': _selectedWallet?.id,
-          'walletId': _selectedWallet?.id,
-          'walletName': _selectedWallet?.name,
-          'category': 'Handover Transfer',
           'note': noteText,
           'notes': noteText,
+          'voucherNumber': receiptNo,
+          'recipientName': recipientName,
         },
       };
 
-      final res = await app.authRequest('POST',
+      final res = await app.authRequest(
+        'POST',
         Uri.parse('${app.apiBaseUrl}/custody/transfers'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${app.token}',
           'x-company-id': app.user!.companyId,
         },
         body: jsonEncode(payload),
@@ -137,34 +207,43 @@ class _HandoverState extends State<CustodyHandoverScreen> {
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final resData = jsonDecode(res.body);
-        final receiptNo = resData['receiptNo'] ?? resData['metadata']?['voucherNumber'] ?? 'HND-${const Uuid().v4().substring(0, 8).toUpperCase()}';
-        
-        final recipientObj = _recipients.firstWhere((c) => c['id'] == _recipient, orElse: () => null);
-        final recipientName = recipientObj != null ? (recipientObj['name'] ?? 'Recipient') : 'Recipient';
+        final returnedNo = resData['receiptNo'] ??
+            resData['metadata']?['voucherNumber'] ??
+            receiptNo;
 
         setState(() {
           _lastSavedReceipt = {
-            'receiptNo': receiptNo,
+            'receiptNo': returnedNo,
             'date': DateTime.now(),
-            'type': 'Handover Transfer',
-            'category': recipientName,
-            'wallet': _selectedWallet?.name ?? 'Wallet',
-            'method': paymentRail,
+            'type': 'Handover Sent',
+            'category': 'To: $recipientName',
+            'wallet': selectedWallet!.name,
+            'method': paymentMethod,
             'note': noteText,
             'amount': amt,
             'fee': feeVal,
           };
-          _amountCtl.clear();
-          _chargeCtl.clear();
+          _amtCtl.clear();
+          _feeCtl.clear();
           _noteCtl.clear();
-          _recipient = null;
-          _success = 'Handover of ৳${amt.toStringAsFixed(2)}${feeVal > 0 ? ' (+ ৳${feeVal.toStringAsFixed(2)} fee)' : ''} submitted! Receiver must confirm.';
+          _selectedCustodianId = null;
         });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Handover transfer submitted successfully!'),
+              backgroundColor: AppTheme.confirmedText,
+            ),
+          );
+        }
         await app.refreshBalance();
       } else {
-        final err = jsonDecode(res.body);
-        final msg = err['message'] ?? err['error'];
-        throw Exception(msg is List ? msg.join(', ') : (msg?.toString() ?? 'Handover failed (HTTP ${res.statusCode})'));
+        final errBody = jsonDecode(res.body);
+        final errMsg = errBody['message'];
+        throw Exception(errMsg is List
+            ? errMsg.join(', ')
+            : (errMsg?.toString() ?? 'Failed (HTTP ${res.statusCode})'));
       }
     } catch (e) {
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
@@ -173,219 +252,583 @@ class _HandoverState extends State<CustodyHandoverScreen> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final amtVal = double.tryParse(_amountCtl.text.trim()) ?? 0.0;
-    final feeVal = double.tryParse(_chargeCtl.text.trim()) ?? 0.0;
-    final totalVal = amtVal + feeVal;
+    final wallets = app.wallets;
+
+    if (_selectedWalletId == null && wallets.isNotEmpty) {
+      final defaultWallet = wallets.firstWhere(
+        (w) => w.isDefault,
+        orElse: () => wallets.first,
+      );
+      _selectedWalletId = defaultWallet.id;
+    }
+
+    Wallet? selectedWallet;
+    if (_selectedWalletId != null && wallets.isNotEmpty) {
+      selectedWallet = wallets.firstWhere(
+        (w) => w.id == _selectedWalletId,
+        orElse: () => wallets.first,
+      );
+    }
+
+    final availableMethods = selectedWallet != null
+        ? PaymentRails.getMethods(selectedWallet.type, 'out')
+        : ['Physical Cash'];
+
+    if (_selectedPaymentMethod == null ||
+        !availableMethods.contains(_selectedPaymentMethod)) {
+      _selectedPaymentMethod = availableMethods.first;
+    }
+
+    final amtVal = double.tryParse(_amtCtl.text.trim()) ?? 0.0;
+    final feeVal = double.tryParse(_feeCtl.text.trim()) ?? 0.0;
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Transfer Funds', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryGradientFallback)),
-            const SizedBox(height: 12),
-            if (_error != null) _banner(_error!, AppTheme.expenseBg, AppTheme.expenseBorder, AppTheme.expenseText),
-            if (_success != null) _banner(_success!, AppTheme.confirmedBg, AppTheme.confirmedBorder, AppTheme.confirmedText),
-
-            // Symmetrical 2x2 Layout - Row 1: Wallet & Recipient Custodian
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<Wallet>(
-                        initialValue: app.wallets.contains(_selectedWallet) ? _selectedWallet : (app.wallets.isNotEmpty ? app.wallets.first : null),
-                        decoration: _inputDec('Select Wallet'),
-                        items: app.wallets.map((w) {
-                          return DropdownMenuItem<Wallet>(
-                            value: w,
-                            child: Text('${w.name} (৳${w.currentBalance.toStringAsFixed(0)})', overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                          );
-                        }).toList(),
-                        onChanged: (w) {
-                          if (w == null) return;
-                          setState(() {
-                            _selectedWallet = w;
-                            final rails = PaymentRails.getMethods(w.type, 'out');
-                            _selectedPaymentMethod = rails.contains(_selectedPaymentMethod)
-                                ? _selectedPaymentMethod
-                                : (rails.isNotEmpty ? rails.first : 'Physical Cash');
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Recipient Custodian', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        initialValue: _recipient,
-                        decoration: _inputDec('Select...'),
-                        items: _recipients.map((c) => DropdownMenuItem(value: c['id'] as String, child: Text(c['name'] ?? 'Unknown', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)))).toList(),
-                        onChanged: (v) => setState(() => _recipient = v),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Symmetrical 2x2 Layout - Row 2: Amount & Fee
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(height: 6),
-                      TextField(controller: _amountCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: _inputDec('0.00'), onChanged: (_) => setState(() {})),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Fee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(height: 6),
-                      TextField(controller: _chargeCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: _inputDec('0.00'), onChanged: (_) => setState(() {})),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            const Text('Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 6),
-            Builder(
-              builder: (context) {
-                final walletType = _selectedWallet?.type ?? 'CASH';
-                final rails = PaymentRails.getMethods(walletType, 'out');
-                final currentMethod = (rails.contains(_selectedPaymentMethod))
-                    ? _selectedPaymentMethod
-                    : (rails.isNotEmpty ? rails.first : 'Physical Cash');
-
-                return DropdownButtonFormField<String>(
-                  initialValue: currentMethod,
-                  decoration: _inputDec('Select Method'),
-                  items: rails.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(),
-                  onChanged: (v) {
-                    setState(() => _selectedPaymentMethod = v);
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-
-            const Text('Note', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _noteCtl,
-              maxLines: 2,
-              decoration: _inputDec('e.g. Daily cash collection handover'),
-            ),
-            const SizedBox(height: 16),
-
-            if (amtVal > 0 || feeVal > 0) Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: AppTheme.cardBg, border: Border.all(color: AppTheme.cardBorder), borderRadius: BorderRadius.circular(10)),
-              child: Column(children: [
-                _impactRow('Base Handover Amount:', '৳${amtVal.toStringAsFixed(2)}'),
-                if (feeVal > 0) _impactRow('Transfer Fee (Expense):', '৳${feeVal.toStringAsFixed(2)}'),
-                const Divider(),
-                _impactRow('Total Balance Deduction:', '৳${totalVal.toStringAsFixed(2)}', bold: true),
-              ]),
-            ),
-            const SizedBox(height: 20),
-
-            Center(
-              child: SizedBox(
-                width: 280,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryGradientFallback,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: _saving ? null : _submit,
-                  child: _saving
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Send', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+      body: RefreshIndicator(
+        onRefresh: _fetchCustodians,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Custody Handover',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.slateDark,
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-
-            // Inline Receipt Status Container
-            Center(
-              child: _lastSavedReceipt == null
-                  ? const Text(
-                      'Hit Send to Generate Receipt',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
-                    )
-                  : TextButton.icon(
-                      onPressed: () {
-                        final r = _lastSavedReceipt!;
-                        showReceiptModal(
-                          context,
-                          receiptNo: r['receiptNo'],
-                          date: r['date'],
-                          type: r['type'],
-                          categoryOrRecipient: r['category'],
-                          wallet: r['wallet'],
-                          method: r['method'],
-                          note: r['note'],
-                          amount: r['amount'],
-                          fee: r['fee'],
-                        );
-                      },
-                      icon: const Icon(Icons.download_rounded, color: Color(0xFF2563EB), size: 18),
-                      label: const Text(
-                        'Download Receipt',
-                        style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              const Text(
+                'Transfer funds to another custodian in your company.',
+                style: TextStyle(fontSize: 13, color: AppTheme.secondaryText),
+              ),
+              const SizedBox(height: 16),
+              if (_error != null) _banner(_error!),
+              _buildRecipientSection(),
+              const SizedBox(height: 14),
+              _buildWalletSection(wallets, selectedWallet, availableMethods),
+              const SizedBox(height: 14),
+              _buildAmountSection(),
+              const SizedBox(height: 14),
+              if (amtVal > 0) _buildSummary(amtVal, feeVal),
+              const SizedBox(height: 20),
+              _buildSubmitButton(wallets),
+              const SizedBox(height: 14),
+              _buildReceiptLink(),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _banner(String t, Color bg, Color border, Color text) => Container(
-    padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 12),
-    decoration: BoxDecoration(color: bg, border: Border.all(color: border), borderRadius: BorderRadius.circular(10)),
-    child: Text(t, style: TextStyle(color: text, fontWeight: FontWeight.bold, fontSize: 13)),
-  );
 
-  InputDecoration _inputDec(String h) => InputDecoration(
-    hintText: h, filled: true, fillColor: AppTheme.inputBg, border: const OutlineInputBorder(),
-  );
+  Widget _buildRecipientSection() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.swap_horiz_rounded,
+                  size: 18, color: AppTheme.slateMid),
+              const SizedBox(width: 8),
+              const Text(
+                'Recipient Custodian',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: AppTheme.primaryText,
+                ),
+              ),
+              const Spacer(),
+              if (_loadingCustodians)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                GestureDetector(
+                  onTap: _fetchCustodians,
+                  child: const Icon(Icons.refresh,
+                      size: 18, color: AppTheme.secondaryText),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_loadingCustodians)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12.0),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (_custodians.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.pendingBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.pendingBorder),
+              ),
+              child: const Text(
+                'No other custodians found in your company.',
+                style: TextStyle(color: AppTheme.pendingText, fontSize: 13),
+              ),
+            )
+          else
+            DropdownButtonFormField<String>(
+              value: _selectedCustodianId,
+              hint: const Text('Select recipient',
+                  style: TextStyle(color: AppTheme.mutedText, fontSize: 13)),
+              items: _custodians.map((c) {
+                final cId =
+                    c['id']?.toString() ?? c['custodianId']?.toString() ?? '';
+                final cName = c['name']?.toString() ??
+                    c['custodianName']?.toString() ??
+                    c['user']?['name']?.toString() ??
+                    'Unknown';
+                final cRole = c['role']?.toString() ??
+                    c['user']?['role']?.toString() ??
+                    '';
+                return DropdownMenuItem<String>(
+                  value: cId,
+                  child: Text(
+                    cRole.isNotEmpty ? '$cName ($cRole)' : cName,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _selectedCustodianId = v),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
-  Widget _impactRow(String l, String v, {bool bold = false}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
-    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      Text(l, style: TextStyle(fontSize: 13, fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
-      Text(v, style: TextStyle(fontSize: 14, fontWeight: bold ? FontWeight.w900 : FontWeight.bold, color: bold ? AppTheme.primaryGradientFallback : Colors.black)),
-    ]),
-  );
+
+  Widget _buildWalletSection(
+      List<Wallet> wallets, Wallet? selectedWallet, List<String> availableMethods) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.account_balance_wallet,
+                  size: 18, color: AppTheme.slateMid),
+              SizedBox(width: 8),
+              Text(
+                'Source Wallet & Payment',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: AppTheme.primaryText,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (wallets.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.pendingBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.pendingBorder),
+              ),
+              child: const Text(
+                'No wallets found. Please create a wallet first.',
+                style: TextStyle(color: AppTheme.pendingText, fontSize: 13),
+              ),
+            )
+          else
+            _buildWalletPaymentRow(wallets, selectedWallet, availableMethods),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWalletPaymentRow(
+      List<Wallet> wallets, Wallet? selectedWallet, List<String> availableMethods) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Wallet',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Color(0xFF64748B))),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                key: ValueKey('wallet_$_selectedWalletId'),
+                value: _selectedWalletId,
+                items: wallets
+                    .map((w) => DropdownMenuItem<String>(
+                          value: w.id,
+                          child: Text(
+                            '${w.name} (৳${w.currentBalance.toStringAsFixed(0)})',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() {
+                      _selectedWalletId = v;
+                      final w = wallets.firstWhere((w) => w.id == v);
+                      final methods = PaymentRails.getMethods(w.type, 'out');
+                      _selectedPaymentMethod = methods.first;
+                    });
+                  }
+                },
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFFF1F5F9),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Method',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Color(0xFF64748B))),
+              const SizedBox(height: 6),
+              selectedWallet?.type.toUpperCase() == 'CASH'
+                  ? InputDecorator(
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      child: const Text('Physical Cash',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 13),
+                          overflow: TextOverflow.ellipsis),
+                    )
+                  : DropdownButtonFormField<String>(
+                      key: ValueKey('method_${selectedWallet?.type}_out'),
+                      value: _selectedPaymentMethod,
+                      items: availableMethods
+                          .map((m) => DropdownMenuItem<String>(
+                                value: m,
+                                child: Text(m,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13)),
+                              ))
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) setState(() => _selectedPaymentMethod = v);
+                      },
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildAmountSection() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.payments_outlined, size: 18, color: AppTheme.slateMid),
+              SizedBox(width: 8),
+              Text('Amount Details',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryText)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Transfer Amount (৳)',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _amtCtl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                      decoration: InputDecoration(
+                        hintText: '0.00',
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 0),
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(left: 14, right: 8),
+                          child: Text('৳', style: TextStyle(color: Color(0xFF64748B), fontSize: 22, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Fee (৳)',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _feeCtl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                      decoration: InputDecoration(
+                        hintText: '0.00',
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 0),
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(left: 14, right: 8),
+                          child: Text('৳', style: TextStyle(color: Color(0xFF64748B), fontSize: 22, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text('Note (optional)',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _noteCtl,
+            minLines: 2,
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: 'Add a note about this handover...',
+              filled: true,
+              fillColor: const Color(0xFFF1F5F9),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummary(double amtVal, double feeVal) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        border: Border.all(color: AppTheme.cardBorder),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          _row('Base Amount:', '৳${amtVal.toStringAsFixed(2)}'),
+          if (feeVal > 0) _row('Fee:', '৳${feeVal.toStringAsFixed(2)}'),
+          const Divider(height: 16),
+          _row('Total Handover:', '৳${(amtVal + feeVal).toStringAsFixed(2)}', bold: true),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildSubmitButton(List<Wallet> wallets) {
+    return Center(
+      child: SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: AppTheme.slateButtonGradient,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
+            ),
+            onPressed: _saving || _loadingCustodians || wallets.isEmpty || _custodians.isEmpty
+                ? null
+                : _submit,
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+            label: Text(
+              _saving ? 'Sending...' : 'Send Handover',
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReceiptLink() {
+    return Center(
+      child: _lastSavedReceipt == null
+          ? const Text(
+              'Submit to generate your Handover Receipt',
+              style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontWeight: FontWeight.w500),
+            )
+          : TextButton.icon(
+              onPressed: () {
+                final r = _lastSavedReceipt!;
+                showReceiptModal(
+                  context,
+                  receiptNo: r['receiptNo'],
+                  date: r['date'],
+                  type: r['type'],
+                  categoryOrRecipient: r['category'],
+                  wallet: r['wallet'],
+                  method: r['method'],
+                  note: r['note'],
+                  amount: r['amount'],
+                  fee: r['fee'],
+                );
+              },
+              icon: const Icon(Icons.download_rounded, color: Color(0xFF2563EB), size: 18),
+              label: const Text(
+                'Download Handover Receipt',
+                style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+    );
+  }
+
+  Widget _banner(String t) => Container(
+        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.expenseBg,
+          border: Border.all(color: AppTheme.expenseBorder),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(t, style: const TextStyle(color: AppTheme.expenseText, fontWeight: FontWeight.bold)),
+      );
+
+  Widget _row(String label, String value, {bool bold = false}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: TextStyle(fontSize: 13, fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: bold ? FontWeight.w900 : FontWeight.bold,
+                    color: bold ? AppTheme.primaryGradientFallback : Colors.black)),
+          ],
+        ),
+      );
 }
+

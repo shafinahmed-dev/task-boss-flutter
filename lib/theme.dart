@@ -8,9 +8,25 @@ class AppTheme {
   static const Color secondaryText = Color(0xFF475569);
   static const Color mutedText = Color(0xFF94A3B8);
 
-  static const Color primaryGradientFallback = Color(0xFF2563EB);
-  static const Color primaryGradientStart = Color(0xFF1E3A8A);
-  static const Color primaryGradientEnd = Color(0xFF3B82F6);
+  static const Color slateDark = Color(0xFF111827);
+  static const Color slateMid = Color(0xFF1E293B);
+  static const Color slateAccent = Color(0xFF283548);
+  
+  static const LinearGradient slateCardGradient = LinearGradient(
+    colors: [Color(0xFF1E293B), Color(0xFF111827)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient slateButtonGradient = LinearGradient(
+    colors: [Color(0xFF283548), Color(0xFF1E293B)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  static const Color primaryGradientFallback = slateMid;
+  static const Color primaryGradientStart = slateDark;
+  static const Color primaryGradientEnd = slateMid;
 
   static const Color pendingBg = Color(0xFFFFFBEB);
   static const Color pendingBorder = Color(0xFFFDE68A);
@@ -37,6 +53,29 @@ class AppTheme {
       scaffoldBackgroundColor: canvas,
       primaryColor: primaryGradientFallback,
       fontFamily: 'Roboto', // Default fallback
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      splashFactory: NoSplash.splashFactory,
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          splashFactory: NoSplash.splashFactory,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          splashFactory: NoSplash.splashFactory,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          splashFactory: NoSplash.splashFactory,
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          splashFactory: NoSplash.splashFactory,
+        ),
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: canvas,
         elevation: 0,

@@ -125,22 +125,85 @@ class _WalletsScreenState extends State<WalletsScreen> {
                       )).toList(),
                     ),
                     const SizedBox(height: 12),
-                    TextField(controller: nameCtl, decoration: const InputDecoration(labelText: 'Wallet Name', border: OutlineInputBorder())),
+                    TextField(
+                        controller: nameCtl,
+                        decoration: InputDecoration(
+                          labelText: 'Wallet Name',
+                          filled: true,
+                          fillColor: const Color(0xFFF1F5F9),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        )),
                     if (type != 'CASH') ...[
                       const SizedBox(height: 10),
-                      TextField(controller: instCtl, decoration: InputDecoration(labelText: type == 'MFS' ? 'Provider (bKash/Nagad)' : 'Bank Name', border: const OutlineInputBorder())),
+                      TextField(
+                          controller: instCtl,
+                          decoration: InputDecoration(
+                            labelText: type == 'MFS' ? 'Provider (bKash/Nagad)' : 'Bank Name',
+                            filled: true,
+                            fillColor: const Color(0xFFF1F5F9),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          )),
                       const SizedBox(height: 10),
-                      TextField(controller: accCtl, decoration: const InputDecoration(labelText: 'Account Number', border: OutlineInputBorder())),
+                      TextField(
+                          controller: accCtl,
+                          decoration: InputDecoration(
+                            labelText: 'Account Number',
+                            filled: true,
+                            fillColor: const Color(0xFFF1F5F9),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          )),
                     ],
                     const SizedBox(height: 10),
-                    TextField(controller: initBalCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Initial Opening Balance (৳)', border: OutlineInputBorder())),
+                    TextField(
+                        controller: initBalCtl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'Initial Opening Balance (৳)',
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                          prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 0),
+                          prefixIcon: const Padding(
+                            padding: EdgeInsets.only(left: 14, right: 8),
+                            child: Text('৳', style: TextStyle(color: Color(0xFF64748B), fontSize: 22, fontWeight: FontWeight.bold)),
+                          ),
+                        )),
                     const SizedBox(height: 10),
-                    SwitchListTile(title: const Text('Set as Default Wallet'), value: isDefault, onChanged: (v) => setModalState(() => isDefault = v)),
+                    SwitchListTile(
+                        title: const Text('Set as Default Wallet'),
+                        value: isDefault,
+                        onChanged: (v) => setModalState(() => isDefault = v)),
                     const SizedBox(height: 12),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGradientFallback, minimumSize: const Size(double.infinity, 48)),
-                      onPressed: saving ? null : submitCreate,
-                      child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Create Wallet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E293B),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                            elevation: 8,
+                            shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.25)),
+                        onPressed: saving ? null : submitCreate,
+                        child: saving
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text('Create Wallet',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
                     ),
                   ],
                 ),
@@ -224,32 +287,100 @@ class _WalletsScreenState extends State<WalletsScreen> {
                     const Text('Internal Wallet Transfer', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
                     if (modalError != null) Text(modalError!, style: const TextStyle(color: AppTheme.expenseText, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    const Text('From Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Text('From Wallet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       initialValue: fromId,
                       items: wallets.map((w) => DropdownMenuItem(value: w.id, child: Text('${w.name} (৳${w.currentBalance.toStringAsFixed(2)})'))).toList(),
                       onChanged: (v) { if (v != null) setModalState(() => fromId = v); },
-                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
                     ),
                     const SizedBox(height: 10),
-                    const Text('To Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Text('To Wallet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       initialValue: toId,
                       items: wallets.map((w) => DropdownMenuItem(value: w.id, child: Text('${w.name} (৳${w.currentBalance.toStringAsFixed(2)})'))).toList(),
                       onChanged: (v) { if (v != null) setModalState(() => toId = v); },
-                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
                     ),
                     const SizedBox(height: 10),
-                    TextField(controller: amtCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Transfer Amount (৳)', border: OutlineInputBorder())),
+                    const Text('Transfer Amount (৳)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
+                    TextField(controller: amtCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), 
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                      decoration: InputDecoration(
+                        hintText: '0.00',
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 0),
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(left: 14, right: 8),
+                          child: Text('৳', style: TextStyle(color: Color(0xFF64748B), fontSize: 22, fontWeight: FontWeight.bold)),
+                        ),
+                    )),
                     const SizedBox(height: 10),
-                    TextField(controller: feeCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Fee (৳, optional)', border: OutlineInputBorder())),
+                    const Text('Fee (৳, optional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
+                    TextField(controller: feeCtl, keyboardType: const TextInputType.numberWithOptions(decimal: true), 
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                      decoration: InputDecoration(
+                        hintText: '0.00',
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 0),
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(left: 14, right: 8),
+                          child: Text('৳', style: TextStyle(color: Color(0xFF64748B), fontSize: 22, fontWeight: FontWeight.bold)),
+                        ),
+                    )),
                     const SizedBox(height: 10),
-                    TextField(controller: noteCtl, decoration: const InputDecoration(labelText: 'Note (optional)', border: OutlineInputBorder())),
+                    const Text('Note (optional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
+                    TextField(controller: noteCtl, decoration: InputDecoration(
+                        hintText: 'Add a note here...',
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    )),
                     const SizedBox(height: 12),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGradientFallback, minimumSize: const Size(double.infinity, 48)),
-                      onPressed: saving ? null : submitTransfer,
-                      child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Execute Transfer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E293B), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), elevation: 8, shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.25)),
+                        onPressed: saving ? null : submitTransfer,
+                        child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Execute Transfer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
                     ),
                   ],
                 ),
@@ -281,10 +412,7 @@ class _WalletsScreenState extends State<WalletsScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppTheme.primaryGradientStart, AppTheme.primaryGradientEnd],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight,
-                ),
+                gradient: AppTheme.slateCardGradient,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -299,7 +427,15 @@ class _WalletsScreenState extends State<WalletsScreen> {
                     children: [
                       Text('${wallets.length} Active Wallets', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                       ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.white24, foregroundColor: Colors.white, elevation: 0),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: const BorderSide(color: Colors.white24),
+                          ),
+                        ),
                         onPressed: () => _showTransferModal(context),
                         icon: const Icon(Icons.swap_horiz, size: 18),
                         label: const Text('Transfer', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
@@ -394,11 +530,38 @@ class _WalletsScreenState extends State<WalletsScreen> {
                         decoration: BoxDecoration(color: AppTheme.expenseBg, border: Border.all(color: AppTheme.expenseBorder), borderRadius: BorderRadius.circular(8)),
                         child: Text(modalError!, style: const TextStyle(color: AppTheme.expenseText, fontSize: 13)),
                       ),
-                    TextField(controller: nameCtl, decoration: const InputDecoration(labelText: 'Wallet Name *', border: OutlineInputBorder())),
+                    TextField(controller: nameCtl, decoration: InputDecoration(
+                        labelText: 'Wallet Name *',
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    )),
                     const SizedBox(height: 12),
-                    TextField(controller: instCtl, decoration: const InputDecoration(labelText: 'Institution / Provider', border: OutlineInputBorder())),
+                    TextField(controller: instCtl, decoration: InputDecoration(
+                        labelText: 'Institution / Provider',
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    )),
                     const SizedBox(height: 12),
-                    TextField(controller: accCtl, decoration: const InputDecoration(labelText: 'Account Number', border: OutlineInputBorder())),
+                    TextField(controller: accCtl, decoration: InputDecoration(
+                        labelText: 'Account Number',
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    )),
                     const SizedBox(height: 12),
                     CheckboxListTile(
                       title: const Text('Set as Default Wallet'),
@@ -408,10 +571,18 @@ class _WalletsScreenState extends State<WalletsScreen> {
                       contentPadding: EdgeInsets.zero,
                     ),
                     const SizedBox(height: 16),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGradientFallback, padding: const EdgeInsets.symmetric(vertical: 14)),
-                      onPressed: saving ? null : submitEdit,
-                      child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E293B),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          elevation: 8,
+                          shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                        ),
+                        onPressed: saving ? null : submitEdit,
+                        child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
                     ),
                     const SizedBox(height: 20),
                   ],
