@@ -253,7 +253,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
             const Text('Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryGradientFallback)),
             const SizedBox(height: 12),
             if (_error != null) _banner(_error!),
-            Row(children: [_tabBtn('Cash In', 'in', AppTheme.inflowText), _tabBtn('Cash Out', 'out', AppTheme.pendingAccent), _tabBtn('Expense', 'expense', AppTheme.expenseText)]),
+            _buildSegmentTrack(),
             const SizedBox(height: 16),
             const Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 6),
@@ -303,10 +303,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
                       const Text('Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 6),
                       selectedWallet?.type.toUpperCase() == 'CASH'
-                          ? Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-                              decoration: BoxDecoration(color: AppTheme.inputBg, borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.grey.shade400)),
-                              child: const Text('Physical Cash', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 12), overflow: TextOverflow.ellipsis),
+                          ? InputDecorator(
+                              decoration: const InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
+                              child: const Text('Physical Cash', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12), overflow: TextOverflow.ellipsis),
                             )
                           : DropdownButtonFormField<String>(
                               key: ValueKey('method_${selectedWallet?.id}_$_selectedPaymentMethod'),
@@ -420,39 +419,81 @@ class _CaptureState extends State<CaptureMovementScreen> {
     );
   }
 
-  Widget _tabBtn(String l, String v, Color c) => Expanded(
-        child: GestureDetector(
-          onTap: () => setState(() {
-            _tab = v;
-            _tag = _tags[v]![0];
-            _error = null;
-            if (_selectedWalletId != null) {
-              final app = context.read<AppState>();
-              if (app.wallets.isNotEmpty) {
-                final wallet = app.wallets.firstWhere((w) => w.id == _selectedWalletId, orElse: () => app.wallets.first);
-                final methods = PaymentRails.getMethods(wallet.type, _tab);
-                _selectedPaymentMethod = methods.first;
-              }
-            }
-          }),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: _tab == v ? c : Colors.grey[200],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              l,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: _tab == v ? Colors.white : AppTheme.secondaryText,
-                fontWeight: FontWeight.bold,
+  Widget _buildSegmentTrack() {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(24)),
+      child: Stack(
+        children: [
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            alignment: _tab == 'in' ? Alignment.centerLeft : _tab == 'out' ? Alignment.center : Alignment.centerRight,
+            child: FractionallySizedBox(
+              widthFactor: 1 / 3,
+              child: Container(
+                height: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6, offset: const Offset(0, 2))],
+                ),
               ),
             ),
           ),
+          Row(
+            children: [
+              _buildSegmentItem('Cash In', 'in', Icons.arrow_downward_rounded, const Color(0xFF10B981)),
+              _buildSegmentItem('Cash Out', 'out', Icons.arrow_upward_rounded, const Color(0xFFF59E0B)),
+              _buildSegmentItem('Expense', 'expense', Icons.receipt_outlined, const Color(0xFFEF4444)),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegmentItem(String label, String value, IconData icon, Color activeColor) {
+    final isActive = _tab == value;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() {
+          _tab = value;
+          _tag = _tags[value]![0];
+          _error = null;
+          if (_selectedWalletId != null) {
+            final app = context.read<AppState>();
+            if (app.wallets.isNotEmpty) {
+              final wallet = app.wallets.firstWhere((w) => w.id == _selectedWalletId, orElse: () => app.wallets.first);
+              final methods = PaymentRails.getMethods(wallet.type, _tab);
+              _selectedPaymentMethod = methods.first;
+            }
+          }
+        }),
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isActive) ...[
+                Icon(icon, size: 16, color: activeColor),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  color: isActive ? const Color(0xFF111827) : Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
         ),
-      );
+      ),
+    );
+  }
 
   Widget _banner(String t) => Container(
     padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 12),
