@@ -56,29 +56,28 @@ class _MainNavigationState extends State<MainNavigation> {
           backgroundColor: Colors.transparent,
           type: BottomNavigationBarType.fixed,
           elevation: 0,
-          selectedLabelStyle:
-              const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          unselectedLabelStyle:
-              const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+          showSelectedLabels: false,
+          showUnselectedLabels: false,
+          iconSize: 26,
           items: [
             const BottomNavigationBarItem(
-              icon: Icon(Icons.sync_alt),
+              icon: Icon(Icons.sync_alt_rounded),
               label: 'Operations',
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.account_balance_wallet),
+              icon: Icon(Icons.account_balance_wallet_outlined),
               label: 'Wallets',
             ),
             BottomNavigationBarItem(
               icon: Badge(
                 isLabelVisible: pendingCount > 0,
                 label: Text(pendingCount.toString()),
-                child: const Icon(Icons.notifications),
+                child: const Icon(Icons.notifications_none_rounded),
               ),
               label: 'Notifications',
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.person),
+              icon: Icon(Icons.person_outline_rounded),
               label: 'Account',
             ),
           ],

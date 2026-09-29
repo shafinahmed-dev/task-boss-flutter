@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/models/models.dart';
@@ -257,14 +256,72 @@ class _CaptureState extends State<CaptureMovementScreen> {
             const SizedBox(height: 16),
             const Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 6),
-            Wrap(
-              spacing: 8, runSpacing: 8,
-              children: _tags[_tab]!.map((t) => ChoiceChip(
-                label: Text(t, style: TextStyle(color: _tag == t ? Colors.white : AppTheme.secondaryText, fontWeight: FontWeight.bold, fontSize: 12)),
-                selected: _tag == t,
-                selectedColor: _tab == 'in' ? AppTheme.inflowText : _tab == 'out' ? AppTheme.pendingAccent : AppTheme.expenseText,
-                onSelected: (_) => setState(() => _tag = t),
-              )).toList(),
+            SizedBox(
+              height: 42,
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
+                    children: _tags[_tab]!.asMap().entries.map((entry) {
+                      final t = entry.value;
+                      final isFirst = entry.key == 0;
+                      final isSelected = _tag == t;
+                      final Color accentColor = _tab == 'in'
+                          ? const Color(0xFF10B981)
+                          : _tab == 'out'
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFFEF4444);
+                      return Padding(
+                        padding: EdgeInsets.only(left: isFirst ? 0 : 8),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _tag = t),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeInOut,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.white : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isSelected ? accentColor : Colors.grey.shade300,
+                                width: isSelected ? 1.5 : 1.0,
+                              ),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.06),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isSelected) ...[
+                                  Icon(Icons.check_rounded, size: 13, color: accentColor),
+                                  const SizedBox(width: 4),
+                                ],
+                                Text(
+                                  t,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                    color: isSelected ? accentColor : const Color(0xFF4B5563),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             Row(
@@ -303,9 +360,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
                       const Text('Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 6),
                       selectedWallet?.type.toUpperCase() == 'CASH'
-                          ? InputDecorator(
-                              decoration: const InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
-                              child: const Text('Physical Cash', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12), overflow: TextOverflow.ellipsis),
+                          ? const InputDecorator(
+                              decoration: InputDecoration(filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder()),
+                              child: Text('Physical Cash', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12), overflow: TextOverflow.ellipsis),
                             )
                           : DropdownButtonFormField<String>(
                               key: ValueKey('method_${selectedWallet?.id}_$_selectedPaymentMethod'),
