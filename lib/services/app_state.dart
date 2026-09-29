@@ -89,6 +89,43 @@ class AppState extends ChangeNotifier {
   }
 
 
+  Future<bool> hasSecurityPin() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.containsKey('@auth_pin');
+  }
+
+  Future<bool> verifySecurityPin(String pin) async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString('@auth_pin');
+    final obfuscated = base64Encode(utf8.encode(pin));
+    return stored == obfuscated;
+  }
+
+  Future<void> setSecurityPin(String pin) async {
+    final prefs = await SharedPreferences.getInstance();
+    final obfuscated = base64Encode(utf8.encode(pin));
+    await prefs.setString('@auth_pin', obfuscated);
+    notifyListeners();
+  }
+
+  Future<void> removeSecurityPin() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('@auth_pin');
+    await prefs.remove('@auth_pin_required');
+    notifyListeners();
+  }
+
+  Future<bool> isPinRequiredForTransactions() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('@auth_pin_required') ?? false;
+  }
+
+  Future<void> setPinRequiredForTransactions(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('@auth_pin_required', value);
+    notifyListeners();
+  }
+
   Future<void> login(String newToken, AuthUser newUser) async {
     token = newToken;
     user = newUser;

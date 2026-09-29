@@ -689,7 +689,7 @@ class _AccountScreenState extends State<AccountScreen> {
             icon: Icons.lock_outline_rounded,
             title: 'Security & Passcode',
             trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.secondaryText, size: 20),
-            onTap: () {},
+            onTap: _showSecuritySheet,
           ),
           const Divider(height: 1),
           _buildProfileTile(
@@ -717,6 +717,345 @@ class _AccountScreenState extends State<AccountScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showSecuritySheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const _SecuritySheet(),
+    );
+  }
+class _SecuritySheet extends StatefulWidget {
+  const _SecuritySheet();
+
+  @override
+  State<_SecuritySheet> createState() => _SecuritySheetState();
+}
+
+class _SecuritySheetState extends State<_SecuritySheet> {
+  bool _isLoading = false;
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+
+  final _currentPwdCtrl = TextEditingController();
+  final _newPwdCtrl = TextEditingController();
+  final _confirmPwdCtrl = TextEditingController();
+
+  bool _hasPin = false;
+  bool _requirePin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSec();
+  }
+
+  Future<void> _loadSec() async {
+    final app = context.read<AppState>();
+    final h = await app.hasSecurityPin();
+    final r = await app.isPinRequiredForTransactions();
+    if (mounted) {
+      setState(() {
+        _hasPin = h;
+        _requirePin = r;
+      });
+    }
+  }
+
+  void _showMsg(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
+  }
+
+  Future<void> _updatePassword() async {
+    final cur = _currentPwdCtrl.text;
+    final newP = _newPwdCtrl.text;
+    final conf = _confirmPwdCtrl.text;
+
+    if (cur.isEmpty || newP.isEmpty || conf.isEmpty) {
+      _showMsg('All password fields are required.');
+      return;
+    }
+    if (newP.length < 6) {
+      _showMsg('New password must be at least 6 characters.');
+      return;
+    }
+    if (newP != conf) {
+      _showMsg('New passwords do not match.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final app = context.read<AppState>();
+      final res = await app.authRequest(
+        'POST',
+        Uri.parse('${app.apiBaseUrl}/auth/change-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'currentPassword': cur, 'newPassword': newP}),
+      );
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        _showMsg('Password updated successfully.');
+        _currentPwdCtrl.clear();
+        _newPwdCtrl.clear();
+        _confirmPwdCtrl.clear();
+      } else {
+        final d = jsonDecode(res.body);
+        _showMsg(d['message'] ?? 'Failed to update password.');
+      }
+    } catch (e) {
+      _showMsg('Error updating password.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+
+
+  Future<void> _handlePinChange() async {
+    final app = context.read<AppState>();
+    if (_hasPin) {
+      final old = await _promptPin('Enter Current PIN');
+      if (old == null) return;
+      final ok = await app.verifySecurityPin(old);
+      if (!ok) {
+        _showMsg('Incorrect PIN.');
+        return;
+      }
+    }
+
+    final newP = await _promptPin('Enter New 4-Digit PIN');
+    if (newP == null || newP.length < 4) return;
+    
+    final confP = await _promptPin('Confirm New PIN');
+    if (confP == null) return;
+    if (newP != confP) {
+      _showMsg('PINs do not match.');
+      return;
+    }
+
+    await app.setSecurityPin(newP);
+    _showMsg('Security PIN updated.');
+    _loadSec();
+  }
+
+  Future<String?> _promptPin(String title) async {
+    String pin = '';
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(pin.padRight(4, '○').replaceAll(RegExp(r'[0-9]'), '●'), style: const TextStyle(fontSize: 32, letterSpacing: 8)),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  alignment: WrapAlignment.center,
+                  children: List.generate(12, (index) {
+                    if (index == 9) return const SizedBox(width: 50, height: 50);
+                    if (index == 11) {
+                      return InkWell(
+                        onTap: () {
+                          if (pin.isNotEmpty) setDialogState(() => pin = pin.substring(0, pin.length - 1));
+                        },
+                        child: Container(
+                          width: 50, height: 50, alignment: Alignment.center,
+                          child: const Icon(Icons.backspace_outlined),
+                        ),
+                      );
+                    }
+                    final num = index == 10 ? 0 : index + 1;
+                    return InkWell(
+                      onTap: () {
+                        if (pin.length < 4) {
+                          setDialogState(() => pin += num.toString());
+                          if (pin.length == 4) {
+                            Navigator.pop(ctx, pin);
+                          }
+                        }
+                      },
+                      child: Container(
+                        width: 50, height: 50, alignment: Alignment.center,
+                        decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+                        child: Text('$num', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      ),
+                    );
+                  }),
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 10, 20, bottomInset + 20),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 5,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const Text('Security & Access', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
+            const SizedBox(height: 4),
+            const Text('Manage login password and transaction authorization PIN.', style: TextStyle(color: AppTheme.secondaryText, fontSize: 13)),
+            const SizedBox(height: 24),
+
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: AppTheme.canvas, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.cardBorder)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('App Unlock & PIN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.primaryText)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _hasPin ? const Color(0xFFDCFCE7) : Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(_hasPin ? 'Status: PIN Active' : 'Status: Not Set', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _hasPin ? const Color(0xFF16A34A) : Colors.grey.shade600)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primaryText,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: _handlePinChange,
+                          child: Text(_hasPin ? 'Change PIN' : 'Set PIN', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                      ),
+                      if (_hasPin) ...[
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.expenseText,
+                              side: const BorderSide(color: AppTheme.expenseBorder),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () async {
+                              final app = context.read<AppState>();
+                              await app.removeSecurityPin();
+                              _loadSec();
+                              _showMsg('PIN removed.');
+                            },
+                            child: const Text('Remove', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          ),
+                        ),
+                      ]
+                    ],
+                  ),
+                  if (_hasPin) ...[
+                    const Divider(height: 30),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Expanded(child: Text('Require PIN for Handovers & Cash Movements', style: TextStyle(fontSize: 13, color: AppTheme.primaryText))),
+                        Switch(
+            const Text('Account Password', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primaryText)),
+            const SizedBox(height: 4),
+            const Text('Update backend account login password.', style: TextStyle(color: AppTheme.secondaryText, fontSize: 13)),
+            const SizedBox(height: 16),
+            _pwdField('Current Password', _currentPwdCtrl, _obscureCurrent, (val) => setState(() => _obscureCurrent = val)),
+            const SizedBox(height: 12),
+            _pwdField('New Password', _newPwdCtrl, _obscureNew, (val) => setState(() => _obscureNew = val)),
+            const SizedBox(height: 12),
+            _pwdField('Confirm New Password', _confirmPwdCtrl, _obscureConfirm, (val) => setState(() => _obscureConfirm = val)),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryGradientFallback,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: _isLoading ? null : _updatePassword,
+                child: _isLoading 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Update Password', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pwdField(String label, TextEditingController ctrl, bool obscure, Function(bool) onTg) {
+    return TextField(
+      controller: ctrl,
+      obscureText: obscure,
+      style: const TextStyle(fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(fontSize: 13, color: AppTheme.secondaryText),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        suffixIcon: IconButton(
+          icon: Icon(obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20, color: AppTheme.secondaryText),
+          onPressed: () => onTg(!obscure),
+        ),
+      ),
+    );
+  }
+}
+
+                          value: _requirePin,
+                          activeColor: AppTheme.primaryGradientFallback,
+                          onChanged: (val) async {
+                            await context.read<AppState>().setPinRequiredForTransactions(val);
+                            _loadSec();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: AppTheme.secondaryText))),
+            ],
+          );
+        });
+      },
     );
   }
 
