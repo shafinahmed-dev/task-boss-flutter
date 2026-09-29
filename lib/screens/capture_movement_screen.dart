@@ -250,7 +250,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryGradientFallback)),
+            const Text('Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.slateDark)),
             const SizedBox(height: 12),
             if (_error != null) _banner(_error!),
             _buildSegmentTrack(),
@@ -376,10 +376,20 @@ class _CaptureState extends State<CaptureMovementScreen> {
               child: SizedBox(
                 width: 280,
                 height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGradientFallback, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                  onPressed: _saving ? null : _submit,
-                  child: _saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.slateButtonGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _saving ? null : _submit,
+                    child: _saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
                 ),
               ),
             ),
@@ -423,13 +433,25 @@ class _CaptureState extends State<CaptureMovementScreen> {
     return Container(
       height: 52,
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(24)),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E293B), Color(0xFF111827)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1),
+      ),
       child: Stack(
         children: [
           AnimatedAlign(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
-            alignment: _tab == 'in' ? Alignment.centerLeft : _tab == 'out' ? Alignment.center : Alignment.centerRight,
+            alignment: _tab == 'in'
+                ? Alignment.centerLeft
+                : _tab == 'out'
+                    ? Alignment.center
+                    : Alignment.centerRight,
             child: FractionallySizedBox(
               widthFactor: 1 / 3,
               child: Container(
@@ -437,7 +459,13 @@ class _CaptureState extends State<CaptureMovementScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6, offset: const Offset(0, 2))],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -448,7 +476,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
               _buildSegmentItem('Cash Out', 'out', Icons.arrow_upward_rounded, const Color(0xFFF59E0B)),
               _buildSegmentItem('Expense', 'expense', Icons.receipt_outlined, const Color(0xFFEF4444)),
             ],
-          )
+          ),
         ],
       ),
     );
@@ -466,7 +494,10 @@ class _CaptureState extends State<CaptureMovementScreen> {
           if (_selectedWalletId != null) {
             final app = context.read<AppState>();
             if (app.wallets.isNotEmpty) {
-              final wallet = app.wallets.firstWhere((w) => w.id == _selectedWalletId, orElse: () => app.wallets.first);
+              final wallet = app.wallets.firstWhere(
+                (w) => w.id == _selectedWalletId,
+                orElse: () => app.wallets.first,
+              );
               final methods = PaymentRails.getMethods(wallet.type, _tab);
               _selectedPaymentMethod = methods.first;
             }
@@ -476,16 +507,20 @@ class _CaptureState extends State<CaptureMovementScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (isActive) ...[
-                Icon(icon, size: 16, color: activeColor),
-                const SizedBox(width: 4),
-              ],
+              Icon(
+                icon,
+                size: 15,
+                color: isActive ? activeColor : const Color(0xFF94A3B8),
+              ),
+              const SizedBox(width: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                  color: isActive ? const Color(0xFF111827) : Colors.grey.shade600,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  color: isActive
+                      ? const Color(0xFF111827)
+                      : const Color(0xFF94A3B8),
                 ),
               ),
             ],
