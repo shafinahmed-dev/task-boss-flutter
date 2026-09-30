@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/screens/account_screen.dart';
 import 'package:task_boss/screens/operations_tabs.dart';
 import 'package:task_boss/screens/wallets_screen.dart';
-import 'package:task_boss/screens/notifications_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -19,14 +16,11 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _pages = [
     const OperationsTabs(),
     const WalletsScreen(),
-    const NotificationsScreen(),
     const AccountScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final pendingCount = context.watch<AppState>().pendingCount;
-
     return Scaffold(
       body: SafeArea(
         child: IndexedStack(
@@ -59,24 +53,16 @@ class _MainNavigationState extends State<MainNavigation> {
           showSelectedLabels: false,
           showUnselectedLabels: false,
           iconSize: 26,
-          items: [
-            const BottomNavigationBarItem(
+          items: const [
+            BottomNavigationBarItem(
               icon: Icon(Icons.sync_alt_rounded),
               label: 'Operations',
             ),
-            const BottomNavigationBarItem(
+            BottomNavigationBarItem(
               icon: Icon(Icons.account_balance_wallet_outlined),
               label: 'Wallets',
             ),
             BottomNavigationBarItem(
-              icon: Badge(
-                isLabelVisible: pendingCount > 0,
-                label: Text(pendingCount.toString()),
-                child: const Icon(Icons.notifications_none_rounded),
-              ),
-              label: 'Notifications',
-            ),
-            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline_rounded),
               label: 'Account',
             ),
