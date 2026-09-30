@@ -466,14 +466,39 @@ export class AuthService {
     role: string;
     password: string;
     companyIds: string[];
+    handle?: string;
   }) {
     const passwordHash = await bcrypt.hash(data.password, 10);
+
+    let tenantId: string | null = null;
+    let tenantSlug = 'taskgroup';
+    if (data.companyIds && data.companyIds.length > 0) {
+      const comp = await this.prisma.company.findUnique({
+        where: { id: data.companyIds[0] },
+        include: { tenant: true },
+      });
+      if (comp) {
+        tenantId = comp.tenantId;
+        if (comp.tenant?.slug) {
+          tenantSlug = comp.tenant.slug;
+        }
+      }
+    }
+
+    const baseHandle = (data.handle || data.name).toLowerCase().replace(/[^a-z0-9]/g, '');
+    let handle = `${baseHandle}.${tenantSlug}`;
+    const existing = await this.prisma.user.findUnique({ where: { handle } });
+    if (existing) {
+      handle = `${baseHandle}${Date.now() % 10000}.${tenantSlug}`;
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
+          handle,
           name: data.name,
           role: data.role,
+          tenantId,
           languagePref: 'bn',
           passwordHash,
         },

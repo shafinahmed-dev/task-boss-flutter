@@ -324,15 +324,21 @@ export class CustodyService {
         ];
 
         for (const col of colleagues) {
+          // Derive a handle from name + company slug (unique per company via companyId prefix)
+          const nameSlug = col.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const companyPrefix = companyId.substring(0, 6);
+          const candidateHandle = `${nameSlug}.${companyPrefix}`;
+
           let user = await this.prisma.user.findFirst({
             where: {
-              OR: [{ email: col.email }, { name: col.name }],
+              OR: [{ email: col.email }, { handle: candidateHandle }],
             },
           });
 
           if (!user) {
             user = await this.prisma.user.create({
               data: {
+                handle: candidateHandle,
                 name: col.name,
                 email: col.email,
                 designation: col.designation,
