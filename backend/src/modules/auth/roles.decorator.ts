@@ -4,15 +4,19 @@ export const ROLES_KEY = 'roles';
 
 /**
  * Role hierarchy (highest → lowest):
- *   admin > approver > accounts > collector
+ *   SUITE_ADMIN > MANAGER > EMPLOYEE
+ *   (Legacy support: admin > approver > accounts > collector)
  *
  * Use @Roles('accounts') on a handler to require that the calling user
  * has at least the "accounts" role (i.e. accounts, approver, or admin).
  */
 export const ROLE_HIERARCHY: Record<string, number> = {
+  SUITE_ADMIN: 4,
   admin: 4,
+  MANAGER: 3,
   approver: 3,
-  accounts: 2,
+  accounts: 2, // Map closely with traditional accounts equivalent
+  EMPLOYEE: 1,
   collector: 1,
 };
 

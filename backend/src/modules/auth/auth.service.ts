@@ -8,10 +8,21 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../database/prisma.service.js';
 
+// ── DTOs ──────────────────────────────────────────────────────────────────
+
 export interface LoginDto {
-  email: string;      // We use name or email as identifier
+  handle: string;     // e.g. "suite.taskgroup", "ceoman.taskgroup"
   password: string;
-  companyId?: string; // Optional — scope the token to a specific company
+  // Legacy compat: accept email field as alias for handle
+  email?: string;
+  companyId?: string;
+}
+
+export interface RegisterCompanyDto {
+  companyName: string;
+  slug: string;
+  password: string;
+  suiteName?: string;
 }
 
 export interface RegisterDto {
@@ -36,12 +47,14 @@ export interface AuthResult {
   expires_in: number;
   user: {
     id: string;
+    handle: string;
     name: string;
     email?: string;
     phone?: string;
     designation?: string;
     department?: string;
     role: string;
+    tenantId?: string;
     companyIds: string[];
     custodianId?: string;
   };
@@ -57,29 +70,41 @@ export class AuthService {
   /**
    * POST /auth/login
    *
-   * Authenticates a user by name (used as email equivalent) + password.
+   * Authenticates a user by handle (or legacy email/name) + password.
    * Returns a signed JWT containing:
    *   • sub: user ID
+   *   • handle: user handle
    *   • role: user role
+   *   • tenantId: tenant UUID
    *   • companyIds: array of authorized company IDs
    */
   async login(dto: LoginDto): Promise<AuthResult> {
-    // Find user by email or name
+    // Normalize: support both "handle" and legacy "email" field
+    const identifier = (dto.handle || dto.email || '').trim().toLowerCase();
+
+    if (!identifier) {
+      throw new BadRequestException('Handle is required');
+    }
+
+    // Try to find user by handle first, then fall back to email/name
     const user = await this.prisma.user.findFirst({
       where: {
         OR: [
-          { email: dto.email },
-          { name: dto.email }
+          { handle: identifier },
+          { email: identifier },
+          { name: identifier },
         ]
       },
       select: {
         id: true,
+        handle: true,
         name: true,
         email: true,
         phone: true,
         designation: true,
         department: true,
         role: true,
+        tenantId: true,
         languagePref: true,
         passwordHash: true,
         createdAt: true,
@@ -124,10 +149,12 @@ export class AuthService {
       authorizedCompanyIds = allCompanyIds;
     }
 
-    // Sign JWT
+    // Sign JWT with handle & tenantId
     const payload = {
       sub: user.id,
+      handle: user.handle,
       role: user.role,
+      tenantId: user.tenantId ?? undefined,
       companyIds: authorizedCompanyIds,
     };
 
@@ -144,16 +171,136 @@ export class AuthService {
       expires_in,
       user: {
         id: user.id,
+        handle: user.handle,
         name: user.name,
-        email: user.email ?? dto.email,
+        email: user.email ?? undefined,
         phone: user.phone ?? undefined,
         designation: user.designation ?? 'User',
         department: user.department ?? 'General',
         role: user.role,
+        tenantId: user.tenantId ?? undefined,
         companyIds: authorizedCompanyIds,
         custodianId: user.custodianAccounts[0]?.id,
       },
     };
+  }
+
+  // ── POST /auth/register-company ──────────────────────────────────────
+
+  async registerCompany(dto: RegisterCompanyDto) {
+    // Sanitize slug: lowercase, alphanumeric only
+    const sanitizedSlug = (dto.slug || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+
+    if (!sanitizedSlug || sanitizedSlug.length < 2) {
+      throw new BadRequestException('Slug must be at least 2 alphanumeric characters');
+    }
+
+    if (!dto.companyName || dto.companyName.trim().length < 2) {
+      throw new BadRequestException('Company name is required (min 2 characters)');
+    }
+
+    if (!dto.password || dto.password.length < 6) {
+      throw new BadRequestException('Password must be at least 6 characters');
+    }
+
+    // Check slug uniqueness
+    const existingTenant = await this.prisma.tenant.findUnique({
+      where: { slug: sanitizedSlug },
+    });
+    if (existingTenant) {
+      throw new ConflictException('Company handle slug is already taken');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const suiteHandle = `suite.${sanitizedSlug}`;
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Create Tenant
+      const tenant = await tx.tenant.create({
+        data: {
+          name: dto.companyName.trim(),
+          slug: sanitizedSlug,
+        },
+      });
+
+      // 2. Create root Suite user
+      const suiteUser = await tx.user.create({
+        data: {
+          handle: suiteHandle,
+          name: dto.suiteName?.trim() || `${dto.companyName.trim()} Suite`,
+          role: 'SUITE_ADMIN',
+          tenantId: tenant.id,
+          languagePref: 'en',
+          passwordHash,
+        },
+      });
+
+      // 3. Create default company under this tenant
+      const code = sanitizedSlug.toUpperCase().slice(0, 4);
+      const company = await tx.company.create({
+        data: {
+          name: dto.companyName.trim(),
+          tenantId: tenant.id,
+          code,
+        },
+      });
+
+      // 4. Link suite user to company
+      await tx.userCompany.create({
+        data: {
+          userId: suiteUser.id,
+          companyId: company.id,
+        },
+      });
+
+      // 5. Create custodian account for suite user
+      const custodian = await tx.custodianAccount.create({
+        data: {
+          type: 'person',
+          name: suiteUser.name,
+          companyId: company.id,
+          linkedUserId: suiteUser.id,
+        },
+      });
+
+      // 6. Create default Cash wallet
+      await tx.wallet.create({
+        data: {
+          custodianId: custodian.id,
+          companyId: company.id,
+          name: 'Cash in Hand',
+          type: 'CASH',
+          isDefault: true,
+        },
+      });
+
+      // 7. Generate JWT
+      const payload = {
+        sub: suiteUser.id,
+        handle: suiteUser.handle,
+        role: suiteUser.role,
+        tenantId: tenant.id,
+        companyIds: [company.id],
+      };
+      const access_token = this.jwtService.sign(payload, { expiresIn: '8h' });
+
+      return {
+        success: true,
+        handle: suiteHandle,
+        token: access_token,
+        user: {
+          id: suiteUser.id,
+          handle: suiteUser.handle,
+          name: suiteUser.name,
+          role: suiteUser.role,
+          tenantId: tenant.id,
+          companyId: company.id,
+          custodianId: custodian.id,
+        },
+      };
+    });
   }
 
   /**
@@ -161,20 +308,12 @@ export class AuthService {
    * Registers a new user and creates their custodian account.
    */
   async register(dto: RegisterDto) {
-    if (!dto.email || !dto.password || !dto.name) {
+    if (!dto.password || !dto.name) {
       throw new BadRequestException('Missing required fields');
     }
 
     if (dto.password.length < 6) {
       throw new BadRequestException('Password must be at least 6 characters');
-    }
-
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email }
-    });
-
-    if (existingUser) {
-      throw new ConflictException('Email already exists');
     }
 
     let companyId = dto.companyId;
@@ -186,17 +325,47 @@ export class AuthService {
       companyId = company.id;
     }
 
+    // Lookup the company's tenant
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      include: { tenant: true },
+    });
+    const tenantSlug = company?.tenant?.slug || 'taskgroup';
+    
+    // Generate a handle
+    const baseHandle = (dto.email || dto.name || 'user')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .replace(/@.*$/, '');
+
+    let handle = `${baseHandle}.${tenantSlug}`;
+    const existing = await this.prisma.user.findUnique({ where: { handle } });
+    if (existing) {
+      handle = `${baseHandle}${Date.now() % 10000}.${tenantSlug}`;
+    }
+
+    if (dto.email) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: dto.email }
+      });
+      if (existingUser) {
+        throw new ConflictException('Email already exists');
+      }
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
+          handle,
           name: dto.name,
-          email: dto.email,
-          phone: dto.phone,
+          email: dto.email || null,
+          phone: dto.phone || null,
           designation: dto.designation || 'User',
           department: dto.department || 'General',
-          role: 'collector',
+          role: 'EMPLOYEE',
+          tenantId: company?.tenantId ?? null,
           languagePref: 'en',
           passwordHash,
         }
@@ -218,14 +387,26 @@ export class AuthService {
         }
       });
 
+      await tx.wallet.create({
+        data: {
+          custodianId: custodian.id,
+          companyId: companyId as string,
+          name: 'Cash in Hand',
+          type: 'CASH',
+          isDefault: true,
+        },
+      });
+
       return {
         id: user.id,
+        handle: user.handle,
         name: user.name,
         email: user.email,
         phone: user.phone,
         designation: user.designation ?? 'User',
         department: user.department ?? 'General',
         role: user.role,
+        tenantId: user.tenantId,
         companyId: companyId as string,
         custodianId: custodian.id
       };

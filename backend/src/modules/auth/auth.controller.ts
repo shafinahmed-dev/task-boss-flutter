@@ -1,6 +1,6 @@
 import { Controller, Post, Patch, Body, HttpCode, HttpStatus, Req, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
-import type { LoginDto, RegisterDto, UpdateProfileDto } from './auth.service.js';
+import type { LoginDto, RegisterDto, RegisterCompanyDto, UpdateProfileDto } from './auth.service.js';
 import { Public } from './public.decorator.js';
 
 @Controller('auth')
@@ -28,6 +28,17 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  /**
+   * POST /auth/register-company
+   * Registers a new tenant workspace and master suite account.
+   */
+  @Public()
+  @Post('register-company')
+  @HttpCode(HttpStatus.CREATED)
+  async registerCompany(@Body() dto: RegisterCompanyDto) {
+    return this.authService.registerCompany(dto);
   }
 
   /**

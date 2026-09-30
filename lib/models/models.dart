@@ -3,21 +3,25 @@ export 'payment_methods.dart';
 
 class AuthUser {
   final String userId;
+  final String handle;
   final String role;
   final String name;
   final String email;
   final String custodianId;
   final String companyId;
+  final String? tenantId;
   final String designation;
   final String department;
 
   AuthUser({
     required this.userId,
+    required this.handle,
     required this.role,
     required this.name,
     required this.email,
     required this.custodianId,
     required this.companyId,
+    this.tenantId,
     this.designation = '',
     this.department = '',
   });
@@ -25,11 +29,13 @@ class AuthUser {
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
       userId: json['userId']?.toString() ?? json['id']?.toString() ?? '',
+      handle: json['handle']?.toString() ?? '',
       role: json['role']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       custodianId: json['custodianId']?.toString() ?? '',
       companyId: json['companyId']?.toString() ?? '',
+      tenantId: json['tenantId']?.toString(),
       designation: json['designation'] as String? ?? 'User',
       department: json['department'] as String? ?? 'General',
     );
@@ -37,21 +43,25 @@ class AuthUser {
 
   AuthUser copyWith({
     String? userId,
+    String? handle,
     String? role,
     String? name,
     String? email,
     String? custodianId,
     String? companyId,
+    String? tenantId,
     String? designation,
     String? department,
   }) {
     return AuthUser(
       userId: userId ?? this.userId,
+      handle: handle ?? this.handle,
       role: role ?? this.role,
       name: name ?? this.name,
       email: email ?? this.email,
       custodianId: custodianId ?? this.custodianId,
       companyId: companyId ?? this.companyId,
+      tenantId: tenantId ?? this.tenantId,
       designation: designation ?? this.designation,
       department: department ?? this.department,
     );
@@ -60,11 +70,13 @@ class AuthUser {
   Map<String, dynamic> toJson() {
     return {
       'userId': userId,
+      'handle': handle,
       'role': role,
       'name': name,
       'email': email,
       'custodianId': custodianId,
       'companyId': companyId,
+      'tenantId': tenantId,
       'designation': designation,
       'department': department,
     };

@@ -12,12 +12,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ── Multi-Tenant Entities ──────────────────────────────────────────────────
+
+model Tenant {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.Text
+  slug        String    @unique @db.Text // e.g. "taskgroup"
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  users       User[]
+  companies   Company[]
+
+  @@map("tenants")
+}
+
 // ── Core Entities ────────────────────────────────────────────────────────
 
 model Company {
-  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name  String @db.Text
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String?  @map("tenant_id") @db.Uuid
+  name      String   @db.Text
+  code      String?  @db.Text
 
+  tenant             Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   users              UserCompany[]
   custodianAccounts  CustodianAccount[]
   projects           Project[]
@@ -31,19 +48,22 @@ model Company {
 }
 
 model User {
-  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String  @db.Text
-  email        String? @unique @db.Text
-  phone        String? @db.Text
-  designation  String? @default("User") @db.Text
-  department   String? @default("General") @db.Text
-  role         String  @db.Text // collector | accounts | approver | admin
-  languagePref String  @default("bn") @map("language_pref") @db.Text
-  passwordHash String  @map("password_hash") @db.Text
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String?  @map("tenant_id") @db.Uuid
+  handle       String   @unique @db.Text
+  name         String   @db.Text
+  email        String?  @unique @db.Text
+  phone        String?  @db.Text
+  designation  String?  @default("User") @db.Text
+  department   String?  @default("General") @db.Text
+  role         String   @db.Text // SUITE_ADMIN | MANAGER | EMPLOYEE | collector | accounts | approver | admin
+  languagePref String   @default("bn") @map("language_pref") @db.Text
+  passwordHash String   @map("password_hash") @db.Text
 
+  tenant            Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   companies         UserCompany[]
   custodianAccounts CustodianAccount[]
-  collectedMovements MoneyMovement[] @relation("CollectorMovements")
+  collectedMovements MoneyMovement[]     @relation("CollectorMovements")
   assignedBlocks    ReceiptNumberBlock[]
 
   createdAt DateTime @default(now()) @map("created_at")

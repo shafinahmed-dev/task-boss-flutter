@@ -4,7 +4,9 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 
 export interface JwtPayload {
   sub: string;        // user ID
-  role: string;       // admin | approver | accounts | collector
+  handle: string;     // user handle e.g. "suite.taskgroup"
+  role: string;       // SUITE_ADMIN | MANAGER | EMPLOYEE | admin | approver | accounts | collector
+  tenantId?: string;  // tenant UUID
   companyIds: string[]; // authorized company IDs
 }
 
@@ -26,7 +28,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Attach user info to request object
     return {
       id: payload.sub,
+      handle: payload.handle,
       role: payload.role,
+      tenantId: payload.tenantId,
       companyIds: payload.companyIds ?? [],
     };
   }

@@ -16,234 +16,113 @@ async function main() {
   await prisma.userCompany.deleteMany();
   await prisma.user.deleteMany();
   await prisma.company.deleteMany();
+  await prisma.tenant.deleteMany();
 
   console.log('Seeding Database...');
 
-  // 1. Create Company
+  // 1. Create Default Tenant
+  const tenant = await prisma.tenant.create({
+    data: {
+      name: 'TASK Group',
+      slug: 'taskgroup',
+    }
+  });
+  console.log(`Created Tenant: ${tenant.name} (${tenant.slug})`);
+
+  // 2. Create Company for Tenant
   const company = await prisma.company.create({
     data: {
       name: 'TASK Engineering Ltd.',
+      tenantId: tenant.id,
+      code: 'TASK',
     },
   });
   console.log(`Created Company: ${company.name} (${company.id})`);
 
-  // 2. Create User (Collector)
-  const passwordHash = await bcrypt.hash('Password123!', 10);
-  const collector = await prisma.user.create({
+  // 3. Create Suite Admin
+  const suitePassword = await bcrypt.hash('TaskSuite2026!', 10);
+  const suiteUser = await prisma.user.create({
     data: {
-      name: 'Collector User',
-      email: 'collector@task.com',
-      designation: 'Senior Collector',
-      department: 'Finance',
-      role: 'collector',
-      passwordHash,
+      handle: 'suite.taskgroup',
+      name: 'TASK Group Suite',
+      email: 'suite@taskgroup.com',
+      role: 'SUITE_ADMIN',
+      tenantId: tenant.id,
+      passwordHash: suitePassword,
       languagePref: 'en',
-    },
+    }
   });
-  console.log(`Created User: ${collector.name} (${collector.id})`);
-
-  // 3. UserCompany link
-  await prisma.userCompany.create({
+  await prisma.userCompany.create({ data: { userId: suiteUser.id, companyId: company.id } });
+  
+  // 4. Create Manager
+  const managerPassword = await bcrypt.hash('TaskMan2026!', 10);
+  const managerUser = await prisma.user.create({
     data: {
-      userId: collector.id,
-      companyId: company.id,
-    },
-  });
-  console.log('Linked User to Company');
-
-  // 4. CustodianAccount
-  const custodian = await prisma.custodianAccount.create({
-    data: {
-      name: 'Collector Wallet / Cash',
-      type: 'person', // from schema (person | drawer | bank | wallet | project_cash)
-      companyId: company.id,
-      linkedUserId: collector.id,
-    },
-  });
-  console.log(`Created CustodianAccount for Collector (${custodian.id})`);
-  // 4b. Create initial Wallets for Collector
-  const collectorCashWallet = await prisma.wallet.create({
-    data: {
-      custodianId: custodian.id,
-      companyId: company.id,
-      name: 'Cash in Hand',
-      type: 'CASH',
-      isDefault: true,
-    },
-  });
-  await prisma.wallet.create({
-    data: {
-      custodianId: custodian.id,
-      companyId: company.id,
-      name: 'bKash Personal',
-      type: 'MFS',
-      institution: 'bKash',
-      accountNumber: '017XXXXXXXX',
-      isDefault: false,
-    },
-  });
-  await prisma.wallet.create({
-    data: {
-      custodianId: custodian.id,
-      companyId: company.id,
-      name: 'City Bank A/C',
-      type: 'BANK',
-      institution: 'City Bank',
-      accountNumber: '110XXXXXXX',
-      isDefault: false,
-    },
-  });
-
-  // 5. ReceiptNumberBlock
-  const block = await prisma.receiptNumberBlock.create({
-    data: {
-      prefix: 'REC',
-      rangeStart: 1000,
-      rangeEnd: 2000,
-      currentPointer: 999, // next will be 1000
-      status: 'active',
-      companyId: company.id,
-      assignedToUserId: collector.id,
-    },
-  });
-  console.log(`Created ReceiptNumberBlock: ${block.prefix}-${block.rangeStart} to ${block.rangeEnd}`);
-
-  // Create User (Accounts)
-  const accountsUser = await prisma.user.create({
-    data: {
-      name: 'Accounts User',
-      email: 'accounts@task.com',
-      designation: 'Accounts Executive',
-      department: 'Accounts',
-      role: 'accounts',
-      passwordHash,
+      handle: 'ceoman.taskgroup',
+      name: 'Managing Director',
+      email: 'ceo@taskgroup.com',
+      designation: 'CEO',
+      department: 'Executive',
+      role: 'MANAGER',
+      tenantId: tenant.id,
+      passwordHash: managerPassword,
       languagePref: 'en',
-    },
+    }
   });
-  console.log(`Created User: ${accountsUser.name} (${accountsUser.id})`);
-
-  await prisma.userCompany.create({
+  await prisma.userCompany.create({ data: { userId: managerUser.id, companyId: company.id } });
+  const managerCustodian = await prisma.custodianAccount.create({
     data: {
-      userId: accountsUser.id,
-      companyId: company.id,
-    },
-  });
-
-  const accountsCustodian = await prisma.custodianAccount.create({
-    data: {
-      name: 'Accounts Vault / Safe',
-      type: 'drawer',
-      companyId: company.id,
-      linkedUserId: accountsUser.id,
-    },
-  });
-  console.log(`Created CustodianAccount for Accounts (${accountsCustodian.id})`);
-
-  // Create Colleague 1: Rafiqul Islam
-  const rafiqul = await prisma.user.create({
-    data: {
-      name: 'Rafiqul Islam',
-      email: 'rafiqul@task.com',
-      designation: 'Site Engineer',
-      department: 'Engineering',
-      role: 'collector',
-      passwordHash,
-      languagePref: 'en',
-    },
-  });
-  await prisma.userCompany.create({
-    data: {
-      userId: rafiqul.id,
-      companyId: company.id,
-    },
-  });
-  const rafiqulCustodian = await prisma.custodianAccount.create({
-    data: {
-      name: 'Rafiqul Islam - Site Engineer',
+      name: 'CEO Vault',
       type: 'person',
       companyId: company.id,
-      linkedUserId: rafiqul.id,
-    },
+      linkedUserId: managerUser.id,
+    }
   });
   await prisma.wallet.create({
     data: {
-      custodianId: rafiqulCustodian.id,
+      custodianId: managerCustodian.id,
       companyId: company.id,
       name: 'Cash in Hand',
       type: 'CASH',
       isDefault: true,
-    },
+    }
   });
 
-  // Create Colleague 2: Tanvir Hasan
-  const tanvir = await prisma.user.create({
+  // 5. Create Employee
+  const employeePassword = await bcrypt.hash('TaskEmp2026!', 10);
+  const employeeUser = await prisma.user.create({
     data: {
-      name: 'Tanvir Hasan',
-      email: 'tanvir@task.com',
-      designation: 'Procurement Officer',
-      department: 'Procurement',
-      role: 'collector',
-      passwordHash,
+      handle: 'shafinahmed.taskgroup',
+      name: 'Shafin Ahmed',
+      email: 'shafin@taskgroup.com',
+      designation: 'Digital Marketer',
+      department: 'Marketing',
+      role: 'EMPLOYEE',
+      tenantId: tenant.id,
+      passwordHash: employeePassword,
       languagePref: 'en',
-    },
+    }
   });
-  await prisma.userCompany.create({
+  await prisma.userCompany.create({ data: { userId: employeeUser.id, companyId: company.id } });
+  const employeeCustodian = await prisma.custodianAccount.create({
     data: {
-      userId: tanvir.id,
-      companyId: company.id,
-    },
-  });
-  const tanvirCustodian = await prisma.custodianAccount.create({
-    data: {
-      name: 'Tanvir Hasan - Procurement',
+      name: 'Shafin Ahmed / Cash',
       type: 'person',
       companyId: company.id,
-      linkedUserId: tanvir.id,
-    },
+      linkedUserId: employeeUser.id,
+    }
   });
-  await prisma.wallet.create({
+  const shafinWallet = await prisma.wallet.create({
     data: {
-      custodianId: tanvirCustodian.id,
+      custodianId: employeeCustodian.id,
       companyId: company.id,
       name: 'Cash in Hand',
       type: 'CASH',
       isDefault: true,
-    },
+    }
   });
 
-  const accountsCashWallet = await prisma.wallet.create({
-    data: {
-      custodianId: accountsCustodian.id,
-      companyId: company.id,
-      name: 'Cash in Hand',
-      type: 'CASH',
-      isDefault: true,
-    },
-  });
-  await prisma.wallet.create({
-    data: {
-      custodianId: accountsCustodian.id,
-      companyId: company.id,
-      name: 'bKash Personal',
-      type: 'MFS',
-      institution: 'bKash',
-      accountNumber: '017XXXXXXXX',
-      isDefault: false,
-    },
-  });
-  await prisma.wallet.create({
-    data: {
-      custodianId: accountsCustodian.id,
-      companyId: company.id,
-      name: 'City Bank A/C',
-      type: 'BANK',
-      institution: 'City Bank',
-      accountNumber: '110XXXXXXX',
-      isDefault: false,
-    },
-  });
-
-  // 6. Initial Ledger Balances
+  // 6. Initial Ledger Balances (Optional but helpful for testing)
   await prisma.moneyMovement.create({
     data: {
       idempotencyKey: crypto.randomUUID(),
@@ -251,39 +130,22 @@ async function main() {
       amount: 50000,
       currency: 'BDT',
       channel: 'cash',
-      collectorId: collector.id,
-      custodianId: custodian.id,
-      walletId: collectorCashWallet.id,
-      entryTag: 'client_payment',
-      occurredAt: new Date(),
-      syncStatus: 'synced',
-    },
-  });
-
-  await prisma.moneyMovement.create({
-    data: {
-      idempotencyKey: crypto.randomUUID(),
-      direction: 'in',
-      amount: 85000,
-      currency: 'BDT',
-      channel: 'cash',
-      collectorId: accountsUser.id,
-      custodianId: accountsCustodian.id,
-      walletId: accountsCashWallet.id,
-      entryTag: 'client_payment',
+      collectorId: employeeUser.id,
+      custodianId: employeeCustodian.id,
+      walletId: shafinWallet.id,
       occurredAt: new Date(),
       syncStatus: 'synced',
     },
   });
 
   console.log('\n=== SEED SUMMARY & CREDENTIALS ===');
-  console.log(`Company ID: ${company.id} (${company.name})`);
-  console.log(`Collector User: collector@task.com | Password: Password123! | Custodian ID: ${custodian.id} (Balance: ৳50,000)`);
-  console.log(`Accounts User: accounts@task.com  | Password: Password123! | Custodian ID: ${accountsCustodian.id} (Balance: ৳85,000)`);
+  console.log(`Tenant Slug: taskgroup`);
+  console.log(`Suite Admin: suite.taskgroup     | Password: TaskSuite2026!`);
+  console.log(`Manager:     ceoman.taskgroup    | Password: TaskMan2026!`);
+  console.log(`Employee:    shafinahmed.taskgroup| Password: TaskEmp2026! (Balance: ৳50,000)`);
   console.log('===================================\n');
 
   console.log('Seeding finished successfully.');
-
 }
 
 main()
