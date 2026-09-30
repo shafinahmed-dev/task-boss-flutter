@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/screens/operations_tabs.dart';
 import 'package:task_boss/screens/wallets_screen.dart';
+import 'package:task_boss/screens/suite/suite_governance_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -19,6 +22,13 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+    final role = appState.user?.role;
+
+    if (role == 'SUITE_ADMIN') {
+      return const SuiteGovernanceScreen();
+    }
+
     return Scaffold(
       body: SafeArea(
         child: IndexedStack(
