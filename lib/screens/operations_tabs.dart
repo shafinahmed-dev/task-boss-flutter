@@ -4,7 +4,6 @@ import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/screens/capture_movement_screen.dart';
 import 'package:task_boss/screens/custody_handover_screen.dart';
-import 'package:task_boss/screens/history_screen.dart';
 
 class OperationsTabs extends StatelessWidget {
   const OperationsTabs({super.key});
@@ -16,7 +15,7 @@ class OperationsTabs extends StatelessWidget {
     final balance = app.balance;
 
     return DefaultTabController(
-      length: 3,
+      length: 2,
       child: Column(
         children: [
           // ── Dual Floating Pills Header ─────────────────────────────────
@@ -116,7 +115,6 @@ class OperationsTabs extends StatelessWidget {
               tabs: [
                 Tab(text: 'Activity'),
                 Tab(text: 'Handover'),
-                Tab(text: 'History'),
               ],
             ),
           ),
@@ -127,7 +125,6 @@ class OperationsTabs extends StatelessWidget {
               children: [
                 CaptureMovementScreen(),
                 CustodyHandoverScreen(),
-                HistoryScreen(),
               ],
             ),
           ),

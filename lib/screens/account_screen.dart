@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:task_boss/models/models.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
+import 'package:task_boss/screens/history_screen.dart';
 
 double _toDouble(dynamic val) {
   if (val == null) return 0.0;
@@ -348,6 +349,39 @@ class _AccountScreenState extends State<AccountScreen> {
                       const SizedBox(height: 2),
                       Text(u.email, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13)),
                     ],
+                  ),
+                ),
+                InkWell(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.history_rounded, size: 16, color: Colors.white),
+                        SizedBox(width: 5),
+                        Text(
+                          'History',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
