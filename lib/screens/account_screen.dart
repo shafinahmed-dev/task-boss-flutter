@@ -214,6 +214,27 @@ class _AccountScreenState extends State<AccountScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
+      appBar: AppBar(
+        backgroundColor: AppTheme.canvas,
+        foregroundColor: AppTheme.primaryText,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: const Text(
+          'Account',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.primaryText,
+          ),
+        ),
+        centerTitle: true,
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           await app.refreshBalance();

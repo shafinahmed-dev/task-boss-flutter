@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:task_boss/screens/account_screen.dart';
 import 'package:task_boss/screens/operations_tabs.dart';
 import 'package:task_boss/screens/wallets_screen.dart';
 
@@ -16,7 +15,6 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _pages = [
     const OperationsTabs(),
     const WalletsScreen(),
-    const AccountScreen(),
   ];
 
   @override
@@ -61,10 +59,6 @@ class _MainNavigationState extends State<MainNavigation> {
             BottomNavigationBarItem(
               icon: Icon(Icons.account_balance_wallet_outlined),
               label: 'Wallets',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline_rounded),
-              label: 'Account',
             ),
           ],
         ),
