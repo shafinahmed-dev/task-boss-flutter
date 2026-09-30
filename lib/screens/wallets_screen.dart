@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/models/models.dart';
 import 'package:task_boss/services/app_state.dart';
+import 'package:task_boss/widgets/app_header_bar.dart';
 
 class WalletsScreen extends StatefulWidget {
   const WalletsScreen({super.key});
@@ -191,17 +192,30 @@ class _WalletsScreenState extends State<WalletsScreen> {
                     const SizedBox(height: 12),
                     SizedBox(
                       height: 52,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E293B),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: AppTheme.slateButtonGradient,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                            elevation: 8,
-                            shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.25)),
-                        onPressed: saving ? null : submitCreate,
-                        child: saving
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('Create Wallet',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                          onPressed: saving ? null : submitCreate,
+                          child: saving
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text('Create Wallet',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
                       ),
                     ),
                   ],
@@ -377,28 +391,40 @@ class _WalletsScreenState extends State<WalletsScreen> {
                       child: SizedBox(
                         width: 200,
                         height: 52,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E293B),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                            elevation: 8,
-                            shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.slateButtonGradient,
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          onPressed: saving ? null : submitTransfer,
-                          child: saving
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                                )
-                              : const Text(
-                                  'Transfer',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                            ),
+                            onPressed: saving ? null : submitTransfer,
+                            child: saving
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                  )
+                                : const Text(
+                                    'Transfer',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
+                          ),
                         ),
                       ),
                     ),
@@ -420,73 +446,77 @@ class _WalletsScreenState extends State<WalletsScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
-      appBar: AppBar(
-        title: const Text('Wallets'),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _refresh)],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: AppTheme.slateCardGradient,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
+        children: [
+          const AppHeaderBar(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
                 children: [
-                  const Text('Total Wallet Balance', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  Text('৳${totalBalance.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.slateCardGradient,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Total Wallet Balance', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Text('৳${totalBalance.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('${wallets.length} Active Wallets', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withValues(alpha: 0.1),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  side: const BorderSide(color: Colors.white24),
+                                ),
+                              ),
+                              onPressed: () => _showTransferModal(context),
+                              icon: const Icon(Icons.swap_horiz, size: 18),
+                              label: const Text('Transfer', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('${wallets.length} Active Wallets', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.1),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            side: const BorderSide(color: Colors.white24),
-                          ),
-                        ),
-                        onPressed: () => _showTransferModal(context),
-                        icon: const Icon(Icons.swap_horiz, size: 18),
-                        label: const Text('Transfer', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
+                      const Text('All Wallets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
+                      TextButton.icon(
+                        onPressed: () => _showCreateWalletModal(context),
+                        icon: const Icon(Icons.add_circle_outline, size: 18),
+                        label: const Text('Add Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
+                      )
                     ],
-                  )
+                  ),
+                  const SizedBox(height: 10),
+                  if (_loading && wallets.isEmpty)
+                    const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+                  else
+                    ...wallets.map((wallet) => _buildWalletCard(wallet)),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('All Wallets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
-                TextButton.icon(
-                  onPressed: () => _showCreateWalletModal(context),
-                  icon: const Icon(Icons.add_circle_outline, size: 18),
-                  label: const Text('Add Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-                )
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (_loading && wallets.isEmpty)
-              const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
-            else
-              ...wallets.map((wallet) => _buildWalletCard(wallet)),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+
 
   void _showEditWalletModal(BuildContext context, Wallet wallet) {
     final nameCtl = TextEditingController(text: wallet.name);
@@ -593,15 +623,30 @@ class _WalletsScreenState extends State<WalletsScreen> {
                     const SizedBox(height: 16),
                     SizedBox(
                       height: 52,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E293B),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                          elevation: 8,
-                          shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: AppTheme.slateButtonGradient,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        onPressed: saving ? null : submitEdit,
-                        child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          ),
+                          onPressed: saving ? null : submitEdit,
+                          child: saving
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text('Save Changes',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 20),

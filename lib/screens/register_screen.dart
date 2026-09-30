@@ -123,16 +123,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGradientFallback,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  height: 52,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.slateButtonGradient,
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    onPressed: _loading ? null : _handleRegister,
-                    child: _loading 
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Register', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      ),
+                      onPressed: _loading ? null : _handleRegister,
+                      child: _loading 
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('Register', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                    ),
                   ),
                 ),
                 if (_error != null) ...[

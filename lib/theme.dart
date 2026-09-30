@@ -12,16 +12,38 @@ class AppTheme {
   static const Color slateMid = Color(0xFF1E293B);
   static const Color slateAccent = Color(0xFF283548);
   
+  // Rich primary card & top header gradient
   static const LinearGradient slateCardGradient = LinearGradient(
-    colors: [Color(0xFF1E293B), Color(0xFF111827)],
+    colors: [
+      Color(0xFF24334A), // Rich midnight slate highlight
+      Color(0xFF161F2E), // Mid slate
+      Color(0xFF0F172A), // Deep base slate
+    ],
+    stops: [0.0, 0.5, 1.0],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
+  // High-contrast button gradient with tactile depth
   static const LinearGradient slateButtonGradient = LinearGradient(
-    colors: [Color(0xFF283548), Color(0xFF1E293B)],
+    colors: [
+      Color(0xFF2C3E55),
+      Color(0xFF1E293B),
+      Color(0xFF131C2A),
+    ],
+    stops: [0.0, 0.6, 1.0],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
+  );
+
+  // Executive dock / segmented track gradient
+  static const LinearGradient slateDockGradient = LinearGradient(
+    colors: [
+      Color(0xFF222F43),
+      Color(0xFF121B27),
+    ],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   );
 
   static const Color primaryGradientFallback = slateMid;

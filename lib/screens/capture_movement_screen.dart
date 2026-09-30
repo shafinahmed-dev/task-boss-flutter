@@ -271,15 +271,28 @@ class _CaptureState extends State<CaptureMovementScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppTheme.cardBg,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: AppTheme.cardBorder),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryText)),
-                  const SizedBox(height: 10),
+                  const Row(
+                    children: [
+                      Icon(Icons.category_outlined, size: 18, color: AppTheme.slateMid),
+                      SizedBox(width: 8),
+                      Text(
+                        'Category',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: AppTheme.primaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   SizedBox(
                     height: 42,
                     child: ScrollConfiguration(
@@ -359,16 +372,34 @@ class _CaptureState extends State<CaptureMovementScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppTheme.cardBg,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: AppTheme.cardBorder),
               ),
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                Expanded(
-                  child: Column(
+                  const Row(
+                    children: [
+                      Icon(Icons.account_balance_wallet_outlined, size: 18, color: AppTheme.slateMid),
+                      SizedBox(width: 8),
+                      Text(
+                        'Source Wallet & Method',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: AppTheme.primaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('Wallet',
                           style: TextStyle(
@@ -466,52 +497,36 @@ class _CaptureState extends State<CaptureMovementScreen> {
                 ),
               ],
             ),
+                ],
+              ),
           ),
           const SizedBox(height: 14),
-          // Card 3: Financial Details & Note
+          // Card 3: Amount Details
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppTheme.cardBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(color: AppTheme.cardBorder),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [
-              const Text('Note',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Color(0xFF64748B),
-                  )),
-              if (_isOtherTag) const Text(' * (Required)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.expenseText)),
-            ]),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _noteCtl,
-              decoration: InputDecoration(
-                hintText: _isOtherTag ? "Required for 'Other'..." : "Note...",
-                filled: true,
-                fillColor: const Color(0xFFF1F5F9),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
+                const Row(
+                  children: [
+                    Icon(Icons.payments_outlined, size: 18, color: AppTheme.slateMid),
+                    SizedBox(width: 8),
+                    Text(
+                      'Amount Details',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: AppTheme.primaryText,
+                      ),
+                    ),
+                  ],
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              ),
-              onChanged: (_) { _saveDraft(); setState(() {}); },
-            ),
-            const SizedBox(height: 16),
+                const SizedBox(height: 12),
             // Symmetrical 2x2 Layout - Row 2: Amount & Fee
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -580,12 +595,14 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Fee',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                          )),
+                      const Text(
+                        'Fee / Charge',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: _chgCtl,
@@ -630,16 +647,68 @@ class _CaptureState extends State<CaptureMovementScreen> {
                           ),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                         ),
-                        onChanged: (_) { _saveDraft(); setState(() {}); },
+                        onChanged: (_) {
+                          _saveDraft();
+                          setState(() {});
+                        },
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-                ],
-              ),
+            const SizedBox(height: 14),
+            // Note input field below them with comfortable spacing
+            Row(
+              children: [
+                const Text(
+                  'Note',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                if (_isOtherTag)
+                  const Text(
+                    ' * (Required)',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: AppTheme.expenseText,
+                    ),
+                  ),
+              ],
             ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _noteCtl,
+              decoration: InputDecoration(
+                hintText: _isOtherTag ? "Required for 'Other'..." : "Note...",
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+              onChanged: (_) {
+                _saveDraft();
+                setState(() {});
+              },
+            ),
+          ],
+        ),
+      ),
             const SizedBox(height: 14),
             if (amtVal > 0 || feeVal > 0) Container(
               padding: const EdgeInsets.all(12),
@@ -668,28 +737,29 @@ class _CaptureState extends State<CaptureMovementScreen> {
                       ),
                     ],
                   ),
-                  child: ElevatedButton(
+                  child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                     ),
                     onPressed: _saving ? null : _submit,
-                    child: _saving
+                    icon: _saving
                         ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
-                        : const Text(
-                            'Save',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
+                        : const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 18),
+                    label: Text(
+                      _saving ? 'Saving...' : 'Save',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -735,11 +805,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
       height: 52,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E293B), Color(0xFF111827)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: AppTheme.slateDockGradient,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1),
       ),
