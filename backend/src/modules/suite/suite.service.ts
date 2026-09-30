@@ -19,8 +19,8 @@ export class SuiteService {
     });
     return companies.map(c => ({
       id: c.id, name: c.name, code: c.code ?? '', tenantId: c.tenantId, createdAt: c.createdAt,
-      totalCustodians: c.custodianAccounts.length,
-      totalWallets: c.custodianAccounts.reduce((sum, ca) => sum + (ca._count?.wallets ?? 0), 0),
+      totalCustodians: c.custodianAccounts?.length ?? 0,
+      totalWallets: c.custodianAccounts?.reduce((sum, ca) => sum + (ca._count?.wallets ?? 0), 0) ?? 0,
     }));
   }
 
@@ -80,7 +80,7 @@ export class SuiteService {
     });
     return managers.map(m => ({
       id: m.id, handle: m.handle, name: m.name, email: m.email, phone: m.phone, designation: m.designation,
-      department: m.department, role: m.role, companies: m.companies.map(uc => uc.company), createdAt: m.createdAt,
+      department: m.department, role: m.role, companies: m.companies?.map(uc => uc.company) ?? [], createdAt: m.createdAt,
     }));
   }
 
