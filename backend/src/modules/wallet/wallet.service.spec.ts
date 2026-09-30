@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WalletService } from './wallet.service.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { WalletType } from '@prisma/client';

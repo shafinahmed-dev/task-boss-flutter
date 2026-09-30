@@ -323,4 +323,3 @@ class AppState extends ChangeNotifier {
       // Ignore network errors offline
     }
   }
-}
