@@ -218,7 +218,7 @@ class _OperationsTabsState extends State<OperationsTabs> {
                           clipBehavior: Clip.none,
                           children: [
                             const Icon(
-                              Icons.notifications_outlined,
+                              Icons.notifications_rounded,
                               color: Colors.white,
                               size: 22,
                             ),
