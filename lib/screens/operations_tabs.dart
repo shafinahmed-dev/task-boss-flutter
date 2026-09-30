@@ -76,7 +76,7 @@ class _OperationsTabsState extends State<OperationsTabs> {
                     ),
                   ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
@@ -91,25 +91,6 @@ class _OperationsTabsState extends State<OperationsTabs> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Dark circular avatar
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: const BoxDecoration(
-                            color: AppTheme.slateMid,
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 7),
                         Text(
                           userName,
                           style: const TextStyle(
@@ -118,7 +99,7 @@ class _OperationsTabsState extends State<OperationsTabs> {
                             color: Color(0xFF111827),
                           ),
                         ),
-                        const SizedBox(width: 2),
+                        const SizedBox(width: 4),
                         const Icon(
                           Icons.chevron_right_rounded,
                           size: 16,
