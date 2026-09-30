@@ -115,7 +115,7 @@ export class SuiteService {
         await tx.userCompany.createMany({
           data: dto.companyIds.map(companyId => ({ userId: user.id, companyId })),
         });
-        await tx.custodianAccount.create({ data: { name: `${user.name} — Custodian Account`, type: 'user', userId: user.id, companyId: dto.companyIds[0] } });
+        await tx.custodianAccount.create({ data: { name: `${user.name} — Custodian Account`, type: 'user', linkedUserId: user.id, companyId: dto.companyIds[0] } });
       }
       return { id: user.id, handle: user.handle, name: user.name, role: user.role, designation: user.designation, companyIds: dto.companyIds };
     });
