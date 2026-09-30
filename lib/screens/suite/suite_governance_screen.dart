@@ -51,14 +51,14 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> with Sing
     setState(() => _loading = true);
     try {
       final appState = context.read<AppState>();
-      final futures = await Future.wait([
+      await Future.wait<void>([
         appState.fetchConcerns(),
         appState.fetchManagers(),
         appState.fetchSuiteSummary(),
       ]);
-      _concerns = futures[0] as List;
-      _managers = futures[1] as List;
-      _summary = futures[2] as Map<String, dynamic>;
+      _concerns = appState.concerns;
+      _managers = appState.managers;
+      _summary = appState.suiteSummary;
     } catch (e) {
       _showError(e.toString().replaceFirst('Exception: ', ''));
     } finally {

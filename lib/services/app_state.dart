@@ -19,6 +19,20 @@ class AppState extends ChangeNotifier {
   bool isReady = false;
   List<Wallet> wallets = [];
 
+  List<Map<String, dynamic>> _concerns = [];
+  List<Map<String, dynamic>> get concerns => _concerns;
+
+  List<Map<String, dynamic>> _managers = [];
+  List<Map<String, dynamic>> get managers => _managers;
+
+  Map<String, dynamic> _suiteSummary = {
+    'totalGroupCash': 0.0,
+    'concernsCount': 0,
+    'managersCount': 0,
+    'employeesCount': 0,
+  };
+  Map<String, dynamic> get suiteSummary => _suiteSummary;
+
   static const String _defaultApiUrl = String.fromEnvironment(
     'API_URL',
     defaultValue: kIsWeb ? 'http://localhost:3000' : 'http://192.168.1.45:3000',
@@ -323,3 +337,93 @@ class AppState extends ChangeNotifier {
       // Ignore network errors offline
     }
   }
+
+  Future<void> fetchConcerns() async {
+    final resp = await authRequest('GET', Uri.parse('$apiBaseUrl/companies'));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final List data = jsonDecode(resp.body);
+      _concerns = data.map((e) => e as Map<String, dynamic>).toList();
+      notifyListeners();
+      return;
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to fetch concerns');
+  }
+
+  Future<void> createConcern({required String name, required String code}) async {
+    final resp = await authRequest('POST', Uri.parse('$apiBaseUrl/companies'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'name': name, 'code': code}));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      await fetchConcerns();
+      return;
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to create concern');
+  }
+
+  Future<void> updateConcern({required String id, required String name, required String code}) async {
+    final resp = await authRequest('PATCH', Uri.parse('$apiBaseUrl/companies/$id'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'name': name, 'code': code}));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      await fetchConcerns();
+      return;
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to update concern');
+  }
+
+  Future<void> deleteConcern(String id) async {
+    final resp = await authRequest('DELETE', Uri.parse('$apiBaseUrl/companies/$id'));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      await fetchConcerns();
+      return;
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to delete concern');
+  }
+
+  Future<void> fetchManagers() async {
+    final resp = await authRequest('GET', Uri.parse('$apiBaseUrl/suite/managers'));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final List data = jsonDecode(resp.body);
+      _managers = data.map((e) => e as Map<String, dynamic>).toList();
+      notifyListeners();
+      return;
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to fetch managers');
+  }
+
+  Future<void> provisionManager({required String name, required String handlePrefix, required String password, required String designation, required List<String> companyIds}) async {
+    final resp = await authRequest('POST', Uri.parse('$apiBaseUrl/suite/provision-manager'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'name': name, 'handlePrefix': handlePrefix, 'password': password, 'designation': designation, 'companyIds': companyIds}));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      await fetchManagers();
+      return;
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to provision manager');
+  }
+
+  Future<void> updateManager({required String id, required String name, required String designation, String? newPassword, List<String>? companyIds}) async {
+    final body = <String, dynamic>{'name': name, 'designation': designation};
+    if (companyIds != null) body['companyIds'] = companyIds;
+    if (newPassword != null && newPassword.isNotEmpty) body['password'] = newPassword;
+    final resp = await authRequest('PATCH', Uri.parse('$apiBaseUrl/suite/managers/$id'), headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      await fetchManagers();
+      return;
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to update manager');
+  }
+
+  Future<void> deleteManager(String id) async {
+    final resp = await authRequest('DELETE', Uri.parse('$apiBaseUrl/suite/managers/$id'));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      await fetchManagers();
+      return;
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to delete manager');
+  }
+
+  Future<void> fetchSuiteSummary() async {
+    final resp = await authRequest('GET', Uri.parse('$apiBaseUrl/suite/ledger-summary'));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      _suiteSummary = jsonDecode(resp.body) as Map<String, dynamic>;
+      notifyListeners();
+      return;
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to fetch ledger summary');
+  }
+}
