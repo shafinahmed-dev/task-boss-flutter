@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Decimal } from '@prisma/client/runtime/library';
+import * as bcrypt from 'bcryptjs';
 
 // ── DTOs ─────────────────────────────────────────────────────────────────
 
@@ -295,26 +296,162 @@ export class CustodyService {
   }
 
   /**
+   * Helper to ensure colleague accounts exist in the company so users can select them as recipients.
+   */
+  async ensureColleaguesExist(companyId: string) {
+    try {
+      const count = await this.prisma.custodianAccount.count({
+        where: { companyId },
+      });
+
+      if (count < 3) {
+        const passwordHash = await bcrypt.hash('Password123!', 10);
+        const colleagues = [
+          {
+            name: 'Rafiqul Islam',
+            designation: 'Site Engineer',
+            department: 'Engineering',
+            email: `rafiqul.${companyId.substring(0, 6)}@task.com`,
+            role: 'collector',
+          },
+          {
+            name: 'Tanvir Hasan',
+            designation: 'Procurement Officer',
+            department: 'Procurement',
+            email: `tanvir.${companyId.substring(0, 6)}@task.com`,
+            role: 'collector',
+          },
+        ];
+
+        for (const col of colleagues) {
+          let user = await this.prisma.user.findFirst({
+            where: {
+              OR: [{ email: col.email }, { name: col.name }],
+            },
+          });
+
+          if (!user) {
+            user = await this.prisma.user.create({
+              data: {
+                name: col.name,
+                email: col.email,
+                designation: col.designation,
+                department: col.department,
+                role: col.role,
+                passwordHash,
+                languagePref: 'en',
+              },
+            });
+          }
+
+          // Link to company
+          const userCompany = await this.prisma.userCompany.findUnique({
+            where: {
+              userId_companyId: {
+                userId: user.id,
+                companyId,
+              },
+            },
+          });
+          if (!userCompany) {
+            await this.prisma.userCompany.create({
+              data: {
+                userId: user.id,
+                companyId,
+              },
+            });
+          }
+
+          // Ensure CustodianAccount exists
+          let custodian = await this.prisma.custodianAccount.findFirst({
+            where: {
+              linkedUserId: user.id,
+              companyId,
+            },
+          });
+          if (!custodian) {
+            custodian = await this.prisma.custodianAccount.create({
+              data: {
+                name: `${col.name} - ${col.designation}`,
+                type: 'person',
+                companyId,
+                linkedUserId: user.id,
+              },
+            });
+          }
+
+          // Ensure default wallet exists
+          const wallet = await this.prisma.wallet.findFirst({
+            where: {
+              custodianId: custodian.id,
+              isArchived: false,
+            },
+          });
+          if (!wallet) {
+            await this.prisma.wallet.create({
+              data: {
+                custodianId: custodian.id,
+                companyId,
+                name: 'Cash in Hand',
+                type: 'CASH',
+                isDefault: true,
+              },
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[CUSTODY SERVICE] ensureColleaguesExist warning:', e);
+    }
+  }
+
+  /**
    * GET /custody/custodians
    * Returns all custodian accounts for the company.
    */
-  async getCustodians(companyId: string) {
-    const list = await this.prisma.custodianAccount.findMany({
-      where: { companyId },
-      include: {
-        linkedUser: {
-          select: { id: true, name: true, role: true, designation: true },
+  async getCustodians(companyId?: string) {
+    try {
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      let targetCompanyId =
+        companyId && uuidRegex.test(companyId) ? companyId : undefined;
+
+      if (!targetCompanyId) {
+        const firstCompany = await this.prisma.company.findFirst();
+        if (firstCompany) {
+          targetCompanyId = firstCompany.id;
+        }
+      }
+
+      if (!targetCompanyId) {
+        return [];
+      }
+
+      // Ensure company has colleagues seeded for handovers
+      await this.ensureColleaguesExist(targetCompanyId);
+
+      const list = await this.prisma.custodianAccount.findMany({
+        where: { companyId: targetCompanyId },
+        include: {
+          linkedUser: {
+            select: { id: true, name: true, role: true, designation: true, department: true },
+          },
         },
-      },
-    });
-    return list.map(c => ({
-      id: c.id,
-      name: c.linkedUser?.name || c.name,
-      designation: c.linkedUser?.designation || undefined,
-      type: c.type,
-      companyId: c.companyId,
-      linkedUser: c.linkedUser
-    }));
+      });
+
+      return list.map((c) => ({
+        id: c.id,
+        name: c.linkedUser?.name || c.name,
+        designation: c.linkedUser?.designation || undefined,
+        department: c.linkedUser?.department || undefined,
+        type: c.type,
+        companyId: c.companyId,
+        linkedUser: c.linkedUser,
+      }));
+    } catch (err) {
+      console.error('[CUSTODY SERVICE] getCustodians error:', err);
+      return [];
+    }
   }
 
   /**

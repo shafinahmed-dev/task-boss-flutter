@@ -38,10 +38,28 @@ export class WalletService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getWallets(custodianId: string) {
-    const wallets = await this.prisma.wallet.findMany({
+    let wallets = await this.prisma.wallet.findMany({
       where: { custodianId, isArchived: false },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
     });
+
+    if (wallets.length === 0 && custodianId) {
+      const custodian = await this.prisma.custodianAccount.findUnique({
+        where: { id: custodianId },
+      });
+      if (custodian) {
+        const defaultWallet = await this.prisma.wallet.create({
+          data: {
+            custodianId: custodian.id,
+            companyId: custodian.companyId,
+            name: 'Cash in Hand',
+            type: WalletType.CASH,
+            isDefault: true,
+          },
+        });
+        wallets = [defaultWallet];
+      }
+    }
 
     const supersededRows = await this.prisma.moneyMovement.findMany({
       where: { editedFromId: { not: null } },

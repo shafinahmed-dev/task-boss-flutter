@@ -30,9 +30,28 @@ export class WalletController {
   ) {
     let custodianId = queryCustodianId;
     if (!custodianId && req?.user?.id) {
-      const custodian = await this.prisma.custodianAccount.findFirst({
+      let custodian = await this.prisma.custodianAccount.findFirst({
         where: { linkedUserId: req.user.id },
       });
+      if (!custodian) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: req.user.id },
+          include: { companies: true },
+        });
+        const companyId =
+          user?.companies[0]?.companyId ||
+          (await this.prisma.company.findFirst())?.id;
+        if (companyId) {
+          custodian = await this.prisma.custodianAccount.create({
+            data: {
+              name: `${user?.name || 'User'} Wallet / Cash`,
+              type: 'person',
+              companyId,
+              linkedUserId: req.user.id,
+            },
+          });
+        }
+      }
       if (custodian) {
         custodianId = custodian.id;
       }

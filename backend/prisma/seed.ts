@@ -33,6 +33,8 @@ async function main() {
     data: {
       name: 'Collector User',
       email: 'collector@task.com',
+      designation: 'Senior Collector',
+      department: 'Finance',
       role: 'collector',
       passwordHash,
       languagePref: 'en',
@@ -111,6 +113,8 @@ async function main() {
     data: {
       name: 'Accounts User',
       email: 'accounts@task.com',
+      designation: 'Accounts Executive',
+      department: 'Accounts',
       role: 'accounts',
       passwordHash,
       languagePref: 'en',
@@ -134,6 +138,78 @@ async function main() {
     },
   });
   console.log(`Created CustodianAccount for Accounts (${accountsCustodian.id})`);
+
+  // Create Colleague 1: Rafiqul Islam
+  const rafiqul = await prisma.user.create({
+    data: {
+      name: 'Rafiqul Islam',
+      email: 'rafiqul@task.com',
+      designation: 'Site Engineer',
+      department: 'Engineering',
+      role: 'collector',
+      passwordHash,
+      languagePref: 'en',
+    },
+  });
+  await prisma.userCompany.create({
+    data: {
+      userId: rafiqul.id,
+      companyId: company.id,
+    },
+  });
+  const rafiqulCustodian = await prisma.custodianAccount.create({
+    data: {
+      name: 'Rafiqul Islam - Site Engineer',
+      type: 'person',
+      companyId: company.id,
+      linkedUserId: rafiqul.id,
+    },
+  });
+  await prisma.wallet.create({
+    data: {
+      custodianId: rafiqulCustodian.id,
+      companyId: company.id,
+      name: 'Cash in Hand',
+      type: 'CASH',
+      isDefault: true,
+    },
+  });
+
+  // Create Colleague 2: Tanvir Hasan
+  const tanvir = await prisma.user.create({
+    data: {
+      name: 'Tanvir Hasan',
+      email: 'tanvir@task.com',
+      designation: 'Procurement Officer',
+      department: 'Procurement',
+      role: 'collector',
+      passwordHash,
+      languagePref: 'en',
+    },
+  });
+  await prisma.userCompany.create({
+    data: {
+      userId: tanvir.id,
+      companyId: company.id,
+    },
+  });
+  const tanvirCustodian = await prisma.custodianAccount.create({
+    data: {
+      name: 'Tanvir Hasan - Procurement',
+      type: 'person',
+      companyId: company.id,
+      linkedUserId: tanvir.id,
+    },
+  });
+  await prisma.wallet.create({
+    data: {
+      custodianId: tanvirCustodian.id,
+      companyId: company.id,
+      name: 'Cash in Hand',
+      type: 'CASH',
+      isDefault: true,
+    },
+  });
 
   const accountsCashWallet = await prisma.wallet.create({
     data: {
