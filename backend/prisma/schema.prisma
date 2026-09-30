@@ -1,0 +1,283 @@
+// ── TASK BOS — Prisma Schema (Phase 1) ──────────────────────────────────
+// Maps 1:1 to the DDL in 05_Technical_Architecture.docx v1.0
+// Rule: custodian balances are NEVER stored — always computed from ledger.
+// Rule: money_movements are append-only; edits create new rows via edited_from_id.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Core Entities ────────────────────────────────────────────────────────
+
+model Company {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name  String @db.Text
+
+  users              UserCompany[]
+  custodianAccounts  CustodianAccount[]
+  projects           Project[]
+  receiptBlocks      ReceiptNumberBlock[]
+  digitalReceipts    DigitalReceipt[]
+  interCompanyAllocationsFrom InterCompanyAllocation[] @relation("AllocFrom")
+  interCompanyAllocationsTo   InterCompanyAllocation[] @relation("AllocTo")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("companies")
+}
+
+model User {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String  @db.Text
+  email        String? @unique @db.Text
+  phone        String? @db.Text
+  designation  String? @db.Text
+  role         String  @db.Text // collector | accounts | approver | admin
+  languagePref String  @default("bn") @map("language_pref") @db.Text
+  passwordHash String  @map("password_hash") @db.Text
+
+  companies         UserCompany[]
+  custodianAccounts CustodianAccount[]
+  collectedMovements MoneyMovement[] @relation("CollectorMovements")
+  assignedBlocks    ReceiptNumberBlock[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("users")
+}
+
+model UserCompany {
+  userId    String @map("user_id") @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+
+  user    User    @relation(fields: [userId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@id([userId, companyId])
+  @@map("user_companies")
+}
+
+// ── Custody ──────────────────────────────────────────────────────────────
+
+enum WalletType {
+  CASH
+  MFS
+  BANK
+}
+
+model Wallet {
+  id            String          @id @default(uuid()) @db.Uuid
+  custodianId   String          @map("custodian_id") @db.Uuid
+  companyId     String          @map("company_id") @db.Uuid
+  name          String          @db.Text
+  type          WalletType      @default(CASH)
+  accountNumber String?         @map("account_number") @db.Text
+  institution   String?         @db.Text
+  isDefault     Boolean         @default(false) @map("is_default")
+  isArchived    Boolean         @default(false) @map("is_archived")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  custodian            CustodianAccount  @relation(fields: [custodianId], references: [id], onDelete: Cascade)
+  movements            MoneyMovement[]
+  custodyTransfersFrom CustodyTransfer[] @relation("TransferFromWallet")
+  custodyTransfersTo   CustodyTransfer[] @relation("TransferToWallet")
+
+  @@index([custodianId])
+  @@index([companyId])
+  @@map("wallets")
+}
+
+model CustodianAccount {
+  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String @map("company_id") @db.Uuid
+  type         String @db.Text // person | drawer | bank | wallet | project_cash
+  name         String @db.Text
+  linkedUserId String? @map("linked_user_id") @db.Uuid
+
+  company         Company         @relation(fields: [companyId], references: [id])
+  linkedUser      User?           @relation(fields: [linkedUserId], references: [id])
+  moneyMovements  MoneyMovement[]
+  transfersSent    CustodyTransfer[] @relation("TransferSender")
+  transfersReceived CustodyTransfer[] @relation("TransferReceiver")
+  wallets          Wallet[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("custodian_accounts")
+}
+
+// ── Clients & Projects ───────────────────────────────────────────────────
+
+model Client {
+  id      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name    String  @db.Text
+  contact String? @db.Text
+
+  projects Project[]
+  moneyMovements MoneyMovement[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("clients")
+}
+
+model Project {
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String  @map("client_id") @db.Uuid
+  companyId       String  @map("company_id") @db.Uuid
+  name            String  @db.Text
+  workOrderValue  Decimal @map("work_order_value") @db.Decimal(14, 2)
+
+  client         Client          @relation(fields: [clientId], references: [id])
+  company        Company         @relation(fields: [companyId], references: [id])
+  moneyMovements MoneyMovement[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("projects")
+}
+
+// ── Money Movement Ledger (append-only) ──────────────────────────────────
+
+model MoneyMovement {
+  id               String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  idempotencyKey   String  @unique @map("idempotency_key") @db.Uuid
+  direction        String  @db.Text // in | out
+  amount           Decimal @db.Decimal(14, 2)
+  currency         String  @default("BDT") @db.Text
+  channel          String  @db.Text // cash|cheque|bank|rtgs|npsb|bkash|nagad|other
+  photoUrl         String? @map("photo_url") @db.Text
+  collectorId      String  @map("collector_id") @db.Uuid
+  custodianId      String  @map("custodian_id") @db.Uuid
+  entryTag         String  @map("entry_tag") @db.Text
+  receiptNo        String? @map("receipt_no") @db.Text
+  digitalReceiptId String? @map("digital_receipt_id") @db.Uuid
+  clientId         String? @map("client_id") @db.Uuid
+  projectId        String? @map("project_id") @db.Uuid
+  loanId           String? @map("loan_id") @db.Uuid
+  walletId         String? @map("wallet_id") @db.Uuid
+  fee              Decimal? @db.Decimal(14, 2)
+  notes            String?  @db.Text
+  metadata         Json?
+  editedFromId     String? @map("edited_from_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  occurredAt       DateTime @map("occurred_at")
+  syncStatus       String  @default("synced") @map("sync_status") @db.Text
+
+  // Self-referential for append-only edit chain
+  editedFrom       MoneyMovement?  @relation("EditChain", fields: [editedFromId], references: [id])
+  editedVersions   MoneyMovement[] @relation("EditChain")
+
+  collector        User            @relation("CollectorMovements", fields: [collectorId], references: [id])
+  custodian        CustodianAccount @relation(fields: [custodianId], references: [id])
+  wallet           Wallet?         @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  client           Client?         @relation(fields: [clientId], references: [id])
+  project          Project?        @relation(fields: [projectId], references: [id])
+
+  digitalReceipt   DigitalReceipt?
+  interCompanyAllocations InterCompanyAllocation[]
+
+  @@index([walletId])
+  @@map("money_movements")
+}
+
+// ── Custody Transfers ────────────────────────────────────────────────────
+
+model CustodyTransfer {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  idempotencyKey  String    @unique @map("idempotency_key") @db.Uuid
+  fromCustodianId String    @map("from_custodian_id") @db.Uuid
+  toCustodianId   String    @map("to_custodian_id") @db.Uuid
+  fromWalletId    String?   @map("from_wallet_id") @db.Uuid
+  toWalletId      String?   @map("to_wallet_id") @db.Uuid
+  amount          Decimal   @db.Decimal(14, 2)
+  fee             Decimal?  @db.Decimal(14, 2)
+  notes           String?   @db.Text
+  metadata        Json?
+  status          String    @default("pending") @db.Text // pending | confirmed | disputed
+  requestedAt     DateTime  @default(now()) @map("requested_at")
+  confirmedAt     DateTime? @map("confirmed_at")
+
+  fromCustodian CustodianAccount @relation("TransferSender", fields: [fromCustodianId], references: [id])
+  toCustodian   CustodianAccount @relation("TransferReceiver", fields: [toCustodianId], references: [id])
+  fromWallet    Wallet?          @relation("TransferFromWallet", fields: [fromWalletId], references: [id])
+  toWallet      Wallet?          @relation("TransferToWallet", fields: [toWalletId], references: [id])
+
+  @@map("custody_transfers")
+}
+
+// ── Digital Receipts ─────────────────────────────────────────────────────
+
+model ReceiptNumberBlock {
+  id              String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String @map("company_id") @db.Uuid
+  assignedToUserId String @map("assigned_to_user_id") @db.Uuid
+  prefix          String @db.Text
+  rangeStart      Int    @map("range_start")
+  rangeEnd        Int    @map("range_end")
+  currentPointer  Int    @map("current_pointer")
+  status          String @default("active") @db.Text // active | exhausted | revoked
+
+  company  Company @relation(fields: [companyId], references: [id])
+  assignedUser User @relation(fields: [assignedToUserId], references: [id])
+  receipts DigitalReceipt[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("receipt_number_blocks")
+}
+
+model DigitalReceipt {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  receiptNumber        String    @unique @map("receipt_number") @db.Text
+  blockId              String    @map("block_id") @db.Uuid
+  moneyMovementId      String    @unique @map("money_movement_id") @db.Uuid
+  companyId            String    @map("company_id") @db.Uuid
+  clientCopySentAt     DateTime? @map("client_copy_sent_at")
+  officeCopyFiledAt    DateTime  @default(now()) @map("office_copy_filed_at")
+  linkedPhysicalReceiptNo String? @map("linked_physical_receipt_no") @db.Text
+
+  block         ReceiptNumberBlock @relation(fields: [blockId], references: [id])
+  moneyMovement MoneyMovement      @relation(fields: [moneyMovementId], references: [id])
+  company       Company            @relation(fields: [companyId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("digital_receipts")
+}
+
+// ── Inter-Company Cost Allocation ────────────────────────────────────────
+
+model InterCompanyAllocation {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  idempotencyKey    String   @unique @map("idempotency_key") @db.Uuid
+  sourceCompanyId   String   @map("source_company_id") @db.Uuid
+  targetCompanyId   String   @map("target_company_id") @db.Uuid
+  sourceMovementId  String   @map("source_movement_id") @db.Uuid
+  amount            Decimal  @db.Decimal(14, 2)
+  description       String   @db.Text
+  status            String   @default("pending") @db.Text // pending | settled
+
+  sourceCompany     Company  @relation("AllocFrom", fields: [sourceCompanyId], references: [id])
+  targetCompany     Company  @relation("AllocTo", fields: [targetCompanyId], references: [id])
+  sourceMovement    MoneyMovement @relation(fields: [sourceMovementId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("inter_company_allocations")
+}
+
+// ── Loans Ledger ─────────────────────────────────────────────────────────
+
+model Loan {
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  idempotencyKey    String  @unique @map("idempotency_key") @db.Uuid
+  type              String  @db.Text // qard_e_hasana | murabaha
+  direction         String  @db.Text // received | given
+  counterparty      String  @db.Text
+  principal         Decimal @db.Decimal(14, 2)
+  profitAmount      Decimal? @map("profit_amount") @db.Decimal(14, 2)
+  outstandingBalance Decimal @map("outstanding_balance") @db.Decimal(14, 2)
+  repaymentSchedule Json    @map("repayment_schedule") // JSONB array
+
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("loans")
+}

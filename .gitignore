@@ -12,6 +12,16 @@
 .swiftpm/
 migrate_working_dir/
 
+# Node / Backend related
+node_modules/
+dist/
+.env
+backend/.env
+backend/node_modules/
+backend/dist/
+backend/*.log
+backend/tsconfig.build.tsbuildinfo
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -46,3 +56,4 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
