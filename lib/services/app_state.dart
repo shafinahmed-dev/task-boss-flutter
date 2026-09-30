@@ -342,7 +342,7 @@ class AppState extends ChangeNotifier {
     final resp = await authRequest('GET', Uri.parse('$apiBaseUrl/companies'));
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       final List data = jsonDecode(resp.body);
-      _concerns = data.map((e) => e as Map<String, dynamic>).toList();
+      _concerns = List<Map<String, dynamic>>.from(data);
       notifyListeners();
       return;
     }
@@ -380,7 +380,7 @@ class AppState extends ChangeNotifier {
     final resp = await authRequest('GET', Uri.parse('$apiBaseUrl/suite/managers'));
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       final List data = jsonDecode(resp.body);
-      _managers = data.map((e) => e as Map<String, dynamic>).toList();
+      _managers = List<Map<String, dynamic>>.from(data);
       notifyListeners();
       return;
     }
@@ -420,7 +420,7 @@ class AppState extends ChangeNotifier {
   Future<void> fetchSuiteSummary() async {
     final resp = await authRequest('GET', Uri.parse('$apiBaseUrl/suite/ledger-summary'));
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      _suiteSummary = jsonDecode(resp.body) as Map<String, dynamic>;
+      _suiteSummary = Map<String, dynamic>.from(jsonDecode(resp.body));
       notifyListeners();
       return;
     }
