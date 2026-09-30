@@ -30,8 +30,8 @@ class AuthUser {
       email: json['email']?.toString() ?? '',
       custodianId: json['custodianId']?.toString() ?? '',
       companyId: json['companyId']?.toString() ?? '',
-      designation: json['designation']?.toString() ?? '',
-      department: json['department']?.toString() ?? '',
+      designation: json['designation'] as String? ?? 'User',
+      department: json['department'] as String? ?? 'General',
     );
   }
 

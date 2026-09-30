@@ -16,11 +16,18 @@ export interface LoginDto {
 
 export interface RegisterDto {
   name: string;
-  designation: string;
+  designation?: string;
+  department?: string;
   email: string;
   phone: string;
   password: string;
   companyId?: string;
+}
+
+export interface UpdateProfileDto {
+  name?: string;
+  designation?: string;
+  department?: string;
 }
 
 export interface AuthResult {
@@ -31,7 +38,9 @@ export interface AuthResult {
     id: string;
     name: string;
     email?: string;
+    phone?: string;
     designation?: string;
+    department?: string;
     role: string;
     companyIds: string[];
     custodianId?: string;
@@ -67,6 +76,9 @@ export class AuthService {
         id: true,
         name: true,
         email: true,
+        phone: true,
+        designation: true,
+        department: true,
         role: true,
         languagePref: true,
         passwordHash: true,
@@ -134,6 +146,9 @@ export class AuthService {
         id: user.id,
         name: user.name,
         email: user.email ?? dto.email,
+        phone: user.phone ?? undefined,
+        designation: user.designation ?? 'User',
+        department: user.department ?? 'General',
         role: user.role,
         companyIds: authorizedCompanyIds,
         custodianId: user.custodianAccounts[0]?.id,
@@ -146,7 +161,7 @@ export class AuthService {
    * Registers a new user and creates their custodian account.
    */
   async register(dto: RegisterDto) {
-    if (!dto.email || !dto.password || !dto.name || !dto.designation) {
+    if (!dto.email || !dto.password || !dto.name) {
       throw new BadRequestException('Missing required fields');
     }
 
@@ -179,7 +194,8 @@ export class AuthService {
           name: dto.name,
           email: dto.email,
           phone: dto.phone,
-          designation: dto.designation,
+          designation: dto.designation || 'User',
+          department: dto.department || 'General',
           role: 'collector',
           languagePref: 'en',
           passwordHash,
@@ -207,12 +223,57 @@ export class AuthService {
         name: user.name,
         email: user.email,
         phone: user.phone,
-        designation: user.designation,
+        designation: user.designation ?? 'User',
+        department: user.department ?? 'General',
         role: user.role,
         companyId: companyId as string,
         custodianId: custodian.id
       };
     });
+  }
+
+  /**
+   * PATCH /auth/profile
+   * Updates user designation, department, and/or name.
+   */
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const data: { name?: string; designation?: string; department?: string } = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.designation !== undefined) data.designation = dto.designation;
+    if (dto.department !== undefined) data.department = dto.department;
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        designation: true,
+        department: true,
+        role: true,
+        companies: {
+          select: { companyId: true },
+        },
+        custodianAccounts: {
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      designation: user.designation ?? 'User',
+      department: user.department ?? 'General',
+      role: user.role,
+      companyIds: user.companies.map((c: { companyId: string }) => c.companyId),
+      custodianId: user.custodianAccounts[0]?.id,
+    };
   }
 
   /**

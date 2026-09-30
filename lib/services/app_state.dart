@@ -34,13 +34,18 @@ class AppState extends ChangeNotifier {
     if (storedToken != null && storedUserStr != null) {
       try {
         final parsedUser = AuthUser.fromJson(jsonDecode(storedUserStr));
-        final cachedDesignation = prefs.getString('@user_designation') ?? '';
-        final cachedDepartment = prefs.getString('@user_department') ?? '';
+        final uid = parsedUser.userId;
+        final cachedDesignation = (uid.isNotEmpty ? prefs.getString('pref_designation_$uid') : null) ?? prefs.getString('@user_designation') ?? '';
+        final cachedDepartment = (uid.isNotEmpty ? prefs.getString('pref_department_$uid') : null) ?? prefs.getString('@user_department') ?? '';
 
         token = storedToken;
         user = parsedUser.copyWith(
-          designation: parsedUser.designation.isNotEmpty ? parsedUser.designation : cachedDesignation,
-          department: parsedUser.department.isNotEmpty ? parsedUser.department : cachedDepartment,
+          designation: (parsedUser.designation.isNotEmpty && parsedUser.designation != 'User')
+              ? parsedUser.designation
+              : (cachedDesignation.isNotEmpty ? cachedDesignation : parsedUser.designation),
+          department: (parsedUser.department.isNotEmpty && parsedUser.department != 'General')
+              ? parsedUser.department
+              : (cachedDepartment.isNotEmpty ? cachedDepartment : parsedUser.department),
         );
         await _fetchBalanceData();
       } catch (e) {
@@ -134,24 +139,29 @@ class AppState extends ChangeNotifier {
   Future<void> login(String newToken, AuthUser newUser) async {
     token = newToken;
     final prefs = await SharedPreferences.getInstance();
+    final uid = newUser.userId;
 
-    final cachedDesignation = prefs.getString('@user_designation') ?? '';
-    final cachedDepartment = prefs.getString('@user_department') ?? '';
+    final cachedDesignation = (uid.isNotEmpty ? prefs.getString('pref_designation_$uid') : null) ?? prefs.getString('@user_designation') ?? '';
+    final cachedDepartment = (uid.isNotEmpty ? prefs.getString('pref_department_$uid') : null) ?? prefs.getString('@user_department') ?? '';
 
     final finalUser = newUser.copyWith(
-      designation: newUser.designation.isNotEmpty ? newUser.designation : cachedDesignation,
-      department: newUser.department.isNotEmpty ? newUser.department : cachedDepartment,
+      designation: (newUser.designation.isNotEmpty && newUser.designation != 'User')
+          ? newUser.designation
+          : (cachedDesignation.isNotEmpty ? cachedDesignation : (newUser.designation.isNotEmpty ? newUser.designation : 'User')),
+      department: (newUser.department.isNotEmpty && newUser.department != 'General')
+          ? newUser.department
+          : (cachedDepartment.isNotEmpty ? cachedDepartment : (newUser.department.isNotEmpty ? newUser.department : 'General')),
     );
 
     user = finalUser;
     await prefs.setString('@auth_token', newToken);
     await prefs.setString('@auth_user', jsonEncode(finalUser.toJson()));
-    if (finalUser.designation.isNotEmpty) {
-      await prefs.setString('@user_designation', finalUser.designation);
+    if (uid.isNotEmpty) {
+      await prefs.setString('pref_designation_$uid', finalUser.designation);
+      await prefs.setString('pref_department_$uid', finalUser.department);
     }
-    if (finalUser.department.isNotEmpty) {
-      await prefs.setString('@user_department', finalUser.department);
-    }
+    await prefs.setString('@user_designation', finalUser.designation);
+    await prefs.setString('@user_department', finalUser.department);
 
     await _fetchBalanceData();
     notifyListeners();
@@ -162,15 +172,20 @@ class AppState extends ChangeNotifier {
       user = user!.copyWith(designation: designation, department: department);
     }
     final prefs = await SharedPreferences.getInstance();
+    final uid = user?.userId ?? '';
+    if (uid.isNotEmpty) {
+      await prefs.setString('pref_designation_$uid', designation);
+      await prefs.setString('pref_department_$uid', department);
+    }
     await prefs.setString('@user_designation', designation);
     await prefs.setString('@user_department', department);
     if (user != null) {
       await prefs.setString('@auth_user', jsonEncode(user!.toJson()));
     }
 
-    if (token != null && user != null) {
+    if (token != null) {
       try {
-        final url = Uri.parse('$apiBaseUrl/users/profile');
+        final url = Uri.parse('$apiBaseUrl/auth/profile');
         await authRequest(
           'PATCH',
           url,

@@ -426,7 +426,6 @@ export class CustodyService {
             select: {
               id: true,
               name: true,
-              designation: true,
               linkedUser: { select: { id: true, name: true, role: true, designation: true } },
             },
           },
@@ -434,7 +433,6 @@ export class CustodyService {
             select: {
               id: true,
               name: true,
-              designation: true,
               linkedUser: { select: { id: true, name: true, role: true, designation: true } },
             },
           },
