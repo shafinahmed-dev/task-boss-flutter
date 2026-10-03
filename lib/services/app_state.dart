@@ -422,10 +422,18 @@ class AppState extends ChangeNotifier {
     throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to provision manager');
   }
 
-  Future<void> updateManager({required String id, required String name, required String designation, String? newPassword, List<String>? companyIds}) async {
+  Future<void> updateManager({
+    required String id,
+    required String name,
+    required String designation,
+    String? handlePrefix,
+    String? newPassword,
+    List<String>? companyIds,
+  }) async {
     final body = <String, dynamic>{'name': name, 'designation': designation};
     if (companyIds != null) body['companyIds'] = companyIds;
     if (newPassword != null && newPassword.isNotEmpty) body['password'] = newPassword;
+    if (handlePrefix != null && handlePrefix.isNotEmpty) body['handlePrefix'] = handlePrefix;
     final resp = await authRequest('PATCH', Uri.parse('$apiBaseUrl/suite/managers/$id'), headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       await fetchManagers();

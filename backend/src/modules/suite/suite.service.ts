@@ -5,7 +5,7 @@ import { PrismaService } from '../../database/prisma.service.js';
 export interface CreateConcernDto { name: string; code: string; }
 export interface UpdateConcernDto { name?: string; code?: string; }
 export interface ProvisionManagerDto { name: string; handlePrefix: string; password: string; designation: string; companyIds: string[]; }
-export interface UpdateManagerDto { name?: string; designation?: string; password?: string; companyIds?: string[]; }
+export interface UpdateManagerDto { name?: string; designation?: string; password?: string; handlePrefix?: string; companyIds?: string[]; }
 
 @Injectable()
 export class SuiteService {
@@ -14,14 +14,70 @@ export class SuiteService {
   async getConcerns(tenantId: string) {
     const companies = await this.prisma.company.findMany({
       where: { tenantId },
-      include: { custodianAccounts: { select: { id: true, _count: { select: { wallets: { where: { isArchived: false } } } } } } },
+      include: {
+        users: {
+          include: {
+            user: {
+              include: {
+                custodianAccounts: {
+                  include: {
+                    wallets: {
+                      include: {
+                        movements: true,
+                        custodyTransfersFrom: { where: { status: 'confirmed' } },
+                        custodyTransfersTo: { where: { status: 'confirmed' } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       orderBy: { createdAt: 'asc' },
     });
-    return companies.map(c => ({
-      id: c.id, name: c.name, code: c.code ?? '', tenantId: c.tenantId, createdAt: c.createdAt,
-      totalCustodians: c.custodianAccounts?.length ?? 0,
-      totalWallets: c.custodianAccounts?.reduce((sum, ca) => sum + (ca._count?.wallets ?? 0), 0) ?? 0,
-    }));
+
+    const supersededRows = await this.prisma.moneyMovement.findMany({
+      where: { editedFromId: { not: null } },
+      select: { editedFromId: true },
+    });
+    const supersededIds = new Set(supersededRows.map((r) => r.editedFromId).filter(Boolean) as string[]);
+
+    const calculateWalletBalance = (wallet: any) => {
+      let balance = 0;
+      for (const m of wallet.movements) {
+        if (supersededIds.has(m.id)) continue;
+        const amt = Number(m.amount) || 0;
+        const fee = m.fee ? Number(m.fee) : 0;
+        if (m.direction.toUpperCase() === 'IN') balance += amt;
+        else balance -= (amt + fee);
+      }
+      return Math.max(0, balance);
+    };
+
+    return companies.map(c => {
+      const assignedMembers = c.users.filter(uc => uc.user && uc.user.role !== 'SUITE_ADMIN');
+      let totalBalance = 0;
+      for (const uc of assignedMembers) {
+        const u = uc.user;
+        for (const ca of u.custodianAccounts) {
+          for (const w of ca.wallets) {
+            if (w.isArchived) continue;
+            totalBalance += calculateWalletBalance(w);
+          }
+        }
+      }
+      return {
+        id: c.id,
+        name: c.name,
+        code: c.code ?? '',
+        tenantId: c.tenantId,
+        createdAt: c.createdAt,
+        totalMembers: assignedMembers.length,
+        totalBalance,
+      };
+    });
   }
 
   async createConcern(tenantId: string, dto: CreateConcernDto) {
@@ -80,7 +136,7 @@ export class SuiteService {
     });
     return managers.map(m => ({
       id: m.id, handle: m.handle, name: m.name, email: m.email, phone: m.phone, designation: m.designation,
-      department: m.department, role: m.role, companies: m.companies?.map(uc => uc.company) ?? [], createdAt: m.createdAt,
+      department: m.department, role: m.role, rawPassword: m.rawPassword ?? null, companies: m.companies?.map(uc => uc.company) ?? [], createdAt: m.createdAt,
     }));
   }
 
@@ -128,7 +184,19 @@ export class SuiteService {
     const data: any = {};
     if (dto.name?.trim()) data.name = dto.name.trim();
     if (dto.designation?.trim()) data.designation = dto.designation.trim();
-    if (dto.password?.trim()) data.passwordHash = await bcrypt.hash(dto.password, 10);
+    if (dto.password?.trim()) {
+      data.passwordHash = await bcrypt.hash(dto.password, 10);
+      data.rawPassword = dto.password;
+    }
+    if (dto.handlePrefix?.trim()) {
+      const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) throw new NotFoundException('Tenant not found');
+      const tenantSlug = tenant.slug || 'taskgroup';
+      const handle = `${dto.handlePrefix.trim().toLowerCase()}.${tenantSlug}`;
+      const existing = await this.prisma.user.findFirst({ where: { handle, id: { not: id } } });
+      if (existing) throw new ConflictException('Handle already in use');
+      data.handle = handle;
+    }
     
     return this.prisma.$transaction(async (tx) => {
       const updatedUser = await tx.user.update({ where: { id }, data });
@@ -139,7 +207,7 @@ export class SuiteService {
           await tx.userCompany.createMany({ data: compIds.map(cId => ({ userId: id, companyId: cId })) });
         }
       }
-      return { id: updatedUser.id, name: updatedUser.name, handle: updatedUser.handle, role: updatedUser.role };
+      return { id: updatedUser.id, name: updatedUser.name, handle: updatedUser.handle, role: updatedUser.role, rawPassword: updatedUser.rawPassword };
     });
   }
 
@@ -187,11 +255,26 @@ export class SuiteService {
     const company = await this.prisma.company.findFirst({
       where: { id, tenantId },
       include: {
-        users: { include: { user: { include: { custodianAccounts: { include: { wallets: { include: { movements: true, custodyTransfersFrom: { where: { status: 'confirmed' } }, custodyTransfersTo: { where: { status: 'confirmed' } } } } } } } } } },
-        custodianAccounts: {
-          include: { wallets: { include: { movements: true, custodyTransfersFrom: { where: { status: 'confirmed' } }, custodyTransfersTo: { where: { status: 'confirmed' } } } } }
-        }
-      }
+        users: {
+          include: {
+            user: {
+              include: {
+                custodianAccounts: {
+                  include: {
+                    wallets: {
+                      include: {
+                        movements: true,
+                        custodyTransfersFrom: { where: { status: 'confirmed' } },
+                        custodyTransfersTo: { where: { status: 'confirmed' } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!company) throw new NotFoundException('Company not found');
@@ -214,38 +297,17 @@ export class SuiteService {
       return Math.max(0, balance);
     };
 
+    const assignedMembers = company.users.filter(uc => uc.user && uc.user.role !== 'SUITE_ADMIN');
     let totalBalance = 0;
-    const wallets = [];
-
-    for (const ca of company.custodianAccounts) {
-      for (const w of ca.wallets) {
-        const bal = calculateWalletBalance(w);
-        totalBalance += bal;
-        wallets.push({
-          id: w.id,
-          name: w.name,
-          type: w.type,
-          holderName: company.name,
-          balance: bal,
-        });
-      }
-    }
-
     const members = [];
-    for (const uc of company.users) {
+
+    for (const uc of assignedMembers) {
       const u = uc.user;
       let memberBalance = 0;
       for (const ca of u.custodianAccounts) {
         for (const w of ca.wallets) {
-          const bal = calculateWalletBalance(w);
-          memberBalance += bal;
-          wallets.push({
-            id: w.id,
-            name: w.name,
-            type: w.type,
-            holderName: u.name,
-            balance: bal,
-          });
+          if (w.isArchived) continue;
+          memberBalance += calculateWalletBalance(w);
         }
       }
       totalBalance += memberBalance;
@@ -267,7 +329,6 @@ export class SuiteService {
         totalBalance,
       },
       members,
-      wallets,
     };
   }
 }

@@ -786,7 +786,6 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
 
           final data = jsonDecode(snapshot.data!.body) as Map<String, dynamic>;
           final members = (data['members'] as List<dynamic>?) ?? [];
-          final wallets = (data['wallets'] as List<dynamic>?) ?? [];
 
           return Container(
             constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
@@ -831,19 +830,6 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                     title: Text(m['name'] ?? '', style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
                     subtitle: Text('${m['designation'] ?? m['role']} • @${m['handle']}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
                     trailing: Text('৳ ${_formatAmount(m['balance'])}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
-                  )),
-                const Divider(color: Color(0xFFE2E8F0), height: 32),
-                Text('Wallets (${wallets.length})', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                if (wallets.isEmpty)
-                  const Text('No wallets registered yet.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13))
-                else
-                  ...wallets.map((w) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF0F172A)),
-                    title: Text(w['name'] ?? 'Wallet', style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
-                    subtitle: Text(w['holderName'] ?? '', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                    trailing: Text('৳ ${_formatAmount(w['balance'])}', style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
                   )),
               ],
             ),
@@ -988,16 +974,14 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                   controller: nameCtl,
                   decoration: const InputDecoration(labelText: 'Full Name'),
                 ),
-                if (!isEditing) ...[
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: prefixCtl,
-                    decoration: const InputDecoration(
-                      labelText: 'Handle Prefix',
-                      hintText: 'e.g. ceoman',
-                    ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: prefixCtl,
+                  decoration: const InputDecoration(
+                    labelText: 'Handle Prefix',
+                    hintText: 'e.g. ceoman',
                   ),
-                ],
+                ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: desigCtl,
@@ -1065,6 +1049,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                             id: manager['id'],
                             name: name,
                             designation: desig,
+                            handlePrefix: prefixCtl.text.trim(),
                             newPassword: pass.isNotEmpty ? pass : null,
                             companyIds: selectedCompanyIds.toList(),
                           );
