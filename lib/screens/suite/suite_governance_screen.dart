@@ -389,7 +389,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.5,
+              childAspectRatio: 1.35,
             ),
             itemCount: concernsList.length,
             itemBuilder: (ctx, i) {
@@ -439,9 +439,19 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                           ),
                         ],
                       ),
-                      Text(
-                        '$membersCount Members • ৳ ${_formatAmount(balance)}',
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w600),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '৳ ${_formatAmount(balance)}',
+                            style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$membersCount Members',
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w500),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -660,101 +670,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
             );
           }),
 
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Managing Accounts (${managers.length})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            ElevatedButton.icon(
-              onPressed: () => _showAddManagerModal(context),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add Manager'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (managers.isEmpty)
-          const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('No managers found.', style: TextStyle(color: Color(0xFF64748B))))
-        else
-          ...managers.map((m) {
-            final mId = m['id'] ?? '';
-            final isVis = _revealedPasswordManagerIds.contains(mId);
-            final rawPwd = m['rawPassword'] ?? '••••••••';
-            final compList = (m['companies'] as List? ?? []);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(m['name'] ?? '', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(4)),
-                                  child: const Text('MANAGER', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text('@${m['handle'] ?? ''}', style: const TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                      IconButton(icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)), onPressed: () => _showEditManagerModal(context, m)),
-                      IconButton(icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)), onPressed: () => _confirmDeleteManager(context, mId)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (compList.isNotEmpty)
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: compList.map<Widget>((comp) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                          child: Text(comp['code'] ?? comp['name'] ?? '', style: const TextStyle(color: Color(0xFF475569), fontSize: 11, fontWeight: FontWeight.w600)),
-                        );
-                      }).toList(),
-                    ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
-                    child: Row(
-                      children: [
-                        const Text('Password: ', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                        Expanded(child: Text(isVis ? rawPwd : '••••••••', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace'))),
-                        InkWell(
-                          onTap: () => setState(() => isVis ? _revealedPasswordManagerIds.remove(mId) : _revealedPasswordManagerIds.add(mId)),
-                          child: Icon(isVis ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
-                        ),
-                        const SizedBox(width: 12),
-                        InkWell(
-                          onTap: () {
-                            Clipboard.setData(ClipboardData(text: rawPwd));
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password copied')));
-                          },
-                          child: const Icon(Icons.copy_rounded, size: 16, color: Color(0xFF64748B)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
+        
 
         const SizedBox(height: 24),
         Row(
