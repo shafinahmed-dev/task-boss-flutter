@@ -14,6 +14,8 @@ double _toDouble(dynamic val) {
 class AppState extends ChangeNotifier {
   String? token;
   AuthUser? user;
+  AuthUser? get currentUser => user;
+
   double balance = 0.0;
   int pendingCount = 0;
   bool isReady = false;
