@@ -165,6 +165,7 @@ export class SuiteService {
         data: {
           handle, name: dto.name.trim(), role: 'MANAGER', tenantId,
           designation: dto.designation?.trim() || 'Manager', department: 'Management', languagePref: 'bn', passwordHash,
+          rawPassword: dto.password,
         },
       });
       if (dto.companyIds && dto.companyIds.length > 0) {
@@ -173,7 +174,7 @@ export class SuiteService {
         });
         await tx.custodianAccount.create({ data: { name: `${user.name} — Custodian Account`, type: 'user', linkedUserId: user.id, companyId: dto.companyIds[0] } });
       }
-      return { id: user.id, handle: user.handle, name: user.name, role: user.role, designation: user.designation, companyIds: dto.companyIds };
+      return { id: user.id, handle: user.handle, name: user.name, role: user.role, designation: user.designation, rawPassword: user.rawPassword, companyIds: dto.companyIds };
     });
   }
 
@@ -249,6 +250,194 @@ export class SuiteService {
     totalCash -= transferFees;
     
     return { totalGroupCash: Math.max(0, totalCash), concernsCount, managersCount, employeesCount };
+  }
+
+  async getDashboardAnalytics(tenantId: string, period: string = 'month') {
+    let startDate = new Date(0);
+    const now = new Date();
+    if (period === 'today') {
+      startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+    } else if (period === 'week') {
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (period === 'month') {
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 30);
+    }
+
+    const concerns = await this.getConcerns(tenantId);
+    const totalGroupCash = concerns.reduce((sum, c) => sum + (c.totalBalance || 0), 0);
+
+    const supersededRows = await this.prisma.moneyMovement.findMany({
+      where: { editedFromId: { not: null } },
+      select: { editedFromId: true },
+    });
+    const supersededIds = new Set(supersededRows.map((r) => r.editedFromId).filter(Boolean) as string[]);
+
+    const movements = await this.prisma.moneyMovement.findMany({
+      where: {
+        custodian: { company: { tenantId } },
+        createdAt: { gte: startDate },
+      },
+      select: { id: true, direction: true, amount: true, createdAt: true },
+    });
+
+    let inflow = 0;
+    let outflow = 0;
+    for (const m of movements) {
+      if (supersededIds.has(m.id)) continue;
+      const amt = Number(m.amount) || 0;
+      if (m.direction.toUpperCase() === 'IN') {
+        inflow += amt;
+      } else if (m.direction.toUpperCase() === 'OUT') {
+        outflow += amt;
+      }
+    }
+
+    const managers = await this.prisma.user.findMany({
+      where: { tenantId, role: 'MANAGER' },
+      include: {
+        companies: {
+          include: {
+            company: { select: { id: true, name: true, code: true } },
+          },
+        },
+        custodianAccounts: {
+          include: {
+            wallets: {
+              include: { movements: true },
+            },
+          },
+        },
+      },
+    });
+
+    const calculateWalletBalance = (wallet: any) => {
+      let balance = 0;
+      for (const m of wallet.movements) {
+        if (supersededIds.has(m.id)) continue;
+        const amt = Number(m.amount) || 0;
+        const fee = m.fee ? Number(m.fee) : 0;
+        if (m.direction.toUpperCase() === 'IN') balance += amt;
+        else balance -= (amt + fee);
+      }
+      return Math.max(0, balance);
+    };
+
+    const managersLeaderboardUnsorted = managers.map(m => {
+      let personalBalance = 0;
+      for (const ca of m.custodianAccounts) {
+        for (const w of ca.wallets) {
+          if (w.isArchived) continue;
+          personalBalance += calculateWalletBalance(w);
+        }
+      }
+      const sharePercentage = totalGroupCash > 0 ? (personalBalance / totalGroupCash) * 100 : 0;
+      return {
+        id: m.id,
+        name: m.name,
+        handle: m.handle,
+        email: m.email,
+        phone: m.phone,
+        designation: m.designation,
+        rawPassword: m.rawPassword ?? null,
+        personalBalance,
+        sharePercentage,
+        companies: m.companies?.map(uc => uc.company) ?? [],
+      };
+    });
+
+    managersLeaderboardUnsorted.sort((a, b) => {
+      if (b.personalBalance !== a.personalBalance) {
+        return b.personalBalance - a.personalBalance;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    const managersLeaderboard = managersLeaderboardUnsorted.map((m, index) => ({
+      ...m,
+      rank: index + 1,
+    }));
+
+    return {
+      totalGroupCash,
+      inflow,
+      outflow,
+      concerns,
+      managersLeaderboard,
+    };
+  }
+
+  async getSuiteEmployees(tenantId: string) {
+    const employees = await this.prisma.user.findMany({
+      where: { tenantId, role: 'EMPLOYEE' },
+      include: {
+        companies: { include: { company: true } },
+        custodianAccounts: {
+          include: {
+            wallets: { include: { movements: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const supersededRows = await this.prisma.moneyMovement.findMany({
+      where: { editedFromId: { not: null } },
+      select: { editedFromId: true },
+    });
+    const supersededIds = new Set(supersededRows.map((r) => r.editedFromId).filter(Boolean) as string[]);
+
+    const calculateWalletBalance = (wallet: any) => {
+      let balance = 0;
+      for (const m of wallet.movements) {
+        if (supersededIds.has(m.id)) continue;
+        const amt = Number(m.amount) || 0;
+        const fee = m.fee ? Number(m.fee) : 0;
+        if (m.direction.toUpperCase() === 'IN') balance += amt;
+        else balance -= (amt + fee);
+      }
+      return Math.max(0, balance);
+    };
+
+    return employees.map(e => {
+      let balance = 0;
+      for (const ca of e.custodianAccounts) {
+        for (const w of ca.wallets) {
+          if (w.isArchived) continue;
+          balance += calculateWalletBalance(w);
+        }
+      }
+      const primaryCompany = e.companies?.[0]?.company ?? null;
+      return {
+        id: e.id,
+        name: e.name,
+        handle: e.handle,
+        email: e.email,
+        phone: e.phone,
+        designation: e.designation,
+        department: e.department,
+        role: e.role,
+        rawPassword: e.rawPassword ?? null,
+        balance,
+        company: primaryCompany,
+        companies: e.companies?.map(uc => uc.company) ?? [],
+        createdAt: e.createdAt,
+      };
+    });
+  }
+
+  async updateUserPassword(tenantId: string, userId: string, newPassword: string) {
+    if (!newPassword?.trim()) throw new BadRequestException('New password is required');
+    const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId } });
+    if (!user) throw new NotFoundException('User not found');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, rawPassword: newPassword },
+    });
+    return { success: true, message: 'Password updated successfully' };
   }
 
   async getConcernBreakdown(tenantId: string, id: string) {

@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Req,
   HttpCode,
   HttpStatus,
@@ -98,5 +99,29 @@ export class SuiteController {
     const tenantId = req.user?.tenantId;
     if (!tenantId) throw new BadRequestException('No tenant associated');
     return this.suiteService.getLedgerSummary(tenantId);
+  }
+
+  @Get('suite/dashboard-analytics')
+  @HttpCode(HttpStatus.OK)
+  async getDashboardAnalytics(@Req() req: any, @Query('period') period?: string) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('No tenant associated');
+    return this.suiteService.getDashboardAnalytics(tenantId, period || 'month');
+  }
+
+  @Get('suite/employees')
+  @HttpCode(HttpStatus.OK)
+  async getSuiteEmployees(@Req() req: any) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('No tenant associated');
+    return this.suiteService.getSuiteEmployees(tenantId);
+  }
+
+  @Patch('suite/users/:id/password')
+  @HttpCode(HttpStatus.OK)
+  async updateUserPassword(@Req() req: any, @Param('id') id: string, @Body() dto: { newPassword: string }) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('No tenant associated');
+    return this.suiteService.updateUserPassword(tenantId, id, dto.newPassword);
   }
 }

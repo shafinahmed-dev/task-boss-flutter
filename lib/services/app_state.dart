@@ -27,6 +27,12 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> _managers = [];
   List<Map<String, dynamic>> get managers => _managers;
 
+  Map<String, dynamic> _dashboardData = {};
+  Map<String, dynamic> get dashboardData => _dashboardData;
+
+  List<Map<String, dynamic>> _suiteEmployees = [];
+  List<Map<String, dynamic>> get suiteEmployees => _suiteEmployees;
+
   Map<String, dynamic> _suiteSummary = {
     'totalGroupCash': 0.0,
     'concernsCount': 0,
@@ -459,5 +465,58 @@ class AppState extends ChangeNotifier {
       return;
     }
     throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to fetch ledger summary');
+  }
+
+  Future<void> fetchSuiteDashboard({String period = 'month'}) async {
+    if (token == null) return;
+    try {
+      final url = Uri.parse('$apiBaseUrl/suite/dashboard-analytics?period=$period');
+      final resp = await authRequest('GET', url);
+      if (resp.statusCode == 200) {
+        _dashboardData = Map<String, dynamic>.from(jsonDecode(resp.body));
+        if (_dashboardData['totalGroupCash'] != null) {
+          balance = _toDouble(_dashboardData['totalGroupCash']);
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      // offline fallback
+    }
+  }
+
+  Future<void> fetchSuiteEmployees() async {
+    if (token == null) return;
+    try {
+      final url = Uri.parse('$apiBaseUrl/suite/employees');
+      final resp = await authRequest('GET', url);
+      if (resp.statusCode == 200) {
+        final List list = jsonDecode(resp.body);
+        _suiteEmployees = list.map((item) => Map<String, dynamic>.from(item)).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      // offline fallback
+    }
+  }
+
+  Future<void> changeUserPassword({required String userId, required String newPassword}) async {
+    if (token == null) return;
+    final url = Uri.parse('$apiBaseUrl/suite/users/$userId/password');
+    final resp = await authRequest(
+      'PATCH',
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'newPassword': newPassword}),
+    );
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      await fetchManagers();
+      await fetchSuiteEmployees();
+      await fetchSuiteDashboard();
+      notifyListeners();
+      return;
+    }
+    final data = jsonDecode(resp.body);
+    final msg = data['message'] ?? 'Failed to update password';
+    throw Exception(msg is List ? msg.join(', ') : msg.toString());
   }
 }
