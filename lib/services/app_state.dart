@@ -292,8 +292,32 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> _fetchSuiteConsolidatedBalanceData() async {
+    if (user == null || token == null) return;
+    try {
+      final url = Uri.parse('$apiBaseUrl/suite/ledger-summary');
+      final resp = await authRequest('GET', url);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        _suiteSummary = Map<String, dynamic>.from(data);
+        balance = _toDouble(_suiteSummary['totalGroupCash']);
+        notifyListeners();
+      }
+    } catch (e) {
+      // offline fallback
+    }
+  }
+
+
   Future<void> _fetchBalanceData() async {
     if (user == null || token == null) return;
+    
+    // For SUITE_ADMIN, calculate consolidated tenant balance
+    if (user!.role == 'SUITE_ADMIN') {
+      await _fetchSuiteConsolidatedBalanceData();
+      return;
+    }
+
     try {
       await fetchWallets();
 

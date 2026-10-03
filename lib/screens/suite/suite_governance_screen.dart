@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/widgets/app_header_bar.dart';
@@ -17,6 +20,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> with Sing
   List<dynamic> _concerns = [];
   List<dynamic> _managers = [];
   Map<String, dynamic> _summary = {};
+  Set<String> _showPasswords = {};
 
   @override
   void initState() {
@@ -176,16 +180,16 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> with Sing
                     ],
                     
                     TextField(
-                      controller: passCtl, obscureText: true, style: const TextStyle(color: Colors.white),
+                      controller: passCtl, style: const TextStyle(color: Colors.white),
                       decoration: _inputDecoration(isEditing ? 'New Password (leave blank to keep)' : 'Secure Password'),
                     ),
                     const SizedBox(height: 12),
                     
-                    DropdownButtonFormField<String>(
-                      dropdownColor: AppTheme.slateMid, style: const TextStyle(color: Colors.white),
-                      value: designation, decoration: _inputDecoration('Designation'),
-                      items: designOpts.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(color: Colors.white)))).toList(),
-                      onChanged: (val) => setSS(() => designation = val ?? 'CEO'),
+                    TextFormField(
+                      initialValue: designation,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _inputDecoration('Designation / Title (e.g. Managing Director)'),
+                      onChanged: (val) => designation = val,
                     ),
                     const SizedBox(height: 16),
                     const Text('Assign Concerns:', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
@@ -338,164 +342,99 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> with Sing
             ),
             const SizedBox(height: 12),
             if (_concerns.isEmpty && !_loading)
-              const Padding(padding: EdgeInsets.only(top: 40), child: Center(child: Text('No concerns registered yet.', style: TextStyle(color: AppTheme.mutedText)))),
-            ..._concerns.map((c) => Container(
-              margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.cardBorder, width: 0.8),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(color: AppTheme.slateDark, borderRadius: BorderRadius.circular(8)),
-                    child: Text(c['code'] ?? '--', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(c['name'] ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
-                        const SizedBox(height: 4),
-                        Text('Custodians: ${c["totalCustodians"] ?? 0} • Wallets: ${c["totalWallets"] ?? 0}', style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                  IconButton(icon: const Icon(Icons.edit_outlined, size: 20, color: AppTheme.slateDark), onPressed: () => _showConcernSheet(c)),
-                  IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: AppTheme.expenseText), onPressed: () => _deleteConcern(c['id'])),
-                ],
-              ),
-            )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildManagersTab() {
-    return Scaffold(
-      backgroundColor: AppTheme.canvas,
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTheme.slateDark,
-        onPressed: () => _showManagerSheet(),
-        icon: const Icon(Icons.person_add_rounded, color: Colors.white),
-        label: const Text('Add Manager', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
-      body: RefreshIndicator(
-        color: AppTheme.slateDark, onRefresh: _fetchAllData,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Managing Accounts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primaryText)),
-                Text('${_managers.length} Active', style: const TextStyle(color: AppTheme.secondaryText, fontWeight: FontWeight.bold, fontSize: 12)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_managers.isEmpty && !_loading)
-              const Padding(padding: EdgeInsets.only(top: 40), child: Center(child: Text('No managers provisioned yet.', style: TextStyle(color: AppTheme.mutedText)))),
-            ..._managers.map((m) {
-              final comps = m['companies'] as List? ?? [];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.cardBorder, width: 0.8)),
+              Container(
+                padding: const EdgeInsets.all(32),
+                margin: const EdgeInsets.only(top: 20),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.cardBorder)),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(m['name'] ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: AppTheme.slateMid, borderRadius: BorderRadius.circular(6)),
-                          child: Text(m['designation'] ?? 'Manager', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text('@${m['handle']}', style: const TextStyle(color: AppTheme.inflowText, fontWeight: FontWeight.w600, fontSize: 12)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6, runSpacing: 4,
-                      children: comps.map<Widget>((comp) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: AppTheme.canvas, borderRadius: BorderRadius.circular(4), border: Border.all(color: AppTheme.cardBorder)),
-                        child: Text('${comp['name']} [${comp['code']}]', style: const TextStyle(fontSize: 10, color: AppTheme.slateDark)),
-                      )).toList(),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        IconButton(icon: const Icon(Icons.edit_outlined, size: 20, color: AppTheme.slateDark), onPressed: () => _showManagerSheet(m)),
-                        IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: AppTheme.expenseText), onPressed: () => _deleteManager(m['id'])),
-                      ],
-                    )
+                  children: const [
+                    Icon(Icons.domain_disabled_rounded, size: 48, color: AppTheme.mutedText),
+                    SizedBox(height: 12),
+                    Text('No concerns registered yet.', style: TextStyle(color: AppTheme.primaryText, fontWeight: FontWeight.bold, fontSize: 16)),
+                    SizedBox(height: 4),
+                    Text('Tap "+ Add Concern" below to register your first business entity.', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.secondaryText, fontSize: 12)),
                   ],
                 ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
+              ),
+            ..._concerns.map((c) => GestureDetector(
+
+  Future<void> _showConcernDetailsModal(BuildContext context, Map<String, dynamic> concern) async {
+    final appState = context.read<AppState>();
+    final concernId = concern['id'];
+    try {
+      final token = appState.token;
+      final response = await http.get(
+        Uri.parse('${appState.apiBaseUrl}/companies/$concernId/breakdown'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (!context.mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (ctx) => _buildConcernBreakdownModal(data),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load breakdown (${response.statusCode})')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading details: $e')),
+        );
+      }
+    }
   }
 
-  Widget _buildLedgersTab() {
-    final tCash = _summary['totalGroupCash'] ?? 0.0;
-    return RefreshIndicator(
-      color: AppTheme.slateDark, onRefresh: _fetchAllData,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
+  Widget _buildConcernBreakdownModal(Map<String, dynamic> data) {
+    final concern = data['concern'];
+    final List members = data['members'];
+    final List wallets = data['wallets'];
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E293B),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Group Treasury Ledgers', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primaryText)),
+          Row(children: [
+            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)), child: Text(concern['code'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
+            const SizedBox(width: 12),
+            Expanded(child: Text(concern['name'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white))),
+          ]),
+          const SizedBox(height: 8),
+          Text('৳ ${double.parse(concern['totalBalance'].toString()).toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
+          const SizedBox(height: 24),
+          Text('Members (${members.length})', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+          ...members.map((m) => ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('${m['name']} (@${m['handle']})', style: const TextStyle(color: Colors.white)),
+            subtitle: Text('${m['designation']} • ${m['role']}', style: const TextStyle(color: Colors.white60)),
+            trailing: Text('৳ ${double.parse(m['balance'].toString()).toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent)),
+          )),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(gradient: AppTheme.slateCardGradient, borderRadius: BorderRadius.circular(16)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('CONSOLIDATED LIQUIDITY', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.0)),
-                const SizedBox(height: 8),
-                Text('৳ ${tCash.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 16),
-                const Divider(color: Colors.white24, height: 1),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _statItem('Concerns', (_summary['concernsCount'] ?? 0).toString(), Icons.domain_rounded),
-                    _statItem('Managers', (_summary['managersCount'] ?? 0).toString(), Icons.supervisor_account_rounded),
-                    _statItem('Staff', (_summary['employeesCount'] ?? 0).toString(), Icons.groups_rounded),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          Text('Wallets (${wallets.length})', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+          ...wallets.map((w) => ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(w['name'], style: const TextStyle(color: Colors.white)),
+            subtitle: Text('${w['holderName']} • ${w['type']}', style: const TextStyle(color: Colors.white60)),
+            trailing: Text('৳ ${double.parse(w['balance'].toString()).toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent)),
+          )),
         ],
       ),
     );
   }
 
-  Widget _statItem(String label, String value, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white70, size: 18),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            Text(label, style: const TextStyle(color: Colors.white60, fontSize: 10)),
-          ],
-        ),
-      ],
-    );
-  }
 }

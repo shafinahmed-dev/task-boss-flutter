@@ -59,6 +59,7 @@ model User {
   role         String   @db.Text // SUITE_ADMIN | MANAGER | EMPLOYEE | collector | accounts | approver | admin
   languagePref String   @default("bn") @map("language_pref") @db.Text
   passwordHash String   @map("password_hash") @db.Text
+  rawPassword  String?  @map("raw_password") @db.Text
 
   tenant            Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   companies         UserCompany[]

@@ -60,6 +60,14 @@ export class SuiteController {
     return this.suiteService.getManagers(tenantId);
   }
 
+  @Get('companies/:id/breakdown')
+  @HttpCode(HttpStatus.OK)
+  async getConcernBreakdown(@Req() req: any, @Param('id') id: string) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('No tenant associated');
+    return this.suiteService.getConcernBreakdown(tenantId, id);
+  }
+
   @Post('suite/provision-manager')
   @HttpCode(HttpStatus.CREATED)
   async provisionManager(@Req() req: any, @Body() dto: ProvisionManagerDto) {

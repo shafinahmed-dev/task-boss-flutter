@@ -234,45 +234,7 @@ export class AuthService {
           tenantId: tenant.id,
           languagePref: 'en',
           passwordHash,
-        },
-      });
-
-      // 3. Create default company under this tenant
-      const code = sanitizedSlug.toUpperCase().slice(0, 4);
-      const company = await tx.company.create({
-        data: {
-          name: dto.companyName.trim(),
-          tenantId: tenant.id,
-          code,
-        },
-      });
-
-      // 4. Link suite user to company
-      await tx.userCompany.create({
-        data: {
-          userId: suiteUser.id,
-          companyId: company.id,
-        },
-      });
-
-      // 5. Create custodian account for suite user
-      const custodian = await tx.custodianAccount.create({
-        data: {
-          type: 'person',
-          name: suiteUser.name,
-          companyId: company.id,
-          linkedUserId: suiteUser.id,
-        },
-      });
-
-      // 6. Create default Cash wallet
-      await tx.wallet.create({
-        data: {
-          custodianId: custodian.id,
-          companyId: company.id,
-          name: 'Cash in Hand',
-          type: 'CASH',
-          isDefault: true,
+          rawPassword: dto.password,
         },
       });
 
@@ -282,7 +244,7 @@ export class AuthService {
         handle: suiteUser.handle,
         role: suiteUser.role,
         tenantId: tenant.id,
-        companyIds: [company.id],
+        companyIds: [],
       };
       const access_token = this.jwtService.sign(payload, { expiresIn: '8h' });
 
@@ -296,8 +258,6 @@ export class AuthService {
           name: suiteUser.name,
           role: suiteUser.role,
           tenantId: tenant.id,
-          companyId: company.id,
-          custodianId: custodian.id,
         },
       };
     });

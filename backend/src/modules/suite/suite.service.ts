@@ -182,4 +182,92 @@ export class SuiteService {
     
     return { totalGroupCash: Math.max(0, totalCash), concernsCount, managersCount, employeesCount };
   }
+
+  async getConcernBreakdown(tenantId: string, id: string) {
+    const company = await this.prisma.company.findFirst({
+      where: { id, tenantId },
+      include: {
+        users: { include: { user: { include: { custodianAccounts: { include: { wallets: { include: { movements: true, custodyTransfersFrom: { where: { status: 'confirmed' } }, custodyTransfersTo: { where: { status: 'confirmed' } } } } } } } } } },
+        custodianAccounts: {
+          include: { wallets: { include: { movements: true, custodyTransfersFrom: { where: { status: 'confirmed' } }, custodyTransfersTo: { where: { status: 'confirmed' } } } } }
+        }
+      }
+    });
+
+    if (!company) throw new NotFoundException('Company not found');
+
+    const supersededRows = await this.prisma.moneyMovement.findMany({
+      where: { editedFromId: { not: null } },
+      select: { editedFromId: true },
+    });
+    const supersededIds = new Set(supersededRows.map((r) => r.editedFromId).filter(Boolean) as string[]);
+
+    const calculateWalletBalance = (wallet: any) => {
+      let balance = 0;
+      for (const m of wallet.movements) {
+        if (supersededIds.has(m.id)) continue;
+        const amt = Number(m.amount) || 0;
+        const fee = m.fee ? Number(m.fee) : 0;
+        if (m.direction.toUpperCase() === 'IN') balance += amt;
+        else balance -= (amt + fee);
+      }
+      return Math.max(0, balance);
+    };
+
+    let totalBalance = 0;
+    const wallets = [];
+
+    for (const ca of company.custodianAccounts) {
+      for (const w of ca.wallets) {
+        const bal = calculateWalletBalance(w);
+        totalBalance += bal;
+        wallets.push({
+          id: w.id,
+          name: w.name,
+          type: w.type,
+          holderName: company.name,
+          balance: bal,
+        });
+      }
+    }
+
+    const members = [];
+    for (const uc of company.users) {
+      const u = uc.user;
+      let memberBalance = 0;
+      for (const ca of u.custodianAccounts) {
+        for (const w of ca.wallets) {
+          const bal = calculateWalletBalance(w);
+          memberBalance += bal;
+          wallets.push({
+            id: w.id,
+            name: w.name,
+            type: w.type,
+            holderName: u.name,
+            balance: bal,
+          });
+        }
+      }
+      totalBalance += memberBalance;
+      members.push({
+        id: u.id,
+        name: u.name,
+        handle: u.handle,
+        role: u.role,
+        designation: u.designation,
+        balance: memberBalance,
+      });
+    }
+
+    return {
+      concern: {
+        id: company.id,
+        name: company.name,
+        code: company.code,
+        totalBalance,
+      },
+      members,
+      wallets,
+    };
+  }
 }
