@@ -1546,7 +1546,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
               await context.read<AppState>().logout();
               if (mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  MaterialPageRoute(builder: (_) => LoginScreen(onSwitchToRegister: () {})),
                   (route) => false,
                 );
               }
