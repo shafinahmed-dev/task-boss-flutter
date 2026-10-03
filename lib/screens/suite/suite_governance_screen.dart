@@ -61,7 +61,8 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
   }
 
   String _formatAmount(dynamic val) {
-    final numVal = (val is num) ? val.toDouble() : (double.tryParse(val?.toString() ?? '0') ?? 0.0);
+    if (val == null) return '0.00';
+    final numVal = (val is num) ? val.toDouble() : (double.tryParse(val.toString()) ?? 0.0);
     return numVal.toStringAsFixed(2);
   }
 
@@ -266,7 +267,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                   await appState.logout();
                   if (context.mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      MaterialPageRoute(builder: (_) => LoginScreen(onSwitchToRegister: () {})),
                       (route) => false,
                     );
                   }
@@ -400,7 +401,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '৳ $_formatAmount(totalBalance) • $membersCount Members',
+                        '৳ ${_formatAmount(totalBalance)} • $membersCount Members',
                         style: const TextStyle(
                           color: Color(0xFF64748B),
                           fontSize: 13,
@@ -664,7 +665,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '৳ $_formatAmount(totalCash)',
+                  '৳ ${_formatAmount(totalCash)}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 28,
@@ -829,7 +830,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                     ),
                     title: Text(m['name'] ?? '', style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
                     subtitle: Text('${m['designation'] ?? m['role']} • @${m['handle']}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                    trailing: Text('৳ $_formatAmount(m['balance'])', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                    trailing: Text('৳ ${_formatAmount(m['balance'])}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                   )),
                 const Divider(color: Color(0xFFE2E8F0), height: 32),
                 Text('Wallets (${wallets.length})', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
@@ -842,7 +843,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                     leading: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF0F172A)),
                     title: Text(w['name'] ?? 'Wallet', style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
                     subtitle: Text(w['holderName'] ?? '', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                    trailing: Text('৳ $_formatAmount(w['balance'])', style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
+                    trailing: Text('৳ ${_formatAmount(w['balance'])}', style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
                   )),
               ],
             ),
