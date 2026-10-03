@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import '../../services/app_state.dart';
+import '../auth/login_screen.dart';
 
 class SuiteGovernanceScreen extends StatefulWidget {
   const SuiteGovernanceScreen({super.key});
@@ -16,6 +17,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
   int _selectedTabIndex = 0;
   final Set<String> _revealedPasswordManagerIds = {};
   bool _isLoading = false;
+  bool _isCashMasked = true;
 
   @override
   void initState() {
@@ -38,6 +40,33 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  void _showAccountModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('TASK Group Suite', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+            const Text('@suite.taskgroup', style: TextStyle(color: Color(0xFF94A3B8))),
+            const SizedBox(height: 16),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF064E3B), borderRadius: BorderRadius.circular(20)), child: const Text('SUITE ADMIN', style: TextStyle(color: Color(0xFF34D399), fontSize: 11, fontWeight: FontWeight.bold))),
+            const SizedBox(height: 24),
+            OutlinedButton(
+              onPressed: () {
+                context.read<AppState>().logout();
+                Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
+              },
+              style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
+              child: const Text('Log Out'),
+            ),
+          ],
+        ),
 
   Future<void> _showConcernDetailsModal(BuildContext context, Map<String, dynamic> concern) async {
     final appState = context.read<AppState>();
@@ -118,103 +147,237 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     );
   }
 
-  void _showAddEditConcernModal(BuildContext context, [Map<String, dynamic>? concern]) {}
-  void _showAddEditManagerModal(BuildContext context, [Map<String, dynamic>? manager]) {}
+
+  Widget _buildExecutiveHeader() {
+    final appState = context.watch<AppState>();
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => _showAccountModal(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFF334155))),
+              child: const Row(children: [Text('TASK Group Suite', style: TextStyle(color: Colors.white)), SizedBox(width: 4), Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white)]),
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFF334155))),
+            child: Row(children: [
+              Text(_isCashMasked ? '৳ ••••••' : '৳ ${appState.suiteSummary['totalGroupCash'] ?? 0}', style: const TextStyle(color: Colors.white)),
+              IconButton(icon: Icon(_isCashMasked ? Icons.visibility : Icons.visibility_off, color: Colors.white, size: 16), onPressed: () => setState(() => _isCashMasked = !_isCashMasked)),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.notifications_outlined, color: Colors.white),
+        ],
+      ),
+    );
+  }
 
   Widget _buildConcernsTab() {
     final appState = context.watch<AppState>();
-    return ListView.builder(
-      itemCount: appState.concerns.length,
-      itemBuilder: (ctx, i) {
-        final c = appState.concerns[i];
-        return ListTile(
-          onTap: () => _showConcernDetailsModal(context, c),
-          title: Text(c['name'], style: const TextStyle(color: Colors.white)),
-          subtitle: Text('৳ ${c['totalBalance'] ?? 0} • ${c['totalMembers'] ?? 0} Members', style: const TextStyle(color: Colors.white60)),
-          trailing: IconButton(icon: const Icon(Icons.edit, color: Colors.white), onPressed: () => _showAddEditConcernModal(context, c)),
-        );
-      },
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Text('Company Concerns', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              const Spacer(),
+              Text('${appState.concerns.length} Registered', style: const TextStyle(color: Color(0xFF94A3B8))),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: appState.concerns.length,
+            itemBuilder: (ctx, i) {
+              final c = appState.concerns[i];
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: const Color(0xFF161F2E),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFF2A374A))),
+                child: InkWell(
+                  onTap: () => _showConcernDetailsModal(context, c),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(width: 48, height: 48, decoration: BoxDecoration(color: const Color(0xFF0F172A), border: Border.all(color: const Color(0xFF334155)), borderRadius: BorderRadius.circular(10)), child: Center(child: Text(c['code'] ?? '??', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(c['name'], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                              Text('৳ ${c['totalBalance'] ?? 0} • ${c['totalMembers'] ?? 0} Members', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        IconButton(icon: const Icon(Icons.edit_outlined, color: Color(0xFF94A3B8)), onPressed: () => _showAddEditConcernModal(context, c)),
+                        IconButton(icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)), onPressed: () => appState.deleteConcern(c['id'])),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAddEditConcernModal(BuildContext context, [Map<String, dynamic>? concern]) {}
+  void _showAddEditManagerModal(BuildContext context, [Map<String, dynamic>? manager]) {}
+
+      ),
     );
   }
 
 
+
+
   Widget _buildManagersTab() {
     final appState = context.watch<AppState>();
-    return ListView.builder(
-      itemCount: appState.managers.length,
-      itemBuilder: (ctx, i) {
-        final m = appState.managers[i];
-        final revealed = _revealedPasswordManagerIds.contains(m['id']);
-        return ListTile(
-          title: Text(m['name'], style: const TextStyle(color: Colors.white)),
-          subtitle: Text('${m['designation']} (@${m['handle']})', style: const TextStyle(color: Colors.white60)),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              IconButton(
-                icon: Icon(revealed ? Icons.visibility_off : Icons.visibility, color: Colors.white),
-                onPressed: () => setState(() => revealed ? _revealedPasswordManagerIds.remove(m['id']) : _revealedPasswordManagerIds.add(m['id'])),
-              ),
-              IconButton(
-                icon: const Icon(Icons.copy, color: Colors.white),
-                onPressed: () => Clipboard.setData(ClipboardData(text: m['rawPassword'] ?? '')),
-              ),
+              const Text('Managing Accounts', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              const Spacer(),
+              Text('${appState.managers.length} Active', style: const TextStyle(color: Color(0xFF94A3B8))),
             ],
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: appState.managers.length,
+            itemBuilder: (ctx, i) {
+              final m = appState.managers[i];
+              final revealed = _revealedPasswordManagerIds.contains(m['id']);
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: const Color(0xFF161F2E),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFF2A374A))),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Text(m['name'], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                        const Spacer(),
+                        Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: const Color(0xFF064E3B), borderRadius: BorderRadius.circular(20)), child: const Text('MANAGER', style: TextStyle(color: Color(0xFF34D399), fontSize: 11))),
+                      ]),
+                      Text('@${m['handle']}', style: const TextStyle(color: Color(0xFF2DD4BF))),
+                      const SizedBox(height: 8),
+                      Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)), child: Row(children: [
+                        Expanded(child: Text('Password: ${revealed ? m['rawPassword'] : '••••••••'}', style: const TextStyle(color: Colors.white))),
+                        IconButton(icon: Icon(revealed ? Icons.visibility_off : Icons.visibility, color: Colors.white, size: 16), onPressed: () => setState(() => revealed ? _revealedPasswordManagerIds.remove(m['id']) : _revealedPasswordManagerIds.add(m['id']))),
+                        IconButton(icon: const Icon(Icons.copy, color: Colors.white, size: 16), onPressed: () => Clipboard.setData(ClipboardData(text: m['rawPassword'] ?? ''))),
+                      ])),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildLedgersTab() {
     final appState = context.watch<AppState>();
     final summary = appState.suiteSummary;
-    return ListView(
-      children: [
-        ListTile(title: Text('Total Group Cash: ${summary['totalGroupCash']}', style: const TextStyle(color: Colors.white))),
-        ListTile(title: Text('Concerns: ${summary['concernsCount']}', style: const TextStyle(color: Colors.white))),
-        ListTile(title: Text('Managers: ${summary['managersCount']}', style: const TextStyle(color: Colors.white))),
-        ListTile(title: Text('Employees: ${summary['employeesCount']}', style: const TextStyle(color: Colors.white))),
-      ],
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF0F172A)]), border: Border.all(color: const Color(0xFF334155)), borderRadius: BorderRadius.circular(16)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('CONSOLIDATED LIQUIDITY', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, letterSpacing: 1.2)),
+                Text('৳ ${summary['totalGroupCash'] ?? 0}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                const Text('Total cash distributed across all active company concerns', style: TextStyle(color: Colors.white60)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: _buildMetricCard(Icons.business_rounded, '${summary['concernsCount'] ?? 0}', 'Concerns')),
+            const SizedBox(width: 16),
+            Expanded(child: _buildMetricCard(Icons.supervisor_account_rounded, '${summary['managersCount'] ?? 0}', 'Managers')),
+          ]),
+          const SizedBox(height: 16),
+          _buildMetricCard(Icons.people_outline_rounded, '${summary['employeesCount'] ?? 0}', 'Employees'),
+        ],
+      ),
     );
   }
+
+  Widget _buildMetricCard(IconData icon, String value, String label) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(color: const Color(0xFF161F2E), border: Border.all(color: const Color(0xFF2A374A)), borderRadius: BorderRadius.circular(16)),
+    child: Column(children: [Icon(icon, color: const Color(0xFF38BDF8)), Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)), Text(label, style: const TextStyle(color: Color(0xFF94A3B8)))]),
+  );
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        title: const Text('Suite Governance', style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF1E293B),
-        actions: const [
-          Icon(Icons.notifications, color: Colors.white),
-          SizedBox(width: 16),
-        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildExecutiveHeader(),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _selectedTabIndex == 0
+                      ? _buildConcernsTab()
+                      : _selectedTabIndex == 1
+                          ? _buildManagersTab()
+                          : _buildLedgersTab(),
+            ),
+          ],
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _selectedTabIndex == 0
-              ? _buildConcernsTab()
-              : _selectedTabIndex == 1
-                  ? _buildManagersTab()
-                  : _buildLedgersTab(),
       floatingActionButton: _selectedTabIndex == 2
           ? null
-          : FloatingActionButton(
-              onPressed: () => _selectedTabIndex == 0 ? _showAddEditConcernModal(context) : _showAddEditManagerModal(context),
-              child: const Icon(Icons.add),
+          : Container(
+              decoration: BoxDecoration(color: const Color(0xFF1E293B), border: Border.all(color: const Color(0xFF334155)), borderRadius: BorderRadius.circular(20)),
+              child: FloatingActionButton.extended(
+                onPressed: () => _selectedTabIndex == 0 ? _showAddEditConcernModal(context) : _showAddEditManagerModal(context),
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                icon: const Icon(Icons.add_rounded),
+                label: Text(_selectedTabIndex == 0 ? 'Add Concern' : 'Add Manager'),
+              ),
             ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF1E293B),
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
-        currentIndex: _selectedTabIndex,
-        onTap: (index) => setState(() => _selectedTabIndex = index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.business), label: 'Concerns'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Managers'),
-          BottomNavigationBarItem(icon: Icon(Icons.account_balance), label: 'Ledgers'),
-        ],
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFF1E293B)))),
+        child: BottomNavigationBar(
+          backgroundColor: const Color(0xFF0A0F1D),
+          selectedItemColor: const Color(0xFF38BDF8),
+          unselectedItemColor: const Color(0xFF64748B),
+          currentIndex: _selectedTabIndex,
+          onTap: (index) => setState(() => _selectedTabIndex = index),
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.domain_rounded), label: 'Concerns'),
+            BottomNavigationBarItem(icon: Icon(Icons.manage_accounts_rounded), label: 'Managers'),
+            BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet_rounded), label: 'Ledgers'),
+          ],
+        ),
       ),
     );
   }
