@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import '../login_screen.dart';
 import '../../services/app_state.dart';
+import 'suite_transactions_screen.dart';
+
 
 class SuiteGovernanceScreen extends StatefulWidget {
   const SuiteGovernanceScreen({super.key});
@@ -240,39 +242,58 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'TOTAL GROUP BALANCE',
-                style: TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+        InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SuiteTransactionsScreen()),
+            );
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'TOTAL GROUP BALANCE',
+                      style: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '৳ ${_formatAmount(totalGroupCash)}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(height: 8),
+                Text(
+                  '৳ ${_formatAmount(totalGroupCash)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Consolidated cash across all active concerns',
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-              ),
-            ],
+                const SizedBox(height: 4),
+                const Text(
+                  'Consolidated cash across all active concerns',
+                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 24),
@@ -421,10 +442,9 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
               final m = leaderboard[i];
               final rank = m['rank'] ?? (i + 1);
               final name = m['name'] ?? 'Manager';
-              final handle = m['handle'] ?? '';
-              final designation = m['designation'] ?? 'Manager';
               final personalBalance = m['personalBalance'] ?? 0.0;
-              final sharePercentage = m['sharePercentage'] ?? 0.0;
+              final comps = (m['companies'] as List? ?? []);
+              final concernName = comps.isNotEmpty ? (comps[0]['name'] ?? comps[0]['code'] ?? '') : '';
 
               Color rankColor = const Color(0xFF0F172A);
               if (rank == 1) rankColor = const Color(0xFFF59E0B);
@@ -458,28 +478,18 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Text(name, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                                child: Text(designation, style: const TextStyle(color: Color(0xFF475569), fontSize: 10, fontWeight: FontWeight.w600)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text('@$handle', style: const TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 6),
-                          Text('${sharePercentage.toStringAsFixed(1)}% of total cash', style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                          Text(name, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
+                          if (concernName.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(concernName, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                          ],
                         ],
                       ),
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('৳ ${_formatAmount(personalBalance)}', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
+                        Text('৳ ${_formatAmount(personalBalance)}', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ],
@@ -644,13 +654,14 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                           children: [
                             Row(
                               children: [
-                                Text(m['name'] ?? '', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
+                                Text(m['name'] ?? '', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
                                 const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(4)),
-                                  child: const Text('MANAGER', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                                ),
+                                if (compList.isNotEmpty && (compList[0]['code'] ?? '').toString().isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(6)),
+                                    child: Text(compList[0]['code'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ),
                               ],
                             ),
                             const SizedBox(height: 2),
@@ -663,11 +674,11 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  if (compList.isNotEmpty)
+                  if (compList.length > 1)
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
-                      children: compList.map<Widget>((comp) {
+                      children: compList.skip(1).map<Widget>((comp) {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),

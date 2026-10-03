@@ -117,6 +117,15 @@ export class SuiteController {
     return this.suiteService.getSuiteEmployees(tenantId);
   }
 
+  @Get('suite/transactions')
+  @HttpCode(HttpStatus.OK)
+  async getSuiteTransactions(@Req() req: any) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('No tenant associated');
+    return this.suiteService.getSuiteTransactions(tenantId);
+  }
+
+
   @Patch('suite/users/:id/password')
   @HttpCode(HttpStatus.OK)
   async updateUserPassword(@Req() req: any, @Param('id') id: string, @Body() dto: { newPassword: string }) {

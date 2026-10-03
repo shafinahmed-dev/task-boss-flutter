@@ -440,6 +440,72 @@ export class SuiteService {
     return { success: true, message: 'Password updated successfully' };
   }
 
+  async getSuiteTransactions(tenantId: string) {
+    const supersededRows = await this.prisma.moneyMovement.findMany({
+      where: { editedFromId: { not: null } },
+      select: { editedFromId: true },
+    });
+    const supersededIds = new Set(supersededRows.map((r) => r.editedFromId).filter(Boolean) as string[]);
+
+    const movements = await this.prisma.moneyMovement.findMany({
+      where: {
+        custodian: {
+          company: {
+            tenantId,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: {
+        wallet: {
+          select: {
+            id: true,
+            name: true,
+            company: {
+              select: {
+                name: true,
+                code: true,
+              },
+            },
+          },
+        },
+        collector: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return movements
+      .filter((m) => !supersededIds.has(m.id))
+      .map((m) => {
+        const direction = m.direction.toUpperCase();
+        const type = direction === 'IN' ? 'INFLOW' : 'OUTFLOW';
+        const amount = Number(m.amount) || 0;
+        const description = m.notes || m.entryTag || 'Transaction';
+        const walletObj = m.wallet as any;
+        const concernName = walletObj?.company?.name || 'General';
+        const concernCode = walletObj?.company?.code || '';
+        const collectorObj = m.collector as any;
+        const actorName = collectorObj?.name || 'System';
+
+        return {
+          id: m.id,
+          amount,
+          type,
+          description,
+          createdAt: m.createdAt.toISOString(),
+          concernName,
+          concernCode,
+          actorName,
+        };
+      });
+  }
+
   async getConcernBreakdown(tenantId: string, id: string) {
     const company = await this.prisma.company.findFirst({
       where: { id, tenantId },

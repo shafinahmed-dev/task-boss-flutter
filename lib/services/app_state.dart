@@ -32,6 +32,10 @@ class AppState extends ChangeNotifier {
 
   List<Map<String, dynamic>> _suiteEmployees = [];
   List<Map<String, dynamic>> get suiteEmployees => _suiteEmployees;
+  List<Map<String, dynamic>> _suiteTransactions = [];
+  List<Map<String, dynamic>> get suiteTransactions => _suiteTransactions;
+
+
 
   Map<String, dynamic> _suiteSummary = {
     'totalGroupCash': 0.0,
@@ -498,6 +502,22 @@ class AppState extends ChangeNotifier {
       // offline fallback
     }
   }
+  Future<void> fetchSuiteTransactions() async {
+    if (token == null) return;
+    try {
+      final url = Uri.parse('$apiBaseUrl/suite/transactions');
+      final resp = await authRequest('GET', url);
+      if (resp.statusCode == 200) {
+        final List list = jsonDecode(resp.body);
+        _suiteTransactions = list.map((item) => Map<String, dynamic>.from(item)).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      // offline fallback
+    }
+  }
+
+
 
   Future<void> changeUserPassword({required String userId, required String newPassword}) async {
     if (token == null) return;
