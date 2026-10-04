@@ -193,6 +193,41 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> logout() async {
+    token = null;
+    user = null;
+    balance = 0.0;
+    pendingCount = 0;
+    isReady = true;
+    wallets = [];
+    _concerns = [];
+    _managers = [];
+    _dashboardData = {};
+    _suiteEmployees = [];
+    _suiteTransactions = [];
+    _suiteSummary = {
+      'totalGroupCash': 0.0,
+      'concernsCount': 0,
+      'managersCount': 0,
+      'employeesCount': 0,
+    };
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('@auth_token');
+      await prefs.remove('@auth_user');
+      await prefs.remove('token');
+      await prefs.remove('auth_token');
+      await prefs.remove('user');
+      await prefs.remove('@auth_pin');
+      await prefs.remove('@auth_pin_required');
+    } catch (e) {
+      debugPrint('Error clearing SharedPreferences on logout: $e');
+    }
+
+    notifyListeners();
+  }
+
   Future<void> updateProfileMeta({required String designation, required String department}) async {
     if (user != null) {
       user = user!.copyWith(designation: designation, department: department);
@@ -225,17 +260,6 @@ class AppState extends ChangeNotifier {
         // Fallback gracefully to local storage
       }
     }
-    notifyListeners();
-  }
-
-  Future<void> logout() async {
-    token = null;
-    user = null;
-    balance = 0.0;
-    pendingCount = 0;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('@auth_token');
-    await prefs.remove('@auth_user');
     notifyListeners();
   }
 
