@@ -316,17 +316,25 @@ export class ManagerService {
     if (!dto.name?.trim()) throw new BadRequestException('Employee name is required');
     if (!dto.handlePrefix?.trim()) throw new BadRequestException('Handle prefix is required');
     if (!dto.password?.trim()) throw new BadRequestException('Password is required');
-    if (!dto.companyId?.trim()) throw new BadRequestException('Company ID is required');
 
-    if (!managerCompanyIds.includes(dto.companyId)) {
+    let companyId = dto.companyId;
+    if (!companyId || companyId === '') {
+      if (managerCompanyIds.length > 0) {
+        companyId = managerCompanyIds[0];
+      } else {
+        throw new BadRequestException('Company ID is required');
+      }
+    }
+
+    if (!managerCompanyIds.includes(companyId)) {
       throw new BadRequestException('You are not authorized to provision employees in this concern');
     }
 
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) throw new NotFoundException('Tenant not found');
-    const tenantSlug = tenant.slug || 'taskgroup';
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Company not found');
+
     const baseHandle = dto.handlePrefix.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-    const handle = baseHandle + '.' + tenantSlug;
+    const handle = `${baseHandle}.${company.code!.toLowerCase()}`;
 
     const existing = await this.prisma.user.findUnique({ where: { handle } });
     if (existing) throw new ConflictException('Handle ' + handle + ' is already taken');
@@ -345,13 +353,14 @@ export class ManagerService {
           designation: dto.designation?.trim() || 'Staff',
           department: dto.department?.trim() || 'General',
           languagePref: 'en',
+          primaryCompanyId: companyId,
         },
       });
 
       await tx.userCompany.create({
         data: {
           userId: user.id,
-          companyId: dto.companyId,
+          companyId,
         },
       });
 
@@ -359,7 +368,7 @@ export class ManagerService {
         data: {
           name: user.name + ' — Cash',
           type: 'person',
-          companyId: dto.companyId,
+          companyId,
           linkedUserId: user.id,
         },
       });
@@ -368,19 +377,18 @@ export class ManagerService {
         data: {
           name: 'Primary Cash Wallet',
           custodianId: custodian.id,
-          companyId: dto.companyId,
+          companyId,
         },
       });
 
       return {
-        id: user.id,
-        name: user.name,
-        handle: user.handle,
-        role: user.role,
-        designation: user.designation,
-        department: user.department,
-        rawPassword: user.rawPassword,
-        createdAt: user.createdAt,
+        success: true,
+        user: {
+          id: user.id,
+          name: user.name,
+          handle: user.handle,
+          role: user.role,
+        },
       };
     });
   }

@@ -236,9 +236,9 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () async {
-                    if (nameCtrl.text.isEmpty || passCtrl.text.isEmpty) {
+                    if (nameCtrl.text.isEmpty || passCtrl.text.isEmpty || handleCtrl.text.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Name and Password are required')),
+                        const SnackBar(content: Text('Name, Handle Prefix and Password are required')),
                       );
                       return;
                     }

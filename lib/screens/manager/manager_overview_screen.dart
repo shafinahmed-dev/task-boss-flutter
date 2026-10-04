@@ -68,7 +68,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
 
               if (concerns.isNotEmpty) ...[
                 SizedBox(
-                  height: 50,
+                  height: 44,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: concerns.length,
@@ -79,23 +79,16 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                         onTap: () => app.selectManagerCompany(c['id']),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          margin: EdgeInsets.only(
-                            left: index == 0 ? 16 : 8,
-                            right: index == concerns.length - 1 ? 16 : 0,
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          margin: EdgeInsets.only(left: index == 0 ? 16 : 8, right: index == concerns.length - 1 ? 16 : 0),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                           decoration: BoxDecoration(
                             color: isSelected ? darkSlate : darkSlate.withOpacity(0.35),
-                            borderRadius: BorderRadius.circular(25),
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: Center(
                             child: Text(
                               c['name'] ?? 'Concern',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              ),
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ),
@@ -119,7 +112,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                   children: [
                     Text(
                       company['name'] ?? 'Consolidated Concern',
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
+                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 6),
                     Text(

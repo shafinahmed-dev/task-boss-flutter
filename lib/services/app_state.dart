@@ -600,6 +600,12 @@ class AppState extends ChangeNotifier {
       if (resp.statusCode == 200) {
         _managerOverviewData = Map<String, dynamic>.from(jsonDecode(resp.body));
         
+        if (_selectedManagerCompanyId == null || _selectedManagerCompanyId!.isEmpty) {
+          final comp = _managerOverviewData['company'] as Map<String, dynamic>?;
+          final concerns = _managerOverviewData['assignedConcerns'] as List?;
+          _selectedManagerCompanyId = comp?['id'] ?? (concerns?.isNotEmpty == true ? concerns![0]['id'] : null);
+        }
+        
         final companyData = _managerOverviewData['company'] as Map<String, dynamic>?;
         if (companyData != null && companyData.containsKey('totalBalance')) {
            balance = _toDouble(companyData['totalBalance']);
@@ -626,12 +632,23 @@ class AppState extends ChangeNotifier {
 
   Future<bool> provisionEmployee(Map<String, dynamic> payload) async {
     if (token == null) return false;
-    final url = Uri.parse('$apiBaseUrl/manager/employees');
-    final resp = await authRequest('POST', url, headers: {'Content-Type': 'application/json'}, body: jsonEncode(payload));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      await fetchManagerOverview();
-      await fetchManagerConcernEmployees();
-      return true;
+    final targetCompanyId = (payload['companyId'] != null && payload['companyId'].toString().isNotEmpty)
+        ? payload['companyId']
+        : (_selectedManagerCompanyId ?? _managerOverviewData['company']?['id'] ?? '');
+    payload['companyId'] = targetCompanyId;
+
+    try {
+      final url = Uri.parse('$apiBaseUrl/manager/employees');
+      final resp = await authRequest('POST', url, headers: {'Content-Type': 'application/json'}, body: jsonEncode(payload));
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        await fetchManagerOverview();
+        await fetchManagerConcernEmployees();
+        return true;
+      } else {
+        print('Provision employee error: ${resp.statusCode} - ${resp.body}');
+      }
+    } catch (e) {
+      print('Provision employee exception: $e');
     }
     return false;
   }
