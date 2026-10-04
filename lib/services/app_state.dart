@@ -629,5 +629,21 @@ class AppState extends ChangeNotifier {
     }
     return false;
   }
+
+  List<Map<String, dynamic>> _managerTransactions = [];
+  List<Map<String, dynamic>> get managerTransactionsList => _managerTransactions;
+
+  Future<void> fetchManagerTransactions({String? companyId}) async {
+    final cid = companyId ?? _selectedManagerCompanyId ?? '';
+    if (token == null) return;
+    try {
+      final url = Uri.parse('$apiBaseUrl/manager/transactions?companyId=$cid');
+      final resp = await authRequest('GET', url);
+      if (resp.statusCode == 200) {
+        final List list = jsonDecode(resp.body);
+        _managerTransactions = list.map((item) => Map<String, dynamic>.from(item)).toList();
+        notifyListeners();
+      }
+    } catch (e) {}
   }
 }
