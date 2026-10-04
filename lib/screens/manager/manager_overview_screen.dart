@@ -48,7 +48,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
     final companyTotalBalance = company['totalBalance'] ?? 0.0;
     final inflow = ov['totalInflow'] ?? 0.0;
     final outflow = ov['totalOutflow'] ?? 0.0;
-    final personalCash = ov['personalCash'] ?? app.user?.balance ?? 0.0;
+    final personalCash = ov['personalCash'] ?? 0.0;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -62,7 +62,6 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
-              // A. Top Executive Header
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
@@ -72,11 +71,8 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Manager Profile Capsule
                     GestureDetector(
-                      onTap: () {
-                        _showProfileBottomSheet(context, app);
-                      },
+                      onTap: () => _showProfileBottomSheet(context, app),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
@@ -101,7 +97,6 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                         ),
                       ),
                     ),
-                    // Personal Cash Pill & Notification Bell
                     Row(
                       children: [
                         GestureDetector(
@@ -138,10 +133,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // B. Sliding Concern Carousel
               if (concerns.isNotEmpty) ...[
                 SizedBox(
                   height: 44,
@@ -152,9 +144,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                       final c = concerns[index];
                       final isSelected = c['id'] == (app.selectedManagerCompanyId ?? concerns.first['id']);
                       return GestureDetector(
-                        onTap: () {
-                          app.selectManagerCompany(c['id']);
-                        },
+                        onTap: () => app.selectManagerCompany(c['id']),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           margin: const EdgeInsets.symmetric(horizontal: 6),
@@ -181,4 +171,10 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: darkSlate,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.08), blurR

@@ -6,7 +6,6 @@ import 'package:task_boss/services/app_state.dart';
 
 class ManagerStaffScreen extends StatefulWidget {
   const ManagerStaffScreen({super.key});
-
   @override
   State<ManagerStaffScreen> createState() => _ManagerStaffScreenState();
 }
@@ -34,7 +33,6 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
     const navyColor = Color(0xFF1E2638);
     const darkSlate = Color(0xFF0F172A);
     const borderColor = Color(0xFFE2E8F0);
-
     final app = context.watch<AppState>();
     final allEmployees = app.managerEmployeesList;
 
@@ -58,53 +56,30 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
         color: navyColor,
         child: Column(
           children: [
-            // Top Search & Add Bar
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
                   Expanded(
                     child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: borderColor),
-                      ),
+                      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: borderColor)),
                       child: TextField(
                         onChanged: (val) => setState(() => _searchQuery = val),
-                        decoration: const InputDecoration(
-                          hintText: 'Search staff members...',
-                          hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-                          prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF64748B)),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        ),
+                        decoration: const InputDecoration(hintText: 'Search staff members...', hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 13), prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF64748B)), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14)),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () => _showAddEmployeeModal(context, app),
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: darkSlate,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.add_rounded, color: Colors.white),
-                    ),
+                    child: Container(width: 48, height: 48, decoration: BoxDecoration(color: darkSlate, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.add_rounded, color: Colors.white)),
                   ),
                 ],
               ),
             ),
-
-            // Roster List
             Expanded(
               child: filteredEmployees.isEmpty
-                  ? const Center(
-                      child: Text('No staff members found.', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
-                    )
+                  ? const Center(child: Text('No staff members found.', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)))
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       itemCount: filteredEmployees.length,
@@ -119,28 +94,16 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
                         final rawPassword = e['rawPassword'] ?? '';
                         final showPassword = _showPasswordMap[id] ?? false;
                         final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'S';
-
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: borderColor),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 6, offset: const Offset(0, 2)),
-                            ],
-                          ),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderColor), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2))]),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: navyColor,
-                                    child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                  ),
+                                  CircleAvatar(radius: 22, backgroundColor: navyColor, child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
@@ -152,23 +115,24 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
                                       ],
                                     ),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      '৳ ${_formatAmount(balance)}',
-                                      style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
+                                  Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)), child: Text('৳ ${_formatAmount(balance)}', style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold))),
                                 ],
                               ),
                               const SizedBox(height: 12),
                               const Divider(height: 1, color: Color(0xFFF1F5F9)),
                               const SizedBox(height: 8),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.between,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-     
+                                  Row(
+                                    children: [
+                                      const Text('Password: ', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                                      Text(showPassword ? (rawPassword.isNotEmpty ? rawPassword : '••••••••') : '••••••••', style: const TextStyle(color: darkSlate, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                                      const SizedBox(width: 8),
+                                      GestureDetector(onTap: () => setState(() => _showPasswordMap[id] = !showPassword), child: Icon(showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 16, color: const Color(0xFF64748B))),
+                                      const SizedBox(width: 8),
+                                      if (rawPassword.isNotEmpty)
+                                        GestureDetector(
+                                          onTap: () {
+                                            Clipboard.setData(ClipboardData(text: rawPassword));
+                                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password copied to clipboard'), duration: Duration(seconds: 2)))
