@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:task_boss/theme.dart';
-import 'package:task_boss/widgets/app_header_bar.dart';
 import 'package:task_boss/screens/capture_movement_screen.dart';
 import 'package:task_boss/screens/custody_handover_screen.dart';
 
@@ -13,9 +12,6 @@ class OperationsTabs extends StatelessWidget {
       length: 2,
       child: Column(
         children: [
-          // ── Dual Floating Pills Header ─────────────────────────────────
-          const AppHeaderBar(),
-
           // ── Tab Bar ────────────────────────────────────────────────────
           Container(
             color: AppTheme.canvas,

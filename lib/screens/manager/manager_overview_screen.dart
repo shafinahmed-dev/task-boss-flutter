@@ -68,30 +68,32 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
 
               if (concerns.isNotEmpty) ...[
                 SizedBox(
-                  height: 44,
+                  height: 50,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: concerns.length,
                     itemBuilder: (context, index) {
                       final c = concerns[index];
-                      final isSelected = c['id'] == (app.selectedManagerCompanyId ?? concerns.first['id']);
+                      final isSelected = c['id'] == (app.selectedManagerCompanyId ?? (concerns.isNotEmpty ? concerns.first['id'] : ''));
                       return GestureDetector(
                         onTap: () => app.selectManagerCompany(c['id']),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.symmetric(horizontal: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          margin: EdgeInsets.only(
+                            left: index == 0 ? 16 : 8,
+                            right: index == concerns.length - 1 ? 16 : 0,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                           decoration: BoxDecoration(
-                            color: isSelected ? darkSlate : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(color: isSelected ? Colors.transparent : borderColor),
+                            color: isSelected ? darkSlate : darkSlate.withOpacity(0.35),
+                            borderRadius: BorderRadius.circular(25),
                           ),
                           child: Center(
                             child: Text(
                               c['name'] ?? 'Concern',
                               style: TextStyle(
-                                color: isSelected ? Colors.white : const Color(0xFF64748B),
-                                fontSize: isSelected ? 14 : 13,
+                                color: Colors.white,
+                                fontSize: 14,
                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                               ),
                             ),

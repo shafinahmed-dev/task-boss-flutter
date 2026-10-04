@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/models/models.dart';
 import 'package:task_boss/services/app_state.dart';
-import 'package:task_boss/widgets/app_header_bar.dart';
 
 class WalletsScreen extends StatefulWidget {
   const WalletsScreen({super.key});
@@ -448,7 +447,6 @@ class _WalletsScreenState extends State<WalletsScreen> {
       backgroundColor: AppTheme.canvas,
       body: Column(
         children: [
-          const AppHeaderBar(),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _refresh,
