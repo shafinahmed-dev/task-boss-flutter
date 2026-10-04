@@ -44,6 +44,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
     final concerns = (ov['assignedConcerns'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
     final topEmployees = (ov['topEmployees'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
     final recentTx = (ov['recentTransactions'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
+    final staffList = (ov['employees'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? topEmployees;
     
     final companyTotalBalance = company['totalBalance'] ?? 0.0;
     final inflow = ov['totalInflow'] ?? 0.0;
@@ -323,7 +324,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '\${isCredit ? '+' : '-'}৳ ${_formatAmount(amount.abs())}',
+                                  '${isCredit ? '+' : '-'}৳ ${_formatAmount(amount.abs())}',
                                   style: TextStyle(
                                     color: isCredit ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                                     fontSize: 13,
