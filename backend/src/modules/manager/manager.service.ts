@@ -378,6 +378,7 @@ export class ManagerService {
           name: 'Primary Cash Wallet',
           custodianId: custodian.id,
           companyId,
+          type: 'CASH',
         },
       });
 
