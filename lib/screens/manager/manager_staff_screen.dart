@@ -136,3 +136,135 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
                                           onTap: () {
                                             Clipboard.setData(ClipboardData(text: rawPassword));
                                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password copied to clipboard'), duration: Duration(seconds: 2)))
+;
+                                          },
+                                          child: const Icon(Icons.copy_rounded, size: 16, color: Color(0xFF64748B)),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddEmployeeModal(BuildContext context, AppState app) {
+    final nameCtrl = TextEditingController();
+    final handleCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    final desigCtrl = TextEditingController();
+    final deptCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Add New Employee',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Full Name',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: handleCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Handle Prefix (e.g. siteeng1)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Initial Password',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: desigCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Designation (e.g. Site Engineer)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: deptCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Department (optional)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F172A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () async {
+                    if (nameCtrl.text.isEmpty || passCtrl.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Name and Password are required')),
+                      );
+                      return;
+                    }
+                    Navigator.pop(ctx);
+                    final success = await app.provisionEmployee({
+                      'name': nameCtrl.text.trim(),
+                      'handlePrefix': handleCtrl.text.trim(),
+                      'password': passCtrl.text.trim(),
+                      'designation': desigCtrl.text.trim(),
+                      'department': deptCtrl.text.trim(),
+                      'companyId': app.selectedManagerCompanyId ?? '',
+                    });
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(success ? 'Employee provisioned successfully' : 'Failed to provision employee')),
+                      );
+                    }
+                  },
+                  child: const Text('Provision Employee', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

@@ -64,10 +64,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: navyColor,
-                  borderRadius: BorderRadius.circular(16),
-                ),
+                decoration: BoxDecoration(color: navyColor, borderRadius: BorderRadius.circular(16)),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -75,22 +72,12 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                       onTap: () => _showProfileBottomSheet(context, app),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
                         child: Row(
                           children: [
-                            const CircleAvatar(
-                              radius: 12,
-                              backgroundColor: darkSlate,
-                              child: Icon(Icons.person, size: 14, color: Colors.white),
-                            ),
+                            const CircleAvatar(radius: 12, backgroundColor: darkSlate, child: Icon(Icons.person, size: 14, color: Colors.white)),
                             const SizedBox(width: 8),
-                            Text(
-                              app.user?.name ?? 'Manager',
-                              style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold),
-                            ),
+                            Text(app.currentUser?.name ?? 'Manager', style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold)),
                             const SizedBox(width: 4),
                             const Icon(Icons.arrow_drop_down, size: 18, color: darkSlate),
                           ],
@@ -103,16 +90,10 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                           onTap: () => setState(() => _isCashMasked = !_isCashMasked),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
                             child: Row(
                               children: [
-                                Text(
-                                  '৳ ${_formatAmount(personalCash)}',
-                                  style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold),
-                                ),
+                                Text('৳ ${_formatAmount(personalCash)}', style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold)),
                                 const SizedBox(width: 6),
                                 Icon(_isCashMasked ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 14, color: const Color(0xFF64748B)),
                               ],
@@ -122,10 +103,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                           child: const Icon(Icons.notifications_outlined, size: 18, color: darkSlate),
                         ),
                       ],
@@ -134,6 +112,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+
               if (concerns.isNotEmpty) ...[
                 SizedBox(
                   height: 44,
@@ -177,4 +156,337 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                   color: darkSlate,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.08), blurR
+                    BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      company['name'] ?? 'Consolidated Concern',
+                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '৳ ${_formatAmount(companyTotalBalance)}',
+                      style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Consolidated cash held across active custodians',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildPeriodChip('Today', 'today', app),
+                  _buildPeriodChip('This Week', 'week', app),
+                  _buildPeriodChip('This Month', 'month', app),
+                  _buildPeriodChip('All Time', 'all', app),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), shape: BoxShape.circle),
+                            child: const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 18),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Inflow', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                              const SizedBox(height: 2),
+                              Text('৳ ${_formatAmount(inflow)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.1), shape: BoxShape.circle),
+                            child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFFEF4444), size: 18),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Outflow', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                              const SizedBox(height: 2),
+                              Text('৳ ${_formatAmount(outflow)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+              InkWell(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManagerTransactionsScreen())),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Recent Transactions', style: TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                          Row(
+                            children: const [
+                              Text('View All', style: TextStyle(color: navyColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                              Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B), size: 18),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (recentTx.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Text('No recent transactions under this concern.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                        )
+                      else
+                        ...recentTx.take(3).map((tx) {
+                          final isCredit = tx['type'] == 'CREDIT' || (tx['amount'] != null && tx['amount'] > 0);
+                          final amount = tx['amount'] ?? 0.0;
+                          final desc = tx['description'] ?? tx['memo'] ?? 'Transaction';
+                          final dateStr = tx['createdAt'] != null ? tx['createdAt'].toString().substring(0, 10) : '';
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: (isCredit ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                                    color: isCredit ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                    size: 14,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(desc, style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      const SizedBox(height: 2),
+                                      Text(dateStr, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '\${isCredit ? '+' : '-'}৳ ${_formatAmount(amount.abs())}',
+                                  style: TextStyle(
+                                    color: isCredit ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Assigned Staff Custodians', style: TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                        InkWell(
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManagerStaffScreen())),
+                          child: const Text('Manage', style: TextStyle(color: navyColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (staffList.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text('No staff assigned under this concern.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                      )
+                    else
+                      ...staffList.take(4).map((staff) {
+                        final name = staff['name'] ?? staff['fullName'] ?? 'Staff Member';
+                        final role = staff['role'] ?? 'Custodian';
+                        final phone = staff['phone'] ?? staff['mobile'] ?? '';
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: navyColor.withOpacity(0.1),
+                                child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'S', style: const TextStyle(color: navyColor, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(name, style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 2),
+                                    Text('$role • $phone', style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B), size: 18),
+                            ],
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildPeriodChip(String label, String value, AppState app) {
+    final isSelected = _selectedPeriod == value;
+    return InkWell(
+      onTap: () => setState(() => _selectedPeriod = value),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? navyColor : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? navyColor : const Color(0xFFE2E8F0)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : const Color(0xFF64748B),
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showProfileBottomSheet(BuildContext context, AppState app) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Manager Profile',
+                style: TextStyle(color: darkSlate, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              Text('Name: ${app.currentUser?.name ?? 'Manager'}', style: const TextStyle(fontSize: 14, color: darkSlate)),
+              const SizedBox(height: 4),
+              Text('Email: ${app.currentUser?.email ?? 'manager@taskboss.com'}', style: const TextStyle(fontSize: 14, color: darkSlate)),
+              const SizedBox(height: 4),
+              Text('Role: ${app.currentUser?.role ?? 'MANAGER'}', style: const TextStyle(fontSize: 14, color: darkSlate)),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade600,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text('Log Out'),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await app.logout();
+                    if (context.mounted) {
+                      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
