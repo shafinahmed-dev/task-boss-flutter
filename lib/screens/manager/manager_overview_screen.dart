@@ -12,6 +12,10 @@ class ManagerOverviewScreen extends StatefulWidget {
 }
 
 class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
+  static const Color navyColor = Color(0xFF0F172A);
+  static const Color darkSlate = Color(0xFF0F172A);
+  static const Color borderColor = Color(0xFFE2E8F0);
+
   bool _isCashMasked = false;
   String _selectedPeriod = 'month';
 
@@ -34,10 +38,6 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const navyColor = Color(0xFF1E2638);
-    const darkSlate = Color(0xFF0F172A);
-    const borderColor = Color(0xFFE2E8F0);
-
     final app = context.watch<AppState>();
     final ov = app.managerOverviewData;
     final company = ov['company'] as Map<String, dynamic>? ?? {};
@@ -253,7 +253,6 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
               ),
               const SizedBox(height: 16),
               InkWell(
-              InkWell(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManagerTransactionsScreen())),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
@@ -423,9 +422,9 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? navyColor : Colors.white,
+          color: isSelected ? const Color(0xFF0F172A) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? navyColor : const Color(0xFFE2E8F0)),
+          border: Border.all(color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0)),
         ),
         child: Text(
           label,
@@ -457,11 +456,20 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                 style: TextStyle(color: darkSlate, fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              Text('Name: ${app.currentUser?.name ?? 'Manager'}', style: const TextStyle(fontSize: 14, color: darkSlate)),
+              Text(
+                'Name: ${app.currentUser?.name ?? 'Manager'}',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+              ),
               const SizedBox(height: 4),
-              Text('Email: ${app.currentUser?.email ?? 'manager@taskboss.com'}', style: const TextStyle(fontSize: 14, color: darkSlate)),
+              Text(
+                'Email: ${app.currentUser?.email ?? 'manager@taskboss.com'}',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+              ),
               const SizedBox(height: 4),
-              Text('Role: ${app.currentUser?.role ?? 'MANAGER'}', style: const TextStyle(fontSize: 14, color: darkSlate)),
+              Text(
+                'Role: ${app.currentUser?.role ?? 'MANAGER'}',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+              ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
