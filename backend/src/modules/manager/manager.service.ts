@@ -353,7 +353,6 @@ export class ManagerService {
           designation: dto.designation?.trim() || 'Staff',
           department: dto.department?.trim() || 'General',
           languagePref: 'en',
-          primaryCompanyId: companyId,
         },
       });
 
