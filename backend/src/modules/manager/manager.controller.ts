@@ -12,8 +12,9 @@ export class ManagerController {
     if (req.user?.role === 'EMPLOYEE') throw new ForbiddenException();
     const tenantId = req.user?.tenantId;
     const authorizedCompanyIds = req.user?.companyIds;
-    if (!tenantId || !authorizedCompanyIds) throw new BadRequestException('Invalid user context');
-    return this.managerService.getOverview(tenantId, authorizedCompanyIds, companyId, period);
+    const userId = req.user?.id || req.user?.sub || req.user?.userId;
+    if (!tenantId || !authorizedCompanyIds || !userId) throw new BadRequestException('Invalid user context');
+    return this.managerService.getOverview(tenantId, authorizedCompanyIds, userId, companyId, period);
   }
 
   @Get('transactions')

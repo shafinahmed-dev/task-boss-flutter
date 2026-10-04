@@ -39,6 +39,12 @@ class AppState extends ChangeNotifier {
   String? get selectedManagerCompanyId => _selectedManagerCompanyId;
   Map<String, dynamic> _managerOverviewData = {};
   Map<String, dynamic> get managerOverviewData => _managerOverviewData;
+  double get managerPersonalBalance {
+    if (_managerOverviewData.containsKey('managerPersonalBalance')) {
+      return _toDouble(_managerOverviewData['managerPersonalBalance']);
+    }
+    return currentUser?.balance ?? 0.0;
+  }
   List<Map<String, dynamic>> _managerConcernEmployees = [];
   List<Map<String, dynamic>> get managerConcernEmployees => _managerConcernEmployees;
 

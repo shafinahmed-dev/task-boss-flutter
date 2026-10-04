@@ -38,6 +38,14 @@ String? _parseNote(dynamic item) {
 }
 
 
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return const AccountScreen();
+  }
+}
+
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
 

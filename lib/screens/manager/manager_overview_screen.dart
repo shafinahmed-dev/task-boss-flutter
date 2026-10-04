@@ -29,8 +29,8 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
     });
   }
 
-  String _formatAmount(dynamic val) {
-    if (_isCashMasked) return '••••••';
+  String _formatAmount(dynamic val, {bool forceShow = false}) {
+    if (!forceShow && _isCashMasked) return '••••••';
     if (val == null) return '0.00';
     final n = (val is num) ? val.toDouble() : (double.tryParse(val.toString()) ?? 0.0);
     return n.toStringAsFixed(2);
@@ -63,55 +63,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(color: navyColor, borderRadius: BorderRadius.circular(16)),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    GestureDetector(
-                      onTap: () => _showProfileBottomSheet(context, app),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-                        child: Row(
-                          children: [
-                            const CircleAvatar(radius: 12, backgroundColor: darkSlate, child: Icon(Icons.person, size: 14, color: Colors.white)),
-                            const SizedBox(width: 8),
-                            Text(app.currentUser?.name ?? 'Manager', style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.arrow_drop_down, size: 18, color: darkSlate),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => setState(() => _isCashMasked = !_isCashMasked),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-                            child: Row(
-                              children: [
-                                Text('৳ ${_formatAmount(personalCash)}', style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 6),
-                                Icon(_isCashMasked ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 14, color: const Color(0xFF64748B)),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                          child: const Icon(Icons.notifications_outlined, size: 18, color: darkSlate),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 8),
               const SizedBox(height: 16),
 
               if (concerns.isNotEmpty) ...[
@@ -169,7 +121,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '৳ ${_formatAmount(companyTotalBalance)}',
+                      '৳ ${_formatAmount(companyTotalBalance, forceShow: true)}',
                       style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
@@ -181,14 +133,23 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildPeriodChip('Today', 'today', app),
-                  _buildPeriodChip('This Week', 'week', app),
-                  _buildPeriodChip('This Month', 'month', app),
-                  _buildPeriodChip('All Time', 'all', app),
-                ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      _buildPeriodChip('Today', 'today', app),
+                      const SizedBox(width: 8),
+                      _buildPeriodChip('This Week', 'week', app),
+                      const SizedBox(width: 8),
+                      _buildPeriodChip('This Month', 'month', app),
+                      const SizedBox(width: 8),
+                      _buildPeriodChip('All Time', 'all', app),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               Row(

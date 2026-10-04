@@ -27,9 +27,27 @@ export class ManagerService {
     return Math.max(0, balance);
   }
 
-  async getOverview(tenantId: string, authorizedCompanyIds: string[], requestedCompanyId?: string, period: 'today' | 'week' | 'month' | 'all' = 'month') {
+  async getOverview(tenantId: string, authorizedCompanyIds: string[], userId: string, requestedCompanyId?: string, period: 'today' | 'week' | 'month' | 'all' = 'month') {
+    let managerPersonalBalance = 0;
+    const managerCustodianAccounts = await this.prisma.custodianAccount.findMany({
+      where: { linkedUserId: userId, isArchived: false },
+      include: { wallets: { include: { movements: true } } },
+    });
+    const supersededRowsForPersonal = await this.prisma.moneyMovement.findMany({
+      where: { editedFromId: { not: null } },
+      select: { editedFromId: true },
+    });
+    const supersededIdsSet = new Set<string>(supersededRowsForPersonal.map((r) => r.editedFromId).filter((id): id is string => !!id));
+
+    for (const ca of managerCustodianAccounts) {
+      for (const w of ca.wallets) {
+        if (w.isArchived) continue;
+        managerPersonalBalance += this.calculateWalletBalance(w, supersededIdsSet);
+      }
+    }
+
     if (!authorizedCompanyIds || authorizedCompanyIds.length === 0) {
-      return { company: null, assignedConcerns: [], velocity: { inflow: 0, outflow: 0 }, recentTransactions: [], topEmployees: [] };
+      return { company: null, assignedConcerns: [], velocity: { inflow: 0, outflow: 0 }, recentTransactions: [], topEmployees: [], managerPersonalBalance };
     }
 
     let targetCompanyId = requestedCompanyId;
@@ -88,7 +106,7 @@ export class ManagerService {
 
     const targetComp = assignedCompanies.find(c => c.id === targetCompanyId) || assignedCompanies[0];
     if (!targetComp) {
-      return { company: null, assignedConcerns, velocity: { inflow: 0, outflow: 0 }, recentTransactions: [], topEmployees: [] };
+      return { company: null, assignedConcerns, velocity: { inflow: 0, outflow: 0 }, recentTransactions: [], topEmployees: [], managerPersonalBalance };
     }
 
     let targetCompanyBalance = 0;
@@ -196,6 +214,7 @@ export class ManagerService {
       },
       recentTransactions: recentMovements,
       topEmployees,
+      managerPersonalBalance,
     };
   }
 
