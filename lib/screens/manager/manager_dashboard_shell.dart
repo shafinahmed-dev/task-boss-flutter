@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:task_boss/screens/operations_tabs.dart';
 import 'package:task_boss/screens/manager/manager_overview_screen.dart';
-import 'package:task_boss/screens/manager/manager_transactions_screen.dart';
-import 'package:task_boss/screens/manager/manager_staff_screen.dart';
+import 'package:task_boss/screens/wallets_screen.dart';
 
 class ManagerDashboardShell extends StatefulWidget {
   const ManagerDashboardShell({super.key});
@@ -13,10 +13,10 @@ class ManagerDashboardShell extends StatefulWidget {
 class _ManagerDashboardShellState extends State<ManagerDashboardShell> {
   int _currentIndex = 1; // Default to Overview (center tab)
 
-  final List<Widget> _pages = [
-    const ManagerTransactionsScreen(),
-    const ManagerOverviewScreen(),
-    const ManagerStaffScreen(),
+  final List<Widget> _pages = const [
+    OperationsTabs(),
+    ManagerOverviewScreen(),
+    WalletsScreen(),
   ];
 
   @override
@@ -38,7 +38,7 @@ class _ManagerDashboardShellState extends State<ManagerDashboardShell> {
             children: [
               _buildNavItem(0, Icons.swap_horiz_rounded),
               _buildCenterElevatedButton(),
-              _buildNavItem(2, Icons.people_alt_outlined),
+              _buildNavItem(2, Icons.account_balance_wallet_outlined),
             ],
           ),
         ),
@@ -51,7 +51,7 @@ class _ManagerDashboardShellState extends State<ManagerDashboardShell> {
     return IconButton(
       icon: Icon(
         iconData,
-        color: isSelected ? Colors.white : Colors.grey,
+        color: isSelected ? Colors.white : const Color(0xFF64748B),
         size: 28,
       ),
       onPressed: () => setState(() => _currentIndex = index),
@@ -90,4 +90,5 @@ class _ManagerDashboardShellState extends State<ManagerDashboardShell> {
     );
   }
 }
+
 
