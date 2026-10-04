@@ -43,7 +43,7 @@ class AppState extends ChangeNotifier {
     if (_managerOverviewData.containsKey('managerPersonalBalance')) {
       return _toDouble(_managerOverviewData['managerPersonalBalance']);
     }
-    return currentUser?.balance ?? 0.0;
+    return balance;
   }
   List<Map<String, dynamic>> _managerConcernEmployees = [];
   List<Map<String, dynamic>> get managerConcernEmployees => _managerConcernEmployees;
