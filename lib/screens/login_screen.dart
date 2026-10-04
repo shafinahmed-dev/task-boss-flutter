@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/models/models.dart';
+import 'package:task_boss/screens/main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onSwitchToRegister;
@@ -92,6 +93,13 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         await appState.login(token, user);
+
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const MainNavigation()),
+            (route) => false,
+          );
+        }
       } else {
         final data = jsonDecode(resp.body);
         final msg = data['message'];

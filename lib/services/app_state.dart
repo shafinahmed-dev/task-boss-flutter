@@ -189,7 +189,11 @@ class AppState extends ChangeNotifier {
     await prefs.setString('@user_designation', finalUser.designation);
     await prefs.setString('@user_department', finalUser.department);
 
-    await _fetchBalanceData();
+    try {
+      await _fetchBalanceData();
+    } catch (e) {
+      debugPrint('Error fetching balance data on login: $e');
+    }
     notifyListeners();
   }
 
