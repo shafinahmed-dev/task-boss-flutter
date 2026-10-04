@@ -3,8 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/screens/manager/manager_dashboard_shell.dart';
 
-import 'package:task_boss/screens/manager/manager_dashboard_shell.dart';
-
 import 'package:task_boss/screens/operations_tabs.dart';
 import 'package:task_boss/screens/wallets_screen.dart';
 import 'package:task_boss/screens/suite/suite_governance_screen.dart';
