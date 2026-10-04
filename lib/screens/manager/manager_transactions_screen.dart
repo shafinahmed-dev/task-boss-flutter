@@ -108,7 +108,30 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
                                 ],
                               ),
                             ),
-                            onTap: () => showReceiptModal(context, tx),
+                            onTap: () {
+                              final receiptNo = tx['receiptNo'] ?? tx['_id']?.toString().substring(0, 8).toUpperCase() ?? 'REC';
+                              final date = tx['createdAt'] != null ? DateTime.tryParse(tx['createdAt'].toString()) ?? DateTime.now() : DateTime.now();
+                              final type = tx['direction'] ?? 'IN';
+                              final categoryOrRecipient = tx['collector']?['name'] ?? tx['custodian']?['name'] ?? 'Employee';
+                              final wallet = tx['wallet']?['name'] ?? 'Wallet';
+                              final method = tx['method'] ?? 'Transfer';
+                              final note = tx['note'] ?? 'Manager Transaction';
+                              final amount = (tx['amount'] is num) ? (tx['amount'] as num).toDouble() : (double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0);
+                              final fee = (tx['fee'] is num) ? (tx['fee'] as num).toDouble() : (double.tryParse(tx['fee']?.toString() ?? '0') ?? 0.0);
+
+                              showReceiptModal(
+                                context,
+                                receiptNo: receiptNo,
+                                date: date,
+                                type: type,
+                                categoryOrRecipient: categoryOrRecipient,
+                                wallet: wallet,
+                                method: method,
+                                note: note,
+                                amount: amount,
+                                fee: fee,
+                              );
+                            },
                           ),
                         );
                       },
