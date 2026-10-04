@@ -1,4 +1,6 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+const fs = require('fs');
+
+const part1 = `import { Injectable, BadRequestException, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../database/prisma.service.js';
 
@@ -66,7 +68,7 @@ export class ManagerService {
       where: { editedFromId: { not: null } },
       select: { editedFromId: true },
     });
-    const supersededIds = new Set<string>(supersededRows.map((r) => r.editedFromId).filter((id): id is string => !!id));
+    const supersededIds = new Set(supersededRows.map((r) => r.editedFromId).filter(Boolean));
 
     const assignedConcerns = assignedCompanies.map(c => {
       let concernBalance = 0;
@@ -85,14 +87,18 @@ export class ManagerService {
         totalBalance: concernBalance,
       };
     });
+`;
 
+fs.writeFileSync('backend/src/modules/manager/manager.service.ts', part1, 'utf8');
+console.log('Part 1 written');
+const part2 = `
     const targetComp = assignedCompanies.find(c => c.id === targetCompanyId) || assignedCompanies[0];
     if (!targetComp) {
       return { company: null, assignedConcerns, velocity: { inflow: 0, outflow: 0 }, recentTransactions: [], topEmployees: [] };
     }
 
     let targetCompanyBalance = 0;
-    const employeeBalances: Array<{ user: any; balance: number }> = [];
+    const employeeBalances = [];
 
     for (const uc of targetComp.users) {
       const u = uc.user;
@@ -109,15 +115,15 @@ export class ManagerService {
       }
     }
 
-    employeeBalances.sort((a, b) => b.balance - a.balance);
+    employeeBalances.sort((a, b) => b['balance'] - a['balance']);
     const topEmployees = employeeBalances.slice(0, 3).map(item => ({
-      id: item.user.id,
-      name: item.user.name,
-      handle: item.user.handle,
-      designation: item.user.designation,
-      department: item.user.department,
-      balance: item.balance,
-      rawPassword: item.user.rawPassword ?? null,
+      id: item['user'].id,
+      name: item['user'].name,
+      handle: item['user'].handle,
+      designation: item['user'].designation,
+      department: item['user'].department,
+      balance: item['balance'],
+      rawPassword: item['user'].rawPassword ?? null,
     }));
 
     const now = new Date();
@@ -130,7 +136,7 @@ export class ManagerService {
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     }
 
-    const targetWalletIds: string[] = [];
+    const targetWalletIds = [];
     for (const uc of targetComp.users) {
       for (const ca of uc.user.custodianAccounts) {
         for (const w of ca.wallets) {
@@ -141,7 +147,7 @@ export class ManagerService {
 
     let inflow = 0;
     let outflow = 0;
-    let recentMovements: any[] = [];
+    let recentMovements = [];
 
     if (targetWalletIds.length > 0) {
       const movements = await this.prisma.moneyMovement.findMany({
@@ -173,7 +179,7 @@ export class ManagerService {
         amount: m.amount,
         type: m.direction,
         direction: m.direction,
-        description: m.notes || 'Transaction',
+        description: m.note || m.description || 'Transaction',
         createdAt: m.createdAt,
         actorName: m.collector?.name || m.custodian?.name || 'Staff',
         wallet: m.wallet,
@@ -198,7 +204,12 @@ export class ManagerService {
       topEmployees,
     };
   }
+`;
 
+fs.appendFileSync('backend/src/modules/manager/manager.service.ts', part2, 'utf8');
+console.log('Part 2 written');
+
+const part3a = `
   async getEmployees(companyId: string) {
     const userCompanies = await this.prisma.userCompany.findMany({
       where: { companyId },
@@ -219,9 +230,9 @@ export class ManagerService {
       where: { editedFromId: { not: null } },
       select: { editedFromId: true },
     });
-    const supersededIds = new Set<string>(supersededRows.map((r) => r.editedFromId).filter((id): id is string => !!id));
+    const supersededIds = new Set(supersededRows.map((r) => r.editedFromId).filter(Boolean));
 
-    const employees: any[] = [];
+    const employees = [];
     for (const uc of userCompanies) {
       const u = uc.user;
       if (u.role !== 'EMPLOYEE') continue;
@@ -289,10 +300,15 @@ export class ManagerService {
       wallet: m.wallet,
       collector: m.collector,
       custodian: m.custodian,
-      note: m.notes,
+      note: m.note,
     }));
   }
+`;
 
+fs.appendFileSync('backend/src/modules/manager/manager.service.ts', part3a, 'utf8');
+console.log('Part 3a written');
+
+const part3b = `
   async provisionEmployee(tenantId: string, managerCompanyIds: string[], dto: ProvisionEmployeeDto) {
     if (!dto.name?.trim()) throw new BadRequestException('Employee name is required');
     if (!dto.handlePrefix?.trim()) throw new BadRequestException('Handle prefix is required');
@@ -379,7 +395,7 @@ export class ManagerService {
       throw new ForbiddenException('Not authorized to update this employee');
     }
 
-    const updateData: Record<string, any> = {};
+    const updateData = {};
     if (dto.designation !== undefined) updateData['designation'] = dto.designation;
     if (dto.department !== undefined) updateData['department'] = dto.department;
     if (dto.password !== undefined && dto.password.trim() !== '') {
@@ -402,3 +418,8 @@ export class ManagerService {
     };
   }
 }
+`;
+
+fs.appendFileSync('backend/src/modules/manager/manager.service.ts', part3b, 'utf8');
+console.log('Part 3b written. Done.');
+

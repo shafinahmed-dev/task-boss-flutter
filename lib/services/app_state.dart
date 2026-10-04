@@ -32,8 +32,17 @@ class AppState extends ChangeNotifier {
 
   List<Map<String, dynamic>> _suiteEmployees = [];
   List<Map<String, dynamic>> get suiteEmployees => _suiteEmployees;
+  List<Map<String, dynamic>> get managerEmployeesList => _managerConcernEmployees;
   List<Map<String, dynamic>> _suiteTransactions = [];
   List<Map<String, dynamic>> get suiteTransactions => _suiteTransactions;
+  String? _selectedManagerCompanyId;
+  String? get selectedManagerCompanyId => _selectedManagerCompanyId;
+  Map<String, dynamic> _managerOverviewData = {};
+  Map<String, dynamic> get managerOverviewData => _managerOverviewData;
+  List<Map<String, dynamic>> _managerConcernEmployees = [];
+  List<Map<String, dynamic>> get managerConcernEmployees => _managerConcernEmployees;
+
+
 
 
 
@@ -626,6 +635,61 @@ class AppState extends ChangeNotifier {
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       await fetchManagers();
       await fetchSuiteEmployees();
+  void selectManagerCompany(String companyId) {
+    _selectedManagerCompanyId = companyId;
+    fetchManagerOverview(companyId: companyId);
+  Future<void> fetchManagerTransactions() async {
+    // not implemented yet here, keeping dummy if needed
+  }
+    notifyListeners();
+  }
+
+  Future<void> fetchManagerOverview({String? companyId, String period = 'month'}) async {
+    final cid = companyId ?? _selectedManagerCompanyId ?? '';
+    if (token == null) return;
+    try {
+      final url = Uri.parse('$apiBaseUrl/manager/overview?companyId=$cid&period=$period');
+      final resp = await authRequest('GET', url);
+      if (resp.statusCode == 200) {
+        _managerOverviewData = Map<String, dynamic>.from(jsonDecode(resp.body));
+        
+        final companyData = _managerOverviewData['company'] as Map<String, dynamic>?;
+        if (companyData != null && companyData.containsKey('totalBalance')) {
+           balance = _toDouble(companyData['totalBalance']);
+        }
+        
+        notifyListeners();
+      }
+    } catch (e) {}
+  }
+
+  Future<void> fetchManagerConcernEmployees({String? companyId}) async {
+    final cid = companyId ?? _selectedManagerCompanyId ?? '';
+    if (token == null) return;
+    try {
+      final url = Uri.parse('$apiBaseUrl/manager/employees?companyId=$cid');
+      final resp = await authRequest('GET', url);
+      if (resp.statusCode == 200) {
+        final List list = jsonDecode(resp.body);
+        _managerConcernEmployees = list.map((item) => Map<String, dynamic>.from(item)).toList();
+        notifyListeners();
+      }
+    } catch (e) {}
+  }
+
+  Future<bool> provisionEmployee(Map<String, dynamic> payload) async {
+    if (token == null) return false;
+    final url = Uri.parse('$apiBaseUrl/manager/employees');
+    final resp = await authRequest('POST', url, headers: {'Content-Type': 'application/json'}, body: jsonEncode(payload));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      await fetchManagerOverview();
+      await fetchManagerConcernEmployees();
+      return true;
+    }
+    return false;
+  }
+
+
       await fetchSuiteDashboard();
       notifyListeners();
       return;
