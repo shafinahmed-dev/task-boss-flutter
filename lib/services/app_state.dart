@@ -449,72 +449,7 @@ class AppState extends ChangeNotifier {
     throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to delete concern');
   }
 
-  Map<String, dynamic> managerOverviewData = {};
-  List<dynamic> managerTransactionsList = [];
-  List<dynamic> managerEmployeesList = [];
-  bool isLoadingManager = false;
 
-  Future<void> fetchManagerOverview() async {
-    isLoadingManager = true;
-    notifyListeners();
-    try {
-      final resp = await authRequest('GET', Uri.parse('$apiBaseUrl/manager/overview'));
-      if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        final data = jsonDecode(resp.body);
-        if (data is Map<String, dynamic>) {
-          managerOverviewData = data;
-          if (data['employees'] is List) managerEmployeesList = data['employees'];
-          if (data['transactions'] is List) managerTransactionsList = data['transactions'];
-        }
-      }
-    } catch (e) {
-      // ignore
-    } finally {
-      isLoadingManager = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> fetchManagerTransactions() async {
-    try {
-      final resp = await authRequest('GET', Uri.parse('$apiBaseUrl/manager/transactions'));
-      if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        final List data = jsonDecode(resp.body);
-        managerTransactionsList = data;
-        notifyListeners();
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  Future<void> provisionEmployee({
-    required String name,
-    required String handlePrefix,
-    required String password,
-    required String designation,
-    required String department,
-    required String companyId,
-  }) async {
-    final resp = await authRequest(
-      'POST',
-      Uri.parse('$apiBaseUrl/manager/employees'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'name': name,
-        'handlePrefix': handlePrefix,
-        'password': password,
-        'designation': designation,
-        'department': department,
-        'companyId': companyId,
-      }),
-    );
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      await fetchManagerOverview();
-      return;
-    }
-    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to provision employee');
-  }
 
   Future<void> fetchManagers() async {
     final resp = await authRequest('GET', Uri.parse('$apiBaseUrl/suite/managers'));
@@ -635,12 +570,18 @@ class AppState extends ChangeNotifier {
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       await fetchManagers();
       await fetchSuiteEmployees();
+      await fetchSuiteDashboard();
+      notifyListeners();
+      return;
+    }
+    final data = jsonDecode(resp.body);
+    final msg = data['message'] ?? 'Failed to update password';
+    throw Exception(msg is List ? msg.join(', ') : msg.toString());
+  }
+
   void selectManagerCompany(String companyId) {
     _selectedManagerCompanyId = companyId;
     fetchManagerOverview(companyId: companyId);
-  Future<void> fetchManagerTransactions() async {
-    // not implemented yet here, keeping dummy if needed
-  }
     notifyListeners();
   }
 
@@ -688,14 +629,5 @@ class AppState extends ChangeNotifier {
     }
     return false;
   }
-
-
-      await fetchSuiteDashboard();
-      notifyListeners();
-      return;
-    }
-    final data = jsonDecode(resp.body);
-    final msg = data['message'] ?? 'Failed to update password';
-    throw Exception(msg is List ? msg.join(', ') : msg.toString());
   }
 }
