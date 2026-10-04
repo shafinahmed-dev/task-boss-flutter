@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'manager_transactions_screen.dart';
+import 'manager_staff_screen.dart';
 
 class ManagerOverviewScreen extends StatefulWidget {
   const ManagerOverviewScreen({super.key});
@@ -81,7 +82,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                     style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF1E2638)),
                     icon: const Icon(Icons.people, size: 18),
                     label: const Text('Staff Directory'),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManagerStaffScreen())),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManagerStaffScreen())),
                   ),
                 ),
               ],
