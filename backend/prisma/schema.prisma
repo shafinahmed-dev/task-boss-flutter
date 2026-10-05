@@ -22,6 +22,7 @@ model Tenant {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   users       User[]
   companies   Company[]
+  categories  TransactionCategory[]
 
   @@map("tenants")
 }
@@ -38,6 +39,7 @@ model Company {
   users              UserCompany[]
   custodianAccounts  CustodianAccount[]
   projects           Project[]
+  categories         TransactionCategory[]
   receiptBlocks      ReceiptNumberBlock[]
   digitalReceipts    DigitalReceipt[]
   interCompanyAllocationsFrom InterCompanyAllocation[] @relation("AllocFrom")
@@ -160,6 +162,24 @@ model Project {
   @@map("projects")
 }
 
+model TransactionCategory {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String          @db.Text
+  type        String          @default("BOTH") // 'INFLOW' | 'OUTFLOW' | 'BOTH'
+  companyId   String          @map("company_id") @db.Uuid
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tenantId    String          @map("tenant_id") @db.Uuid
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdById String?         @map("created_by_id") @db.Uuid
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  movements   MoneyMovement[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("transaction_categories")
+}
+
 // ── Money Movement Ledger (append-only) ──────────────────────────────────
 
 model MoneyMovement {
@@ -177,6 +197,7 @@ model MoneyMovement {
   digitalReceiptId String? @map("digital_receipt_id") @db.Uuid
   clientId         String? @map("client_id") @db.Uuid
   projectId        String? @map("project_id") @db.Uuid
+  categoryId       String? @map("category_id") @db.Uuid
   loanId           String? @map("loan_id") @db.Uuid
   walletId         String? @map("wallet_id") @db.Uuid
   fee              Decimal? @db.Decimal(14, 2)
@@ -196,6 +217,7 @@ model MoneyMovement {
   wallet           Wallet?         @relation(fields: [walletId], references: [id], onDelete: SetNull)
   client           Client?         @relation(fields: [clientId], references: [id])
   project          Project?        @relation(fields: [projectId], references: [id])
+  category         TransactionCategory? @relation(fields: [categoryId], references: [id])
 
   digitalReceipt   DigitalReceipt?
   interCompanyAllocations InterCompanyAllocation[]
@@ -230,6 +252,25 @@ model CustodyTransfer {
 }
 
 // ── Digital Receipts ─────────────────────────────────────────────────────
+model TransactionCategory {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String          @db.Text
+  type        String          @default("BOTH") // 'INFLOW' | 'OUTFLOW' | 'BOTH'
+  companyId   String          @map("company_id") @db.Uuid
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tenantId    String          @map("tenant_id") @db.Uuid
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdById String?         @map("created_by_id") @db.Uuid
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  movements   MoneyMovement[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("transaction_categories")
+}
+
+
 
 model ReceiptNumberBlock {
   id              String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

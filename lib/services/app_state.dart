@@ -49,6 +49,37 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> _managerConcernEmployees = [];
   List<Map<String, dynamic>> get managerConcernEmployees => _managerConcernEmployees;
 
+  List<Map<String, dynamic>> _concernCategories = [];
+  List<Map<String, dynamic>> get concernCategories => _concernCategories;
+
+  Future<void> fetchCategories({required String companyId, String? flowType}) async {
+    final url = Uri.parse('$apiBaseUrl/categories?companyId=$companyId${flowType != null ? '&flowType=$flowType' : ''}');
+    final resp = await authRequest('GET', url, headers: {'x-company-id': companyId});
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final List data = jsonDecode(resp.body);
+      _concernCategories = List<Map<String, dynamic>>.from(data);
+      notifyListeners();
+    } else {
+      throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to fetch categories');
+    }
+  }
+
+  Future<Map<String, dynamic>?> createCategory({required String name, required String type, required String companyId}) async {
+    final url = Uri.parse('$apiBaseUrl/manager/categories');
+    final resp = await authRequest(
+      'POST',
+      url,
+      headers: {'Content-Type': 'application/json', 'x-company-id': companyId},
+      body: jsonEncode({'name': name, 'type': type, 'companyId': companyId}),
+    );
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final data = jsonDecode(resp.body);
+      await fetchCategories(companyId: companyId);
+      return Map<String, dynamic>.from(data);
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to create category');
+  }
+
 
 
 

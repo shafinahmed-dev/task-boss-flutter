@@ -296,6 +296,9 @@ export class ManagerService {
         custodian: {
           select: { id: true, name: true, type: true, linkedUserId: true },
         },
+        category: {
+          select: { id: true, name: true, type: true },
+        },
       },
     });
 
@@ -308,6 +311,7 @@ export class ManagerService {
       wallet: m.wallet,
       collector: m.collector,
       custodian: m.custodian,
+      category: m.category,
       note: m.notes,
     }));
   }

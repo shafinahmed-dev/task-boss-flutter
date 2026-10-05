@@ -43,6 +43,7 @@ export interface RecordMovementDto {
   digitalReceiptId?: string;
   clientId?: string;
   projectId?: string;
+  categoryId?: string;
   loanId?: string;
   occurredAt: string; // ISO-8601
   syncStatus?: string;
@@ -60,6 +61,7 @@ export interface EditMovementDto {
   receiptNo?: string;
   clientId?: string;
   projectId?: string;
+  categoryId?: string;
   loanId?: string;
   occurredAt?: string;
 }
@@ -309,6 +311,7 @@ export class LedgerService {
           digitalReceiptId: dto.digitalReceiptId ?? null,
           clientId: dto.clientId ?? null,
           projectId: dto.projectId ?? null,
+          categoryId: dto.categoryId ?? null,
           loanId: dto.loanId ?? null,
           editedFromId: null,
           occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : new Date(),

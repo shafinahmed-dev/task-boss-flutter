@@ -30,7 +30,7 @@ class CaptureMovementScreen extends StatefulWidget {
 class _CaptureState extends State<CaptureMovementScreen> {
   String _flowType = 'INFLOW'; // INFLOW | OUTFLOW
   Map<String, dynamic>? _selectedCategory;
-  final TextEditingController _catSearchCtl = TextEditingController();
+  final TextEditingController _categorySearchCtrl = TextEditingController();
   String _catSearchQuery = '';
 
   final _amtCtl = TextEditingController();
@@ -49,14 +49,26 @@ class _CaptureState extends State<CaptureMovementScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppState>().fetchCategories(companyId: context.read<AppState>().user!.companyId);
+      final app = context.read<AppState>();
+      final cid = app.selectedManagerCompanyId ?? app.currentUser?.primaryCompanyId ?? '';
+      if (cid.isNotEmpty) {
+        app.fetchCategories(companyId: cid);
+      }
     });
     _loadDraft();
   }
 
-  void _showCreateCategoryModal() {
-    String name = '';
+  @override
+  void dispose() {
+    _categorySearchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _showAddCategoryModal(BuildContext context, AppState app) {
+    String name = _categorySearchCtrl.text.trim();
     String type = 'BOTH';
+    final cid = app.selectedManagerCompanyId ?? app.currentUser?.primaryCompanyId ?? '';
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -66,9 +78,10 @@ class _CaptureState extends State<CaptureMovementScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('New Category / Ledger', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('New Category / Project Ledger', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               TextField(
+                controller: TextEditingController(text: name),
                 onChanged: (val) => name = val,
                 decoration: const InputDecoration(labelText: 'Category Name', border: OutlineInputBorder()),
               ),
@@ -85,10 +98,16 @@ class _CaptureState extends State<CaptureMovementScreen> {
               ElevatedButton(
                 onPressed: () async {
                   if (name.isEmpty) return;
-                  await context.read<AppState>().createCategory(name: name, type: type, companyId: context.read<AppState>().user!.companyId);
-                  Navigator.pop(ctx);
+                  final newCat = await app.createCategory(name: name, type: type, companyId: cid);
+                  if (newCat != null && mounted) {
+                    setState(() {
+                      _selectedCategory = newCat;
+                      _categorySearchCtrl.clear();
+                    });
+                    Navigator.pop(context);
+                  }
                 },
-                child: const Text('Create'),
+                child: const Text('Create Category'),
               ),
               const SizedBox(height: 20),
             ],
@@ -311,103 +330,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
             if (_error != null) _banner(_error!),
             _buildFlowPill(),
             const SizedBox(height: 14),
-            // Card 1: Category Selection
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.cardBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.cardBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.category_outlined, size: 18, color: AppTheme.slateMid),
-                      SizedBox(width: 8),
-                      Text(
-                        'Category',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color: AppTheme.primaryText,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 42,
-                    child: ScrollConfiguration(
-                      behavior: WebDragScrollBehavior(),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Row(
-                          children: [
-                            ..._getCategories(context.read<AppState>()).map((category) {
-                              final isSelected = _selectedCategory?['id'] == category['id'];
-                              final Color accentColor = _flowType == 'INFLOW'
-                                  ? const Color(0xFF10B981)
-                                  : const Color(0xFFEF4444);
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _selectedCategory = category),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 180),
-                                    curve: Curves.easeInOut,
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: isSelected ? Colors.white : Colors.grey.shade100,
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: isSelected ? accentColor : Colors.grey.shade300,
-                                        width: isSelected ? 1.5 : 1.0,
-                                      ),
-                                      boxShadow: isSelected
-                                          ? [
-                                              BoxShadow(
-                                                color: Colors.black.withValues(alpha: 0.06),
-                                                blurRadius: 4,
-                                                offset: const Offset(0, 1),
-                                              ),
-                                            ]
-                                          : [],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (isSelected) ...[
-                                          Icon(Icons.check_rounded, size: 13, color: accentColor),
-                                          const SizedBox(width: 4),
-                                        ],
-                                        Text(
-                                          category['name'],
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                            color: isSelected ? accentColor : const Color(0xFF4B5563),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }),
-
-                            const SizedBox(width: 16),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _buildCategoryCard(context.watch<AppState>()),
             const SizedBox(height: 14),
             // Card 2: Wallet & Method
             Container(
@@ -848,6 +771,111 @@ class _CaptureState extends State<CaptureMovementScreen> {
     decoration: BoxDecoration(
       color: const Color(0xFFFEF2F2),
       border: Border.all(color: const Color(0xFFFEE2E2)),
+  Widget _buildCategoryCard(AppState app) {
+    final isManager = app.currentUser?.role != 'EMPLOYEE';
+    final categories = app.concernCategories.where((c) {
+      final matchesFlow = c['type'] == _flowType || c['type'] == 'BOTH';
+      final matchesSearch = c['name'].toString().toLowerCase().contains(_categorySearchCtrl.text.trim().toLowerCase());
+      return matchesFlow && matchesSearch;
+    }).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.category_outlined, size: 18, color: Color(0xFF0F172A)),
+              const SizedBox(width: 8),
+              const Text('Category', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: TextField(
+                    controller: _categorySearchCtrl,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Search categories or projects...',
+                      hintStyle: const TextStyle(fontSize: 13),
+                      prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                  ),
+                ),
+              ),
+              if (isManager) ...[
+                const SizedBox(width: 8),
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(10)),
+                  child: IconButton(icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20), onPressed: () => _showAddCategoryModal(context, app)),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (categories.isNotEmpty)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: categories.map((c) {
+                  final isSelected = _selectedCategory?['id'] == c['id'];
+                  final isInflow = _flowType == 'INFLOW';
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedCategory = c),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected ? (isInflow ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2)) : Colors.white,
+                          border: Border.all(color: isSelected ? (isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : const Color(0xFFE2E8F0)),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          children: [
+                            if (isSelected) ...[Icon(Icons.check_rounded, size: 14, color: isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444)), const SizedBox(width: 4)],
+                            Text(c['name'], style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: const Color(0xFF475569))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                }).toList(),
+              ),
+            )
+          else if (isManager && _categorySearchCtrl.text.isNotEmpty)
+            GestureDetector(
+              onTap: () => _showAddCategoryModal(context, app),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)),
+                child: Text('+ Create "${_categorySearchCtrl.text.trim()}"', style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+              ),
+            )
+          else
+            const Text("No categories found. Tap + to add one.", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+
       borderRadius: BorderRadius.circular(14),
     ),
     child: Row(
