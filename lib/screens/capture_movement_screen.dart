@@ -47,24 +47,6 @@ class _CaptureState extends State<CaptureMovementScreen> {
 
   @override
   void initState() {
-  String _getEffectiveCompanyId(AppState app) {
-    if (app.selectedManagerCompanyId != null && app.selectedManagerCompanyId!.isNotEmpty) {
-      return app.selectedManagerCompanyId!;
-    }
-    final overviewCompanyId = app.managerOverviewData['company']?['id']?.toString();
-    if (overviewCompanyId != null && overviewCompanyId.isNotEmpty) {
-      return overviewCompanyId;
-    }
-    if (app.wallets.isNotEmpty) {
-      final walletCompanyId = app.wallets.first['companyId']?.toString();
-      if (walletCompanyId != null && walletCompanyId.isNotEmpty) {
-        return walletCompanyId;
-      }
-    }
-    return '';
-  }
-
-
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final app = context.read<AppState>();
@@ -74,6 +56,17 @@ class _CaptureState extends State<CaptureMovementScreen> {
       }
     });
     _loadDraft();
+  }
+
+  String _getEffectiveCompanyId(AppState app) {
+    if (app.selectedManagerCompanyId != null && app.selectedManagerCompanyId!.isNotEmpty) {
+      return app.selectedManagerCompanyId!;
+    }
+    final overviewCid = app.managerOverviewData['company']?['id']?.toString();
+    if (overviewCid != null && overviewCid.isNotEmpty) {
+      return overviewCid;
+    }
+    return '';
   }
 
   @override
@@ -791,63 +784,85 @@ class _CaptureState extends State<CaptureMovementScreen> {
       border: Border.all(color: const Color(0xFFFEE2E2)),
  );
   Widget _buildCategoryCard(AppState app) {
-    final isManager = app.currentUser?.role != 'EMPLOYEE';
-    final categories = app.concernCategories.where((c) {
-      final matchesFlow = c['type'] == _flowType || c['type'] == 'BOTH';
-      final matchesSearch = c['name'].toString().toLowerCase().contains(_categorySearchCtrl.text.trim().toLowerCase());
-      return matchesFlow && matchesSearch;
-    }).toList();
+  final filteredCategories = app.concernCategories.where((c) {
+    final matchesFlow = c['type'] == _flowType || c['type'] == 'BOTH';
+    final query = _categorySearchCtrl.text.trim().toLowerCase();
+    final matchesSearch = query.isEmpty || (c['name']?.toString().toLowerCase().contains(query) ?? false);
+    return matchesFlow && matchesSearch;
+  }).toList();
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.category_outlined, size: 18, color: Color(0xFF0F172A)),
-              const SizedBox(width: 8),
-              const Text('Category', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 42,
-                  child: TextField(
-                    controller: _categorySearchCtrl,
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      hintText: 'Search categories or projects...',
-                      hintStyle: const TextStyle(fontSize: 13),
-                      prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+  final isManager = app.currentUser?.role != 'EMPLOYEE';
+
+  return Container(
+    margin: const EdgeInsets.symmetric(vertical: 12),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: const Color(0xFFE2E8F0)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(Icons.category_outlined, size: 18, color: Color(0xFF0F172A)),
+            SizedBox(width: 8),
+            Text(
+              'Category / Project Ledger',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Search & Add Row
+        Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 42,
+                child: TextField(
+                  controller: _categorySearchCtrl,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Search categories or projects...',
+                    hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                     ),
                   ),
                 ),
               ),
-              if (isManager) ...[
-                const SizedBox(width: 8),
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(10)),
-                  child: IconButton(icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20), onPressed: () => _showAddCategoryModal(context, app)),
+            ),
+            if (isManager) ...[
+              const SizedBox(width: 8),
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ],
+                child: IconButton(
+                  icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                  padding: EdgeInsets.zero,
+                  tooltip: 'Add Category',
+                  onPressed: () => _showAddCategoryModal(context, app),
+                ),
+              ),
             ],
-          ),
-          const SizedBox(height: 12),
+          ],
+        ),
+        const SizedBox(height: 12),
           if (categories.isNotEmpty)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -895,26 +910,6 @@ class _CaptureState extends State<CaptureMovementScreen> {
   }
 
 
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Row(
-      children: [
-        const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFDC2626)),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            t,
-            style: const TextStyle(
-              color: Color(0xFFDC2626),
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-
   Widget _row(String l, String v, {bool bold = false}) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 2),
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -923,117 +918,95 @@ class _CaptureState extends State<CaptureMovementScreen> {
     ]),
   );
   Widget _buildFlowPill() {
-    final isInflow = _flowType == 'INFLOW';
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E2638),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          // Inflow Segment
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                if (_flowType != 'INFLOW') {
-                  setState(() {
-                    _flowType = 'INFLOW';
-                    _selectedCategory = null;
-                  });
-                }
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  color: isInflow ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  boxShadow: isInflow
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ]
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.arrow_downward_rounded,
-                      size: 16,
-                      color: isInflow ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+  final isInflow = _flowType == 'INFLOW';
+  return Container(
+    height: 48,
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1E2638),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              if (_flowType != 'INFLOW') {
+                setState(() {
+                  _flowType = 'INFLOW';
+                  _selectedCategory = null;
+                });
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: isInflow ? Colors.white : Colors.transparent,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.arrow_downward_rounded,
+                    size: 16,
+                    color: isInflow ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Inflow',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isInflow ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Inflow',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: isInflow ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-          // Outflow Segment
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                if (_flowType != 'OUTFLOW') {
-                  setState(() {
-                    _flowType = 'OUTFLOW';
-                    _selectedCategory = null;
-                  });
-                }
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  color: !isInflow ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  boxShadow: !isInflow
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ]
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.arrow_upward_rounded,
-                      size: 16,
-                      color: !isInflow ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+        ),
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              if (_flowType != 'OUTFLOW') {
+                setState(() {
+                  _flowType = 'OUTFLOW';
+                  _selectedCategory = null;
+                });
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: !isInflow ? Colors.white : Colors.transparent,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.arrow_upward_rounded,
+                    size: 16,
+                    color: !isInflow ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Outflow',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: !isInflow ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Outflow',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: !isInflow ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
 }
