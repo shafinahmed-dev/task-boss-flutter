@@ -196,8 +196,12 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
               const SizedBox(height: 12),
               TextField(
                 controller: handleCtrl,
+                onChanged: (_) => (ctx as Element).markNeedsBuild(),
                 decoration: InputDecoration(
-                  labelText: 'Handle Prefix (e.g. siteeng1)',
+                  labelText: 'Handle Prefix',
+                  hintText: 'e.g. shafin',
+                  suffixText: '.taskgroup',
+                  helperText: 'Username will be @${handleCtrl.text.trim().isEmpty ? 'username' : handleCtrl.text.trim()}.taskgroup',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),

@@ -333,11 +333,34 @@ export class ManagerService {
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
     if (!company) throw new NotFoundException('Company not found');
 
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, slug: true, name: true },
+    });
+    const tenantSlug = tenant?.slug?.toLowerCase() || 'taskgroup';
+
+    // Safe migration: update any employee handles ending with incorrect company codes in this tenant
+    const employeesToMigrate = await this.prisma.user.findMany({
+      where: { tenantId, role: 'EMPLOYEE', NOT: { handle: { endsWith: `.${tenantSlug}` } } }
+    });
+    for (const emp of employeesToMigrate) {
+      const parts = emp.handle.split('.');
+      const base = parts[0].replace('@', '');
+      const newHandle = `${base}.${tenantSlug}`;
+      const exists = await this.prisma.user.findUnique({ where: { handle: newHandle } });
+      if (!exists) {
+        await this.prisma.user.update({
+          where: { id: emp.id },
+          data: { handle: newHandle }
+        });
+      }
+    }
+
     const baseHandle = dto.handlePrefix.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-    const handle = `${baseHandle}.${company.code!.toLowerCase()}`;
+    const handle = `${baseHandle}.${tenantSlug}`;
 
     const existing = await this.prisma.user.findUnique({ where: { handle } });
-    if (existing) throw new ConflictException('Handle ' + handle + ' is already taken');
+    if (existing) throw new ConflictException('Username already taken in this suite');
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
