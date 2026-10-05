@@ -675,8 +675,6 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  }
-
   List<Map<String, dynamic>> _managerTransactions = [];
   List<Map<String, dynamic>> get managerTransactionsList => _managerTransactions;
 
