@@ -776,18 +776,24 @@ class _CaptureState extends State<CaptureMovementScreen> {
   }
 
 
-  Widget _banner(String t) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    margin: const EdgeInsets.only(bottom: 14),
-    decoration: BoxDecoration(
-      color: const Color(0xFFFEF2F2),
-      border: Border.all(color: const Color(0xFFFEE2E2)),
- );
+  Widget _banner(String t) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        border: Border.all(color: const Color(0xFFFEE2E2)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(t, style: const TextStyle(fontSize: 13, color: Color(0xFF991B1B))),
+    );
+  }
   Widget _buildCategoryCard(AppState app) {
-  final filteredCategories = app.concernCategories.where((c) {
+  final query = _categorySearchCtrl.text.trim().toLowerCase();
+  final categories = app.concernCategories.where((c) {
     final matchesFlow = c['type'] == _flowType || c['type'] == 'BOTH';
-    final query = _categorySearchCtrl.text.trim().toLowerCase();
-    final matchesSearch = query.isEmpty || (c['name']?.toString().toLowerCase().contains(query) ?? false);
+    final matchesSearch = query.isEmpty ||
+        (c['name']?.toString().toLowerCase().contains(query) ?? false);
     return matchesFlow && matchesSearch;
   }).toList();
 
@@ -810,7 +816,11 @@ class _CaptureState extends State<CaptureMovementScreen> {
             SizedBox(width: 8),
             Text(
               'Category / Project Ledger',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
+              ),
             ),
           ],
         ),
@@ -863,47 +873,81 @@ class _CaptureState extends State<CaptureMovementScreen> {
           ],
         ),
         const SizedBox(height: 12),
-          if (categories.isNotEmpty)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: categories.map((c) {
-                  final isSelected = _selectedCategory?['id'] == c['id'];
-                  final isInflow = _flowType == 'INFLOW';
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedCategory = c),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isSelected ? (isInflow ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2)) : Colors.white,
-                          border: Border.all(color: isSelected ? (isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : const Color(0xFFE2E8F0)),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            if (isSelected) ...[Icon(Icons.check_rounded, size: 14, color: isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444)), const SizedBox(width: 4)],
-                            Text(c['name'], style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: const Color(0xFF475569))),
-                          ],
+          // Category Pills or Empty State via clean ternary (no semicolons in list)
+        categories.isNotEmpty
+            ? SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: categories.map((c) {
+                    final isSelected = _selectedCategory?["id"] == c["id"];
+                    final isInflow = _flowType == "INFLOW";
+                    final activeBorderColor = isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+                    final activeBgColor = isInflow ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2);
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () {
+                          setState(() {
+                            _selectedCategory = isSelected ? null : c;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? activeBgColor : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected ? activeBorderColor : const Color(0xFFE2E8F0),
+                              width: isSelected ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isSelected) ...[
+                                Icon(Icons.check_rounded, size: 14, color: activeBorderColor),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                c["name"]?.toString() ?? "",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                  color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF475569),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
+              )
+            : Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: isManager && _categorySearchCtrl.text.trim().isNotEmpty
+                    ? ActionChip(
+                        backgroundColor: const Color(0xFFF8FAFC),
+                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                        avatar: const Icon(Icons.add_rounded, size: 16, color: Color(0xFF0F172A)),
+                        label: Text(
+                          "Create \"${_categorySearchCtrl.text.trim()}\"",
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        onPressed: () => _showAddCategoryModal(context, app),
+                      )
+                    : const Text(
+                        "No categories found.",
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      ),
               ),
-            )
-          else if (isManager && _categorySearchCtrl.text.isNotEmpty)
-            GestureDetector(
-              onTap: () => _showAddCategoryModal(context, app),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)),
-                child: Text('+ Create "${_categorySearchCtrl.text.trim()}"', style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
-              ),
-            )
-          else
-            const Text("No categories found. Tap + to add one.", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
         ],
       ),
     );
