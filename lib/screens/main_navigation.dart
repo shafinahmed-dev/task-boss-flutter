@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/screens/manager/manager_dashboard_shell.dart';
+import 'package:task_boss/screens/suite/suite_governance_screen.dart';
 
 import 'package:task_boss/screens/operations_tabs.dart';
 import 'package:task_boss/screens/wallets_screen.dart';
@@ -72,7 +73,9 @@ class _MainNavigationState extends State<MainNavigation> {
                 child: Row(
                   children: [
                     Text(
-                      _isBalanceVisible ? '৳ ${_formatAmount(appState.balance)}' : '৳ ••••••',
+                      _isBalanceVisible 
+                          ? '৳ ${_formatAmount(appState.userBalance ?? appState.balance ?? 0.0)}' 
+                          : '৳ ••••••',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                     ),
                     const SizedBox(width: 6),

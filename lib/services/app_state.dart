@@ -45,6 +45,7 @@ class AppState extends ChangeNotifier {
     }
     return balance;
   }
+  double? get userBalance => balance;
   List<Map<String, dynamic>> _managerConcernEmployees = [];
   List<Map<String, dynamic>> get managerConcernEmployees => _managerConcernEmployees;
 
