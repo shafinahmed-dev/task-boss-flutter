@@ -136,88 +136,36 @@ class _CaptureState extends State<CaptureMovementScreen> {
               const SizedBox(height: 20),
             ],
           ),
-  void _showEditCategoryModal(BuildContext context, AppState app, Map<String, dynamic> category) {
-    String name = category['name']?.toString() ?? '';
-    String type = category['type']?.toString() ?? 'BOTH';
-    final categoryId = category['id']?.toString() ?? '';
+        ),
+      ),
+    );
+  }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 20, right: 20, top: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Manage Category', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: const Icon(Icons.delete_rounded, color: Colors.red),
-                    onPressed: () async {
-                      final confirm = await showDialog<bool>(
-                        context: ctx,
-                        builder: (dialogContext) => AlertDialog(
-                          title: const Text('Delete Category'),
-                          content: const Text('Are you sure you want to delete this category?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(dialogContext, false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(dialogContext, true),
-                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                            ),
-                          ],
-                        ),
-                      );
+  void _showEditCategoryModal(BuildContext c, AppState a, Map<String, dynamic> cat) {
+    final nCtrl = TextEditingController(text: cat['name']?.toString() ?? '');
+    String sType = cat['type']?.toString() ?? 'BOTH';
+    showModalBottomSheet(context: c, isScrollControlled: true, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 16, left: 16, right: 16, top: 16), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('Manage Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        IconButton(icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)), onPressed: () async {
+          final confirm = await showDialog<bool>(context: c, builder: (dC) => AlertDialog(title: const Text('Delete Category'), content: Text('Are you sure you want to delete "${cat['name']}"?'), actions: [TextButton(onPressed: () => Navigator.pop(dC, false), child: const Text('Cancel')), TextButton(onPressed: () => Navigator.pop(dC, true), child: const Text('Delete', style: TextStyle(color: Colors.red)))]));
+          if (confirm == true) { final s = await a.deleteCategory(cat['id']); if (c.mounted) { Navigator.pop(ctx); if (s) { setState(() { if (_selectedCategory?['id'] == cat['id']) _selectedCategory = null; }); ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('Category deleted'))); } else ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text(a.errorMessage ?? 'Failed to delete category'))); } }
+        })
+      ]),
+      const SizedBox(height: 16), TextField(controller: nCtrl, decoration: InputDecoration(labelText: 'Category Name', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+      const SizedBox(height: 16), const Text('Applies To', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF64748B))), const SizedBox(height: 8),
+      Row(children: [
+        ChoiceChip(label: const Text('Inflow Only'), selected: sType == 'INFLOW', onSelected: (v) => setS(() => sType = 'INFLOW')), const SizedBox(width: 8),
+        ChoiceChip(label: const Text('Outflow Only'), selected: sType == 'OUTFLOW', onSelected: (v) => setS(() => sType = 'OUTFLOW')), const SizedBox(width: 8),
+        ChoiceChip(label: const Text('Both'), selected: sType == 'BOTH', onSelected: (v) => setS(() => sType = 'BOTH'))
+      ]),
+      const SizedBox(height: 20), SizedBox(width: double.infinity, height: 48, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), onPressed: () async {
+        final n = nCtrl.text.trim(); if (n.isEmpty) return; final s = await a.updateCategory(id: cat['id'], name: n, type: sType);
+        if (c.mounted) { Navigator.pop(ctx); if (s) { setState(() { if (_selectedCategory?['id'] == cat['id']) _selectedCategory = {..._selectedCategory!, 'name': n, 'type': sType}; }); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Category updated'))); } else ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(a.errorMessage ?? 'Failed to update category'))); }
+      }, child: const Text('Update Category', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))))
+    ])))));
+  }
 
-                      if (confirm == true) {
-                        try {
-                          await app.deleteCategory(categoryId);
-                          if (mounted) {
-                            Navigator.pop(ctx);
-                            if (_selectedCategory?['id'] == categoryId) {
-                              setState(() {
-                                _selectedCategory = null;
-                              });
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Category deleted successfully')),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to delete: ${e.toString()}')),
-                            );
-                          }
-                        }
-                      }
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: TextEditingController(text: name),
-                onChanged: (val) => name = val,
-                decoration: const InputDecoration(labelText: 'Category Name', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ChoiceChip(label: const Text('Inflow Only'), selected: type == 'INFLOW', onSelected: (s) => setModalState(() => type = 'INFLOW')),
-                  ChoiceChip(label: const Text('Outflow Only'), selected: type == 'OUTFLOW', onSelected: (s) => setModalState(() => type = 'OUTFLOW')),
-                  ChoiceChip(label: const Text('Both'), selected: type == 'BOTH', onSelected: (s) => setModalState(() => type = 'BOTH')),
-                ],
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
                 onPressed: () async {
                   if (name.isEmpty) return;
 

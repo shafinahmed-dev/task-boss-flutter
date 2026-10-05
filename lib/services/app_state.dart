@@ -68,25 +68,6 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> createCategory({required String name, required String type, String? companyId}) async {
-    try {
-      final cid = companyId ?? effectiveCompanyId;
-      final response = await authRequest(
-        'POST',
-        Uri.parse('$apiBaseUrl/manager/categories'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'name': name, 'type': type, 'companyId': cid}),
-      );
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        await fetchCategories(companyId: cid);
-      } else {
-        throw Exception('Failed to create category');
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }
-
   Future<void> updateCategory({required String id, required String name, required String type}) async {
     try {
       final response = await authRequest(
