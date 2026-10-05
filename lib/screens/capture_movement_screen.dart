@@ -28,38 +28,81 @@ class CaptureMovementScreen extends StatefulWidget {
 }
 
 class _CaptureState extends State<CaptureMovementScreen> {
-  String _tab = 'in';
+  String _flowType = 'INFLOW'; // INFLOW | OUTFLOW
+  Map<String, dynamic>? _selectedCategory;
+  final TextEditingController _catSearchCtl = TextEditingController();
+  String _catSearchQuery = '';
+
   final _amtCtl = TextEditingController();
   final _chgCtl = TextEditingController();
   final _noteCtl = TextEditingController();
   
   String? _selectedWalletId;
   String? _selectedPaymentMethod;
-  
-  String _tag = '';
   bool _saving = false;
   String? _error;
-  Map<String, dynamic>? _lastSavedReceipt;
+  String get _tab => _flowType == 'INFLOW' ? 'in' : 'out';
 
-  final Map<String, List<String>> _tags = {
-    'in': ['Client Payment', 'Vendor Collection', 'Investor / Funding', 'Loan', 'Refund Received', 'Other Inflow'],
-    'out': ['Vendor / Supplier Payout', 'Refund to Client', 'Cash Withdrawal', 'Salary / Advance Disbursed', 'Other Outflow'],
-    'expense': ['Food & Meals', 'Commute & Fuel', 'Office Supplies', 'Client Meeting', 'Courier & Logistics', 'Utility / Bill', 'Other Expense']
-  };
+  Map<String, dynamic>? _lastSavedReceipt;
 
   @override
   void initState() {
     super.initState();
-    _tag = _tags['in']![0];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AppState>().fetchCategories(companyId: context.read<AppState>().user!.companyId);
+    });
     _loadDraft();
+  }
+
+  void _showCreateCategoryModal() {
+    String name = '';
+    String type = 'BOTH';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 20, right: 20, top: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('New Category / Ledger', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              TextField(
+                onChanged: (val) => name = val,
+                decoration: const InputDecoration(labelText: 'Category Name', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ChoiceChip(label: const Text('Inflow Only'), selected: type == 'INFLOW', onSelected: (s) => setModalState(() => type = 'INFLOW')),
+                  ChoiceChip(label: const Text('Outflow Only'), selected: type == 'OUTFLOW', onSelected: (s) => setModalState(() => type = 'OUTFLOW')),
+                  ChoiceChip(label: const Text('Both'), selected: type == 'BOTH', onSelected: (s) => setModalState(() => type = 'BOTH')),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () async {
+                  if (name.isEmpty) return;
+                  await context.read<AppState>().createCategory(name: name, type: type, companyId: context.read<AppState>().user!.companyId);
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Create'),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _loadDraft() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        _tab = prefs.getString('draft_tab') ?? 'in';
-        _tag = prefs.getString('draft_tag') ?? _tags[_tab]![0];
+        _flowType = prefs.getString('draft_flow') ?? 'INFLOW';
         _amtCtl.text = prefs.getString('draft_amt') ?? '';
         _chgCtl.text = prefs.getString('draft_chg') ?? '';
         _noteCtl.text = prefs.getString('draft_note') ?? '';
@@ -69,8 +112,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
 
   Future<void> _saveDraft() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('draft_tab', _tab);
-    await prefs.setString('draft_tag', _tag);
+    await prefs.setString('draft_flow', _flowType);
     await prefs.setString('draft_amt', _amtCtl.text);
     await prefs.setString('draft_chg', _chgCtl.text);
     await prefs.setString('draft_note', _noteCtl.text);
@@ -78,25 +120,25 @@ class _CaptureState extends State<CaptureMovementScreen> {
 
   Future<void> _clearDraft() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('draft_tab');
-    await prefs.remove('draft_tag');
+    await prefs.remove('draft_flow');
     await prefs.remove('draft_amt');
     await prefs.remove('draft_chg');
     await prefs.remove('draft_note');
   }
 
-  bool get _isOtherTag => _tag.startsWith('Other');
+  bool get _isOtherTag => false;
 
-  String _getEntryTag(String tab, String tag) {
-    if (tab == 'expense') return 'business_expense';
-    if (tab == 'in') {
-      if (tag == 'Investor / Funding') return 'partner_funding';
-      if (tag == 'Loan') return 'loan_received';
+  String _getEntryTag(String flowType, String? catName) {
+    if (flowType == 'INFLOW') {
       return 'client_payment';
     }
-    if (tag == 'Cash Withdrawal') return 'personal_partner';
     return 'outflow';
   }
+
+  List<dynamic> _getCategories(AppState app) {
+    return app.concernCategories.where((c) => c['type'] == 'BOTH' || c['type'] == _flowType).toList();
+  }
+
 
   Future<void> _submit() async {
     setState(() => _error = null);
@@ -131,12 +173,13 @@ class _CaptureState extends State<CaptureMovementScreen> {
       return;
     }
     final noteText = _noteCtl.text.trim();
-    if (_isOtherTag && noteText.isEmpty) {
-      setState(() => _error = "Note is required when selecting an 'Other' category.");
+
+    if (_selectedCategory == null) {
+      setState(() => _error = 'Please select a Category / Project Ledger.');
       return;
     }
 
-    final availableMethods = PaymentRails.getMethods(selectedWallet.type, _tab);
+    final availableMethods = PaymentRails.getMethods(selectedWallet.type, _flowType == 'INFLOW' ? 'in' : 'out');
     final paymentMethod = (_selectedPaymentMethod != null && availableMethods.contains(_selectedPaymentMethod))
         ? _selectedPaymentMethod!
         : availableMethods.first;
@@ -146,7 +189,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
       final receiptNo = 'TRX-${const Uuid().v4().substring(0, 8).toUpperCase()}';
       final payload = {
         'idempotencyKey': const Uuid().v4(),
-        'direction': _tab == 'in' ? 'in' : 'out',
+        'direction': _flowType == 'INFLOW' ? 'in' : 'out',
         'amount': amt,
         'currency': 'BDT',
         'channel': selectedWallet.type.toLowerCase(),
@@ -155,14 +198,16 @@ class _CaptureState extends State<CaptureMovementScreen> {
         'companyId': app.user!.companyId,
         'collectorId': app.user!.userId,
         'custodianId': app.user!.custodianId,
-        'entryTag': _getEntryTag(_tab, _tag),
+        'entryTag': _getEntryTag(_flowType, _selectedCategory?['name']),
+        'categoryId': _selectedCategory?['id'],
         'occurredAt': DateTime.now().toIso8601String(),
         'notes': noteText.isNotEmpty ? noteText : null,
         'note': noteText.isNotEmpty ? noteText : null,
         'description': noteText.isNotEmpty ? noteText : null,
         'metadata': {
-          'category': _tag,
-          'movementType': _tab == 'in' ? 'Cash In' : (_tab == 'out' ? 'Cash Out' : 'Expense'),
+          'category': _selectedCategory?['name'],
+          'categoryId': _selectedCategory?['id'],
+          'movementType': _flowType == 'INFLOW' ? 'Cash In' : 'Cash Out',
           'note': noteText,
           'notes': noteText,
           'baseAmount': amt,
@@ -171,7 +216,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
           'walletId': selectedWallet.id,
           'paymentMethod': paymentMethod,
           'walletName': selectedWallet.name,
-          'directionTab': _tab,
+          'directionTab': _flowType == 'INFLOW' ? 'in' : 'out',
           'voucherNumber': receiptNo,
         },
       };
@@ -194,8 +239,8 @@ class _CaptureState extends State<CaptureMovementScreen> {
           _lastSavedReceipt = {
             'receiptNo': returnedNo,
             'date': DateTime.now(),
-            'type': _tab == 'in' ? 'Cash In' : (_tab == 'out' ? 'Cash Out' : 'Expense'),
-            'category': _tag,
+            'type': _flowType == 'INFLOW' ? 'Cash In' : 'Cash Out',
+            'category': _selectedCategory?['name'],
             'wallet': selectedWallet!.name,
             'method': paymentMethod,
             'note': noteText,
@@ -205,7 +250,6 @@ class _CaptureState extends State<CaptureMovementScreen> {
           _amtCtl.clear();
           _chgCtl.clear();
           _noteCtl.clear(); _clearDraft();
-          _tag = _tags[_tab]![0];
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -265,7 +309,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
             const Text('Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.slateDark)),
             const SizedBox(height: 12),
             if (_error != null) _banner(_error!),
-            _buildSegmentTrack(),
+            _buildFlowPill(),
             const SizedBox(height: 14),
             // Card 1: Category Selection
             Container(
@@ -303,19 +347,15 @@ class _CaptureState extends State<CaptureMovementScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Row(
                           children: [
-                            ..._tags[_tab]!.asMap().entries.map((entry) {
-                              final t = entry.value;
-                              final isFirst = entry.key == 0;
-                              final isSelected = _tag == t;
-                              final Color accentColor = _tab == 'in'
+                            ..._getCategories(context.read<AppState>()).map((category) {
+                              final isSelected = _selectedCategory?['id'] == category['id'];
+                              final Color accentColor = _flowType == 'INFLOW'
                                   ? const Color(0xFF10B981)
-                                  : _tab == 'out'
-                                      ? const Color(0xFFF59E0B)
-                                      : const Color(0xFFEF4444);
+                                  : const Color(0xFFEF4444);
                               return Padding(
-                                padding: EdgeInsets.only(left: isFirst ? 0 : 8),
+                                padding: const EdgeInsets.only(right: 8),
                                 child: GestureDetector(
-                                  onTap: () => setState(() => _tag = t),
+                                  onTap: () => setState(() => _selectedCategory = category),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 180),
                                     curve: Curves.easeInOut,
@@ -345,7 +385,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                                           const SizedBox(width: 4),
                                         ],
                                         Text(
-                                          t,
+                                          category['name'],
                                           style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -358,6 +398,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                                 ),
                               );
                             }),
+
                             const SizedBox(width: 16),
                           ],
                         ),
@@ -800,102 +841,6 @@ class _CaptureState extends State<CaptureMovementScreen> {
     );
   }
 
-  Widget _buildSegmentTrack() {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        gradient: AppTheme.slateDockGradient,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1),
-      ),
-      child: Stack(
-        children: [
-          AnimatedAlign(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            alignment: _tab == 'in'
-                ? Alignment.centerLeft
-                : _tab == 'out'
-                    ? Alignment.center
-                    : Alignment.centerRight,
-            child: FractionallySizedBox(
-              widthFactor: 1 / 3,
-              child: Container(
-                height: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              _buildSegmentItem('Cash In', 'in', Icons.arrow_downward_rounded, const Color(0xFF10B981)),
-              _buildSegmentItem('Cash Out', 'out', Icons.arrow_upward_rounded, const Color(0xFFF59E0B)),
-              _buildSegmentItem('Expense', 'expense', Icons.receipt_outlined, const Color(0xFFEF4444)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSegmentItem(String label, String value, IconData icon, Color activeColor) {
-    final isActive = _tab == value;
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() {
-          _tab = value;
-          _tag = _tags[value]![0];
-          _error = null;
-          if (_selectedWalletId != null) {
-            final app = context.read<AppState>();
-            if (app.wallets.isNotEmpty) {
-              final wallet = app.wallets.firstWhere(
-                (w) => w.id == _selectedWalletId,
-                orElse: () => app.wallets.first,
-              );
-              final methods = PaymentRails.getMethods(wallet.type, _tab);
-              _selectedPaymentMethod = methods.first;
-            }
-          }
-        }),
-        child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 15,
-                color: isActive ? activeColor : const Color(0xFF94A3B8),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                  color: isActive
-                      ? const Color(0xFF111827)
-                      : const Color(0xFF94A3B8),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _banner(String t) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -930,4 +875,119 @@ class _CaptureState extends State<CaptureMovementScreen> {
       Text(v, style: TextStyle(fontSize: 14, fontWeight: bold ? FontWeight.w900 : FontWeight.bold, color: bold ? AppTheme.primaryGradientFallback : Colors.black)),
     ]),
   );
+
+  Widget _buildFlowPill() {
+    final isInflow = _flowType == 'INFLOW';
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E2638),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          // Inflow Segment
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                if (_flowType != 'INFLOW') {
+                  setState(() {
+                    _flowType = 'INFLOW';
+                    _selectedCategory = null;
+                  });
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                decoration: BoxDecoration(
+                  color: isInflow ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: isInflow
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.arrow_downward_rounded,
+                      size: 16,
+                      color: isInflow ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Inflow',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isInflow ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Outflow Segment
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                if (_flowType != 'OUTFLOW') {
+                  setState(() {
+                    _flowType = 'OUTFLOW';
+                    _selectedCategory = null;
+                  });
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                decoration: BoxDecoration(
+                  color: !isInflow ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: !isInflow
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.arrow_upward_rounded,
+                      size: 16,
+                      color: !isInflow ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Outflow',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: !isInflow ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
