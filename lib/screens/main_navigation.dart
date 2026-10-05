@@ -72,7 +72,7 @@ class _MainNavigationState extends State<MainNavigation> {
                 child: Row(
                   children: [
                     Text(
-                      _isBalanceVisible ? '৳ ${_formatAmount(appState.currentUser?.balance ?? appState.balance)}' : '৳ ••••••',
+                      _isBalanceVisible ? '৳ ${_formatAmount(appState.balance)}' : '৳ ••••••',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                     ),
                     const SizedBox(width: 6),
@@ -115,10 +115,10 @@ class _MainNavigationState extends State<MainNavigation> {
     final role = appState.user?.role;
 
     if (role == 'SUITE_ADMIN') {
-      return const SuiteGovernanceScreen();
+      return SuiteGovernanceScreen();
     }
     if (role == 'MANAGER') {
-      return const ManagerDashboardShell();
+      return ManagerDashboardShell();
     }
 
     return Scaffold(
