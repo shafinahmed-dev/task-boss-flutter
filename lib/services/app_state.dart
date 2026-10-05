@@ -68,7 +68,11 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> updateCategory({required String id, required String name, required String type}) async {
+  Future<bool> updateCategory({
+    required String id,
+    required String name,
+    required String type,
+  }) async {
     try {
       final response = await authRequest(
         'PATCH',
@@ -78,11 +82,40 @@ class AppState extends ChangeNotifier {
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
         await fetchCategories(companyId: effectiveCompanyId);
-      } else {
-        throw Exception('Failed to update category');
+        notifyListeners();
+        return true;
       }
+      _errorMessage = jsonDecode(response.body)['message'] ?? 'Failed to update category';
+      notifyListeners();
+      return false;
     } catch (e) {
-      rethrow;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteCategory(String id) async {
+    try {
+      final response = await authRequest(
+        'DELETE',
+        Uri.parse('$apiBaseUrl/manager/categories/$id'),
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        await fetchCategories(companyId: effectiveCompanyId);
+        notifyListeners();
+        return true;
+      }
+      _errorMessage = jsonDecode(response.body)['message'] ?? 'Failed to delete category';
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  };
+      return false;
     }
   }
 
