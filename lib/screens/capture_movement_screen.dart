@@ -47,10 +47,28 @@ class _CaptureState extends State<CaptureMovementScreen> {
 
   @override
   void initState() {
+  String _getEffectiveCompanyId(AppState app) {
+    if (app.selectedManagerCompanyId != null && app.selectedManagerCompanyId!.isNotEmpty) {
+      return app.selectedManagerCompanyId!;
+    }
+    final overviewCompanyId = app.managerOverviewData['company']?['id']?.toString();
+    if (overviewCompanyId != null && overviewCompanyId.isNotEmpty) {
+      return overviewCompanyId;
+    }
+    if (app.wallets.isNotEmpty) {
+      final walletCompanyId = app.wallets.first['companyId']?.toString();
+      if (walletCompanyId != null && walletCompanyId.isNotEmpty) {
+        return walletCompanyId;
+      }
+    }
+    return '';
+  }
+
+
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final app = context.read<AppState>();
-      final cid = app.selectedManagerCompanyId ?? app.currentUser?.primaryCompanyId ?? '';
+      final cid = _getEffectiveCompanyId(app);
       if (cid.isNotEmpty) {
         app.fetchCategories(companyId: cid);
       }
@@ -67,7 +85,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
   void _showAddCategoryModal(BuildContext context, AppState app) {
     String name = _categorySearchCtrl.text.trim();
     String type = 'BOTH';
-    final cid = app.selectedManagerCompanyId ?? app.currentUser?.primaryCompanyId ?? '';
+    final cid = _getEffectiveCompanyId(app);
     
     showModalBottomSheet(
       context: context,
@@ -771,6 +789,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
     decoration: BoxDecoration(
       color: const Color(0xFFFEF2F2),
       border: Border.all(color: const Color(0xFFFEE2E2)),
+ );
   Widget _buildCategoryCard(AppState app) {
     final isManager = app.currentUser?.role != 'EMPLOYEE';
     final categories = app.concernCategories.where((c) {
@@ -903,7 +922,6 @@ class _CaptureState extends State<CaptureMovementScreen> {
       Text(v, style: TextStyle(fontSize: 14, fontWeight: bold ? FontWeight.w900 : FontWeight.bold, color: bold ? AppTheme.primaryGradientFallback : Colors.black)),
     ]),
   );
-
   Widget _buildFlowPill() {
     final isInflow = _flowType == 'INFLOW';
     return Container(
