@@ -116,6 +116,11 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
                                     ),
                                   ),
                                   Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)), child: Text('৳ ${_formatAmount(balance)}', style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold))),
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () => _showEditEmployeeModal(context, app, e),
+                                    child: Container(width: 36, height: 36, decoration: BoxDecoration(color: navyColor, borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.edit_rounded, color: Colors.white, size: 18)),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 12),
@@ -272,3 +277,72 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
   }
 }
 
+
+
+  void _showEditEmployeeModal(BuildContext context, AppState app, Map<String, dynamic> employee) {
+    final nameCtrl = TextEditingController(text: employee['name']);
+    final handleCtrl = TextEditingController(text: employee['handle']?.toString().split('.').first.replaceFirst('@', ''));
+    final passCtrl = TextEditingController(); // Leave empty for no change
+    final desigCtrl = TextEditingController(text: employee['designation']);
+    final deptCtrl = TextEditingController(text: employee['department']);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Edit Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder())),
+              const SizedBox(height: 12),
+              TextField(
+                controller: handleCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Handle Prefix',
+                  suffixText: '.${(employee['handle'] as String? ?? '').split('.').last}',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(controller: passCtrl, decoration: const InputDecoration(labelText: 'New Password (optional)', border: OutlineInputBorder())),
+              const SizedBox(height: 12),
+              TextField(controller: desigCtrl, decoration: const InputDecoration(labelText: 'Designation', border: OutlineInputBorder())),
+              const SizedBox(height: 12),
+              TextField(controller: deptCtrl, decoration: const InputDecoration(labelText: 'Department', border: OutlineInputBorder())),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                  onPressed: () async {
+                    if (nameCtrl.text.isEmpty || handleCtrl.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name and Handle Prefix are required')));
+                      return;
+                    }
+                    Navigator.pop(ctx);
+                    final success = await app.updateEmployee(employee['id'], {
+                      'name': nameCtrl.text.trim(),
+                      'handlePrefix': handleCtrl.text.trim(),
+                      'password': passCtrl.text.trim(),
+                      'designation': desigCtrl.text.trim(),
+                      'department': deptCtrl.text.trim(),
+                      'companyId': app.selectedManagerCompanyId ?? '',
+                    });
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success ? 'Employee updated successfully' : 'Failed to update employee')));
+                    }
+                  },
+                  child: const Text('Update Employee'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }

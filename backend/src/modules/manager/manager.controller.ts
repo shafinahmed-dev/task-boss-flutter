@@ -53,10 +53,11 @@ export class ManagerController {
   @Patch('employees/:id')
   async updateEmployee(@Req() req: any, @Param('id') id: string, @Body() dto: any) {
     if (req.user?.role === 'EMPLOYEE') throw new ForbiddenException();
+    const tenantId = req.user?.tenantId;
     const authorizedCompanyIds = req.user?.companyIds;
-    if (!authorizedCompanyIds) throw new BadRequestException('Invalid user context');
+    if (!tenantId || !authorizedCompanyIds) throw new BadRequestException('Invalid user context');
     
-    return this.managerService.updateEmployee(id, authorizedCompanyIds, dto);
+    return this.managerService.updateEmployee(id, tenantId, authorizedCompanyIds, dto);
   }
 }
 

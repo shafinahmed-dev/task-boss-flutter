@@ -416,12 +416,14 @@ export class ManagerService {
     });
   }
 
-  async updateEmployee(id: string, managerCompanyIds: string[], dto: any) {
+  async updateEmployee(id: string, tenantId: string, managerCompanyIds: string[], dto: any) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: { companies: true },
     });
     if (!user) throw new NotFoundException('Employee not found');
+    if (user.role !== 'EMPLOYEE') throw new ForbiddenException('Cannot update non-employee');
+    if (user.tenantId !== tenantId) throw new ForbiddenException('Unauthorized');
 
     const userCompanyIds = user.companies.map(c => c.companyId);
     const hasAccess = userCompanyIds.some(cId => managerCompanyIds.includes(cId));
@@ -430,25 +432,57 @@ export class ManagerService {
     }
 
     const updateData: Record<string, any> = {};
+    if (dto.name) updateData['name'] = dto.name.trim();
     if (dto.designation !== undefined) updateData['designation'] = dto.designation;
     if (dto.department !== undefined) updateData['department'] = dto.department;
-    if (dto.password !== undefined && dto.password.trim() !== '') {
+    if (dto.password && dto.password.trim() !== '') {
       updateData['rawPassword'] = dto.password;
       updateData['passwordHash'] = await bcrypt.hash(dto.password, 10);
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: updateData,
-    });
+    // Handle Prefix
+    if (dto.handlePrefix && dto.handlePrefix.trim() !== '') {
+        const tenant = await this.prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { slug: true },
+        });
+        const tenantSlug = tenant?.slug?.toLowerCase() || 'taskgroup';
+        const cleanPrefix = dto.handlePrefix.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const handle = `${cleanPrefix}.${tenantSlug}`;
+        
+        const existing = await this.prisma.user.findFirst({
+            where: { handle, id: { not: id } }
+        });
+        if (existing) {
+            throw new BadRequestException(`Username @${cleanPrefix}.${tenantSlug} is already in use`);
+        }
+        updateData['handle'] = handle;
+    }
 
-    return {
-      id: updated.id,
-      name: updated.name,
-      handle: updated.handle,
-      designation: updated.designation,
-      department: updated.department,
-      rawPassword: updated.rawPassword,
-    };
+    return this.prisma.$transaction(async (tx) => {
+        const updated = await tx.user.update({
+            where: { id },
+            data: updateData,
+        });
+
+        // Company Update
+        if (dto.companyId && dto.companyId !== userCompanyIds[0]) {
+            if (!managerCompanyIds.includes(dto.companyId)) {
+                throw new ForbiddenException('Not authorized for target company');
+            }
+            await tx.userCompany.deleteMany({ where: { userId: id } });
+            await tx.userCompany.create({
+                data: {
+                    userId: id,
+                    companyId: dto.companyId,
+                }
+            });
+        }
+
+        return {
+            success: true,
+            user: updated,
+        };
+    });
   }
 }

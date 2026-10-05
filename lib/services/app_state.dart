@@ -644,6 +644,7 @@ class AppState extends ChangeNotifier {
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         await fetchManagerOverview();
         await fetchManagerConcernEmployees();
+        notifyListeners();
         return true;
       } else {
         print('Provision employee error: ${resp.statusCode} - ${resp.body}');
@@ -652,6 +653,28 @@ class AppState extends ChangeNotifier {
       print('Provision employee exception: $e');
     }
     return false;
+  }
+
+  Future<bool> updateEmployee(String employeeId, Map<String, dynamic> payload) async {
+    if (token == null) return false;
+    try {
+      final url = Uri.parse('$apiBaseUrl/manager/employees/$employeeId');
+      final resp = await authRequest('PATCH', url, headers: {'Content-Type': 'application/json'}, body: jsonEncode(payload));
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        await fetchManagerOverview();
+        await fetchManagerConcernEmployees();
+        notifyListeners();
+        return true;
+      } else {
+        print('Update employee error: ${resp.statusCode} - ${resp.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Update employee exception: $e');
+      return false;
+    }
+  }
+
   }
 
   List<Map<String, dynamic>> _managerTransactions = [];
