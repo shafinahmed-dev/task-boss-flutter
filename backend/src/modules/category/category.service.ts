@@ -1,12 +1,45 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 
 @Injectable()
 export class CategoryService {
   constructor(private prisma: PrismaService) {}
 
-  async getCategories(companyId: string, type?: string) {
-    const where: any = { companyId };
+  async getCategories(reqUser: any, companyId?: string, type?: string) {
+    let targetCompanyId = companyId;
+
+    // Auto-resolve if companyId is missing, empty, or 'null'
+    if (!targetCompanyId || targetCompanyId.trim() === '' || targetCompanyId === 'null') {
+      const userCompany = await this.prisma.userCompany.findFirst({
+        where: { userId: reqUser.id },
+        select: { companyId: true },
+      });
+      targetCompanyId = userCompany?.companyId;
+
+      if (!targetCompanyId) {
+        const firstCompany = await this.prisma.company.findFirst({
+          where: { tenantId: reqUser.tenantId },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        });
+        targetCompanyId = firstCompany?.id;
+      }
+    }
+
+    if (!targetCompanyId) {
+      throw new BadRequestException('No concern found for this workspace');
+    }
+
+    // Verify company belongs to user's tenant
+    const company = await this.prisma.company.findFirst({
+      where: { id: targetCompanyId, tenantId: reqUser.tenantId },
+    });
+
+    if (!company) {
+      throw new ForbiddenException('Invalid or unauthorized companyId');
+    }
+
+    const where: any = { companyId: targetCompanyId };
     if (type && type.trim() !== '') {
       const upperType = type.toUpperCase();
       where.OR = [
@@ -20,10 +53,42 @@ export class CategoryService {
     });
   }
 
-  async createCategory(tenantId: string, companyIds: string[], dto: { name: string; type?: string; companyId: string }) {
-    if (!dto.companyId || !companyIds.includes(dto.companyId)) {
-      throw new BadRequestException('Invalid or unauthorized companyId');
+  async createCategory(reqUser: any, dto: { name: string; type?: string; companyId: string }) {
+    let targetCompanyId: string | undefined = dto.companyId;
+
+    // Auto-resolve if companyId is missing, empty, or 'null'
+    if (!targetCompanyId || targetCompanyId.trim() === '' || targetCompanyId === 'null') {
+      // 1. Check UserCompany links for this user
+      const userCompany = await this.prisma.userCompany.findFirst({
+        where: { userId: reqUser.id },
+        select: { companyId: true },
+      });
+      targetCompanyId = userCompany?.companyId;
+
+      // 2. Fallback to first company in the manager's tenant
+      if (!targetCompanyId) {
+        const firstCompany = await this.prisma.company.findFirst({
+          where: { tenantId: reqUser.tenantId },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        });
+        targetCompanyId = firstCompany?.id || undefined;
+      }
     }
+
+    if (!targetCompanyId) {
+      throw new BadRequestException('No concern found for this workspace');
+    }
+
+    // Verify company exists and belongs to user's tenant
+    const company = await this.prisma.company.findFirst({
+      where: { id: targetCompanyId, tenantId: reqUser.tenantId },
+    });
+
+    if (!company) {
+      throw new ForbiddenException('Invalid or unauthorized companyId');
+    }
+
     const name = dto.name?.trim();
     if (!name) {
       throw new BadRequestException('Category name is required');
@@ -38,11 +103,12 @@ export class CategoryService {
         data: {
           name,
           type,
-          companyId: dto.companyId,
-          tenantId,
+          companyId: targetCompanyId,
+          tenantId: reqUser.tenantId,
+          createdById: reqUser.id,
         },
       });
-      return category;
+      return { success: true, category };
     } catch (e: any) {
       if (e.code === 'P2002') {
         throw new ConflictException('Category with this name already exists in this concern.');
@@ -119,5 +185,70 @@ export class CategoryService {
       netBalance,
       transactions: movements,
     };
+  }
+
+  async updateCategory(reqUser: any, id: string, dto: { name?: string; type?: string }) {
+    const category = await this.prisma.transactionCategory.findUnique({
+      where: { id },
+    });
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+    if (category.tenantId !== reqUser.tenantId) {
+      throw new ForbiddenException('Unauthorized');
+    }
+
+    const data: any = {};
+    if (dto.name !== undefined) {
+      const name = dto.name.trim();
+      if (!name) throw new BadRequestException('Category name cannot be empty');
+      data.name = name;
+    }
+    if (dto.type !== undefined) {
+      const type = dto.type.toUpperCase();
+      if (!['INFLOW', 'OUTFLOW', 'BOTH'].includes(type)) {
+        throw new BadRequestException('Invalid category type');
+      }
+      data.type = type;
+    }
+
+    try {
+      const updated = await this.prisma.transactionCategory.update({
+        where: { id },
+        data,
+      });
+      return { success: true, category: updated };
+    } catch (e: any) {
+      if (e.code === 'P2002') {
+        throw new ConflictException('Category with this name already exists in this concern.');
+      }
+      throw new BadRequestException('Failed to update category: ' + e.message);
+    }
+  }
+
+  async deleteCategory(reqUser: any, id: string) {
+    const category = await this.prisma.transactionCategory.findUnique({
+      where: { id },
+    });
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+    if (category.tenantId !== reqUser.tenantId) {
+      throw new ForbiddenException('Unauthorized');
+    }
+
+    const movementsCount = await this.prisma.moneyMovement.count({
+      where: { categoryId: id },
+    });
+
+    if (movementsCount > 0) {
+      throw new BadRequestException('Cannot delete category because it has associated transactions.');
+    }
+
+    await this.prisma.transactionCategory.delete({
+      where: { id },
+    });
+
+    return { success: true };
   }
 }

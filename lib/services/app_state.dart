@@ -52,32 +52,136 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> _concernCategories = [];
   List<Map<String, dynamic>> get concernCategories => _concernCategories;
 
-  Future<void> fetchCategories({required String companyId, String? flowType}) async {
-    final url = Uri.parse('$apiBaseUrl/categories?companyId=$companyId${flowType != null ? '&flowType=$flowType' : ''}');
-    final resp = await authRequest('GET', url, headers: {'x-company-id': companyId});
+  Future<void> fetchCategories({String? companyId, String? flowType}) async {
+    final cid = companyId ?? effectiveCompanyId;
+    if (cid.isEmpty) return;
+    
+    final url = Uri.parse('$apiBaseUrl/categories?companyId=$cid${flowType != null ? '&flowType=$flowType' : ''}');
+    final resp = await authRequest('GET', url);
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       final List data = jsonDecode(resp.body);
       _concernCategories = List<Map<String, dynamic>>.from(data);
       notifyListeners();
     } else {
-      throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to fetch categories');
+      _errorMessage = jsonDecode(resp.body)['message'] ?? 'Failed to fetch categories';
+      notifyListeners();
     }
   }
 
-  Future<Map<String, dynamic>?> createCategory({required String name, required String type, required String companyId}) async {
-    final url = Uri.parse('$apiBaseUrl/manager/categories');
-    final resp = await authRequest(
-      'POST',
-      url,
-      headers: {'Content-Type': 'application/json', 'x-company-id': companyId},
-      body: jsonEncode({'name': name, 'type': type, 'companyId': companyId}),
-    );
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      final data = jsonDecode(resp.body);
-      await fetchCategories(companyId: companyId);
-      return Map<String, dynamic>.from(data);
+  Future<void> createCategory({required String name, required String type, String? companyId}) async {
+    try {
+      final cid = companyId ?? effectiveCompanyId;
+      final response = await authRequest(
+        'POST',
+        Uri.parse('$apiBaseUrl/manager/categories'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'name': name, 'type': type, 'companyId': cid}),
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        await fetchCategories(companyId: cid);
+      } else {
+        throw Exception('Failed to create category');
+      }
+    } catch (e) {
+      rethrow;
     }
-    throw Exception(jsonDecode(resp.body)['message'] ?? 'Failed to create category');
+  }
+
+  Future<void> updateCategory({required String id, required String name, required String type}) async {
+    try {
+      final response = await authRequest(
+        'PATCH',
+        Uri.parse('$apiBaseUrl/manager/categories/$id'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'name': name, 'type': type}),
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        await fetchCategories(companyId: effectiveCompanyId);
+      } else {
+        throw Exception('Failed to update category');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> deleteCategory(String id) async {
+    try {
+      final response = await authRequest(
+        'DELETE',
+        Uri.parse('$apiBaseUrl/manager/categories/$id'),
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        await fetchCategories(companyId: effectiveCompanyId);
+      } else {
+        throw Exception('Failed to delete category');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  String get effectiveCompanyId {
+    if (_selectedManagerCompanyId != null && _selectedManagerCompanyId!.isNotEmpty) {
+      return _selectedManagerCompanyId!;
+    }
+    if (user?.primaryCompanyId != null && user!.primaryCompanyId!.isNotEmpty) {
+      return user!.primaryCompanyId!;
+    }
+    final overviewCid = _managerOverviewData['company']?['id']?.toString();
+    if (overviewCid != null && overviewCid.isNotEmpty) {
+      return overviewCid;
+    }
+    if (wallets.isNotEmpty && wallets.first.companyId.isNotEmpty) {
+      return wallets.first.companyId;
+    }
+    return '';
+  }
+
+  String? _errorMessage;
+  String? get errorMessage => _errorMessage;
+
+  Future<Map<String, dynamic>?> createCategory({
+    required String name,
+    required String type,
+    String? companyId,
+  }) async {
+    try {
+      final cid = (companyId != null && companyId.isNotEmpty)
+          ? companyId
+          : effectiveCompanyId;
+
+      final response = await authRequest(
+        'POST',
+        Uri.parse('$apiBaseUrl/manager/categories'),
+        headers: {'Content-Type': 'application/json', 'x-company-id': cid},
+        body: jsonEncode({'name': name.trim(), 'type': type, 'companyId': cid}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final dynamic raw = jsonDecode(response.body);
+        Map<String, dynamic> category;
+        if (raw is Map && raw['category'] != null) {
+          category = Map<String, dynamic>.from(raw['category']);
+        } else if (raw is Map) {
+          category = Map<String, dynamic>.from(raw);
+        } else {
+          category = {'id': '', 'name': name.trim(), 'type': type};
+        }
+
+        await fetchCategories(companyId: cid);
+        return category;
+      } else {
+        _errorMessage = jsonDecode(response.body)?['message']?.toString() ?? 'Failed to create category';
+        notifyListeners();
+        return null;
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+      debugPrint('createCategory error: $e');
+      notifyListeners();
+      return null;
+    }
   }
 
 

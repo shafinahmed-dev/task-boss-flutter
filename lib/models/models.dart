@@ -10,6 +10,7 @@ class AuthUser {
   final String custodianId;
   final String companyId;
   final String? tenantId;
+  final String? primaryCompanyId;
   final String designation;
   final String department;
 
@@ -21,6 +22,7 @@ class AuthUser {
     required this.email,
     required this.custodianId,
     required this.companyId,
+    this.primaryCompanyId,
     this.tenantId,
     this.designation = '',
     this.department = '',
@@ -35,6 +37,7 @@ class AuthUser {
       email: json['email']?.toString() ?? '',
       custodianId: json['custodianId']?.toString() ?? '',
       companyId: json['companyId']?.toString() ?? '',
+      primaryCompanyId: json['primaryCompanyId']?.toString() ?? json['companyId']?.toString(),
       tenantId: json['tenantId']?.toString(),
       designation: json['designation'] as String? ?? 'User',
       department: json['department'] as String? ?? 'General',
@@ -49,6 +52,7 @@ class AuthUser {
     String? email,
     String? custodianId,
     String? companyId,
+    String? primaryCompanyId,
     String? tenantId,
     String? designation,
     String? department,
@@ -61,6 +65,7 @@ class AuthUser {
       email: email ?? this.email,
       custodianId: custodianId ?? this.custodianId,
       companyId: companyId ?? this.companyId,
+      primaryCompanyId: primaryCompanyId ?? this.primaryCompanyId,
       tenantId: tenantId ?? this.tenantId,
       designation: designation ?? this.designation,
       department: department ?? this.department,
@@ -76,6 +81,7 @@ class AuthUser {
       'email': email,
       'custodianId': custodianId,
       'companyId': companyId,
+      'primaryCompanyId': primaryCompanyId,
       'tenantId': tenantId,
       'designation': designation,
       'department': department,

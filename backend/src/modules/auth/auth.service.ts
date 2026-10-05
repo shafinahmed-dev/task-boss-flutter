@@ -56,6 +56,7 @@ export interface AuthResult {
     role: string;
     tenantId?: string;
     companyIds: string[];
+    primaryCompanyId: string | null;
     custodianId?: string;
   };
 }
@@ -180,6 +181,7 @@ export class AuthService {
         role: user.role,
         tenantId: user.tenantId ?? undefined,
         companyIds: authorizedCompanyIds,
+        primaryCompanyId: authorizedCompanyIds.length > 0 ? authorizedCompanyIds[0] : null,
         custodianId: user.custodianAccounts[0]?.id,
       },
     };

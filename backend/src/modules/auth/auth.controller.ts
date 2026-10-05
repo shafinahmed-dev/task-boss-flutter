@@ -1,4 +1,4 @@
-import { Controller, Post, Patch, Body, HttpCode, HttpStatus, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, HttpCode, HttpStatus, Req, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import type { LoginDto, RegisterDto, RegisterCompanyDto, UpdateProfileDto } from './auth.service.js';
 import { Public } from './public.decorator.js';
@@ -6,6 +6,16 @@ import { Public } from './public.decorator.js';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Get('me')
+  @HttpCode(HttpStatus.OK)
+  async getMe(@Req() req: any) {
+    const userId = req.user?.id || req.user?.sub || req.user?.userId;
+    if (!userId) {
+      throw new BadRequestException('User identification missing from token');
+    }
+    return this.authService.updateProfile(userId, {});
+  }
 
   /**
    * POST /auth/login

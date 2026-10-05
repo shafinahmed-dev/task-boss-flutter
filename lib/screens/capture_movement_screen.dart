@@ -48,25 +48,22 @@ class _CaptureState extends State<CaptureMovementScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final app = context.read<AppState>();
+      // If company ID not yet initialized, load overview to establish it
+      if (app.selectedManagerCompanyId == null || app.selectedManagerCompanyId!.isEmpty) {
+        await app.fetchManagerOverview();
+      }
       final cid = _getEffectiveCompanyId(app);
       if (cid.isNotEmpty) {
-        app.fetchCategories(companyId: cid);
+        await app.fetchCategories(companyId: cid);
       }
     });
     _loadDraft();
   }
 
   String _getEffectiveCompanyId(AppState app) {
-    if (app.selectedManagerCompanyId != null && app.selectedManagerCompanyId!.isNotEmpty) {
-      return app.selectedManagerCompanyId!;
-    }
-    final overviewCid = app.managerOverviewData['company']?['id']?.toString();
-    if (overviewCid != null && overviewCid.isNotEmpty) {
-      return overviewCid;
-    }
-    return '';
+    return app.effectiveCompanyId;
   }
 
   @override
@@ -109,13 +106,29 @@ class _CaptureState extends State<CaptureMovementScreen> {
               ElevatedButton(
                 onPressed: () async {
                   if (name.isEmpty) return;
-                  final newCat = await app.createCategory(name: name, type: type, companyId: cid);
-                  if (newCat != null && mounted) {
-                    setState(() {
-                      _selectedCategory = newCat;
-                      _categorySearchCtrl.clear();
-                    });
-                    Navigator.pop(context);
+
+                  try {
+                    await app.createCategory(
+                      name: name,
+                      type: type,
+                      companyId: cid,
+                    );
+
+                    if (mounted) {
+                      setState(() {
+                        _categorySearchCtrl.clear();
+                      });
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Category "$name" created')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to create category: ${e.toString()}')),
+                      );
+                    }
                   }
                 },
                 child: const Text('Create Category'),
@@ -123,6 +136,123 @@ class _CaptureState extends State<CaptureMovementScreen> {
               const SizedBox(height: 20),
             ],
           ),
+  void _showEditCategoryModal(BuildContext context, AppState app, Map<String, dynamic> category) {
+    String name = category['name']?.toString() ?? '';
+    String type = category['type']?.toString() ?? 'BOTH';
+    final categoryId = category['id']?.toString() ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 20, right: 20, top: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Manage Category', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.delete_rounded, color: Colors.red),
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: ctx,
+                        builder: (dialogContext) => AlertDialog(
+                          title: const Text('Delete Category'),
+                          content: const Text('Are you sure you want to delete this category?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialogContext, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialogContext, true),
+                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true) {
+                        try {
+                          await app.deleteCategory(categoryId);
+                          if (mounted) {
+                            Navigator.pop(ctx);
+                            if (_selectedCategory?['id'] == categoryId) {
+                              setState(() {
+                                _selectedCategory = null;
+                              });
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Category deleted successfully')),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to delete: ${e.toString()}')),
+                            );
+                          }
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: TextEditingController(text: name),
+                onChanged: (val) => name = val,
+                decoration: const InputDecoration(labelText: 'Category Name', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ChoiceChip(label: const Text('Inflow Only'), selected: type == 'INFLOW', onSelected: (s) => setModalState(() => type = 'INFLOW')),
+                  ChoiceChip(label: const Text('Outflow Only'), selected: type == 'OUTFLOW', onSelected: (s) => setModalState(() => type = 'OUTFLOW')),
+                  ChoiceChip(label: const Text('Both'), selected: type == 'BOTH', onSelected: (s) => setModalState(() => type = 'BOTH')),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () async {
+                  if (name.isEmpty) return;
+
+                  try {
+                    await app.updateCategory(
+                      id: categoryId,
+                      name: name,
+                      type: type,
+                    );
+
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Category updated successfully')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to update: ${e.toString()}')),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Update Category'),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+
         ),
       ),
     );
@@ -892,6 +1022,11 @@ class _CaptureState extends State<CaptureMovementScreen> {
                           setState(() {
                             _selectedCategory = isSelected ? null : c;
                           });
+                        },
+                        onLongPress: () {
+                          if (app.currentUser?.role != 'EMPLOYEE') {
+                            _showEditCategoryModal(context, app, c);
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

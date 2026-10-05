@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Req, Query, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Req, Query, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { CategoryService } from './category.service.js';
 import { Roles } from '../auth/roles.decorator.js';
 
@@ -8,14 +8,7 @@ export class CategoryController {
 
   @Get('categories')
   async getCategories(@Req() req: any, @Query('companyId') companyId: string, @Query('flowType') flowType?: string, @Query('type') type?: string) {
-    if (!companyId) {
-      throw new BadRequestException('companyId query parameter is required');
-    }
-    const userCompanyIds = req.user?.companyIds || [];
-    if (req.user?.role !== 'SUITE_ADMIN' && !userCompanyIds.includes(companyId)) {
-      throw new ForbiddenException('Not authorized for this company');
-    }
-    return this.categoryService.getCategories(companyId, flowType || type);
+    return this.categoryService.getCategories(req.user, companyId, flowType || type);
   }
 
   @Post('manager/categories')
@@ -24,12 +17,25 @@ export class CategoryController {
     if (req.user?.role === 'EMPLOYEE') {
       throw new ForbiddenException('Employees cannot create categories');
     }
-    const tenantId = req.user?.tenantId;
-    const companyIds = req.user?.companyIds;
-    if (!tenantId || !companyIds) {
-      throw new BadRequestException('Invalid user context');
+    return this.categoryService.createCategory(req.user, dto);
+  }
+
+  @Patch('manager/categories/:id')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  async updateCategory(@Req() req: any, @Param('id') id: string, @Body() dto: { name?: string; type?: string }) {
+    if (req.user?.role === 'EMPLOYEE') {
+      throw new ForbiddenException('Employees cannot update categories');
     }
-    return this.categoryService.createCategory(tenantId, companyIds, dto);
+    return this.categoryService.updateCategory(req.user, id, dto);
+  }
+
+  @Delete('manager/categories/:id')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  async deleteCategory(@Req() req: any, @Param('id') id: string) {
+    if (req.user?.role === 'EMPLOYEE') {
+      throw new ForbiddenException('Employees cannot delete categories');
+    }
+    return this.categoryService.deleteCategory(req.user, id);
   }
 
   @Get('manager/transactions/category-summary')
