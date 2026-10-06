@@ -370,6 +370,71 @@ export class ManagerService {
     return employees;
   }
 
+  async getAllTransactions(companyId?: string, reqUser?: any) {
+    let targetCompanyId = companyId;
+
+    if (!targetCompanyId || targetCompanyId === 'null' || targetCompanyId === 'undefined') {
+      const userCompany = await this.prisma.userCompany.findFirst({
+        where: { userId: reqUser?.id || reqUser?.sub || reqUser?.userId },
+        select: { companyId: true },
+      });
+      targetCompanyId = userCompany?.companyId;
+
+      if (!targetCompanyId && reqUser?.tenantId) {
+        const firstCompany = await this.prisma.company.findFirst({
+          where: { tenantId: reqUser.tenantId },
+          select: { id: true },
+        });
+        targetCompanyId = firstCompany?.id;
+      }
+    }
+
+    if (!targetCompanyId) {
+      return { success: true, transactions: [] };
+    }
+
+    const movements = await this.prisma.moneyMovement.findMany({
+      where: {
+        wallet: { companyId: targetCompanyId },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        category: { select: { id: true, name: true, type: true } },
+        collector: { select: { id: true, name: true, role: true } },
+        custodian: { select: { id: true, name: true, type: true } },
+        wallet: { select: { id: true, name: true } },
+      },
+    });
+
+    const transactions = movements.map((tx: any) => {
+      const isOut =
+        tx.direction === 'out' ||
+        tx.direction === 'OUT' ||
+        tx.type === 'CASH_OUT' ||
+        tx.type === 'EXPENSE' ||
+        tx.movementType === 'Cash Out' ||
+        tx.movementType === 'Expense';
+
+      return {
+        id: tx.id,
+        amount: Number(tx.amount || 0),
+        fee: Number(tx.fee || 0),
+        direction: isOut ? 'out' : 'in',
+        type: isOut ? 'Cash Out' : 'Cash In',
+        movementType: tx.movementType || (isOut ? 'Cash Out' : 'Cash In'),
+        note: tx.notes || tx.note || tx.movementType || '',
+        segmentName: tx.category?.name || 'General',
+        categoryId: tx.categoryId,
+        actorName: tx.collector?.name || tx.custodian?.name || tx.user?.name || 'System',
+        actorRole: tx.collector?.role || tx.user?.role || 'STAFF',
+        walletName: tx.wallet?.name || 'Cash in Hand',
+        createdAt: tx.createdAt.toISOString(),
+      };
+    });
+
+    return { success: true, transactions };
+  }
+
   async getManagerTransactions(tenantId: string, companyIds: string[]) {
     const movements = await this.prisma.moneyMovement.findMany({
       where: {

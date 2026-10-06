@@ -823,18 +823,38 @@ class AppState extends ChangeNotifier {
 
   List<Map<String, dynamic>> _managerTransactions = [];
   List<Map<String, dynamic>> get managerTransactionsList => _managerTransactions;
+  List<Map<String, dynamic>> get managerTransactions => _managerTransactions;
 
   Future<void> fetchManagerTransactions({String? companyId}) async {
-    final cid = companyId ?? _selectedManagerCompanyId ?? '';
-    if (token == null) return;
     try {
-      final url = Uri.parse('$apiBaseUrl/manager/transactions?companyId=$cid');
-      final resp = await authRequest('GET', url);
-      if (resp.statusCode == 200) {
-        final List list = jsonDecode(resp.body);
-        _managerTransactions = list.map((item) => Map<String, dynamic>.from(item)).toList();
+      final cid = (companyId != null && companyId.isNotEmpty)
+          ? companyId
+          : effectiveCompanyId;
+
+      final query = cid.isNotEmpty ? '?companyId=$cid' : '';
+      final url = Uri.parse('$apiBaseUrl/manager/transactions$query');
+      final response = await authRequest('GET', url);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = jsonDecode(response.body);
+        List<dynamic> rawList = [];
+
+        if (data is List) {
+          rawList = data;
+        } else if (data is Map && data['transactions'] is List) {
+          rawList = data['transactions'];
+        } else if (data is Map && data['data'] is List) {
+          rawList = data['data'];
+        }
+
+        _managerTransactions = rawList
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .toList();
+
         notifyListeners();
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('Error fetching manager transactions: $e');
+    }
   }
 }

@@ -17,7 +17,8 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppState>().fetchManagerTransactions();
+      final app = context.read<AppState>();
+      app.fetchManagerTransactions(companyId: app.effectiveCompanyId);
     });
   }
 
@@ -102,11 +103,17 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
           Expanded(
             child: filtered.isEmpty
                 ? _buildEmptyState()
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (ctx, i) => _buildTransactionCard(filtered[i]),
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      final app = context.read<AppState>();
+                      await app.fetchManagerTransactions(companyId: app.effectiveCompanyId);
+                    },
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (ctx, i) => _buildTransactionCard(filtered[i]),
+                    ),
                   ),
           ),
         ],

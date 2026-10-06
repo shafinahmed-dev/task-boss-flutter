@@ -19,12 +19,9 @@ export class ManagerController {
   }
 
   @Get('transactions')
-  async getTransactions(@Req() req: any) {
+  async getTransactions(@Req() req: any, @Query('companyId') companyId?: string) {
     if (req.user?.role === 'EMPLOYEE') throw new ForbiddenException();
-    const tenantId = req.user?.tenantId;
-    const companyIds = req.user?.companyIds;
-    if (!tenantId || !companyIds) throw new BadRequestException('Invalid user context');
-    return this.managerService.getManagerTransactions(tenantId, companyIds);
+    return this.managerService.getAllTransactions(companyId, req.user);
   }
 
   @Get('employees')
