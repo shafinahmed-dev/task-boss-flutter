@@ -5,7 +5,12 @@ import { PrismaService } from '../../database/prisma.service.js';
 export class CategoryService {
   constructor(private prisma: PrismaService) {}
 
-  private async validateAndAuthorizeCompany(userId: string, tenantId: string, userRole: string, companyId: string) {
+  private async validateAndAuthorizeCompany(
+    userId: string,
+    tenantId: string,
+    userRole: string,
+    companyId: string,
+  ) {
     // 1. Verify company exists and belongs to the user's tenant
     const company = await this.prisma.company.findFirst({
       where: { id: companyId, tenantId: tenantId },
@@ -15,29 +20,20 @@ export class CategoryService {
       throw new ForbiddenException('Company not found in this workspace');
     }
 
-    // 2. Suite Admins have universal access across their tenant
-    if (userRole === 'SUITE_ADMIN') {
-      return company;
-    }
+    // 2. Suite Admins and Managers belonging to this tenant are authorized for the company
+    const isManagerOrAdmin = userRole === 'SUITE_ADMIN' || userRole === 'MANAGER';
 
-    // 3. Check UserCompany join table or primaryCompanyId
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, role: true, primaryCompanyId: true },
-    });
-
-    const hasUserCompanyLink = await this.prisma.userCompany.findFirst({
+    // 3. Check UserCompany join table
+    const userCompany = await this.prisma.userCompany.findFirst({
       where: { userId: userId, companyId: companyId },
     });
 
-    const isAssigned = hasUserCompanyLink || user?.primaryCompanyId === companyId || userRole === 'MANAGER';
-
-    if (!isAssigned) {
+    if (!userCompany && !isManagerOrAdmin) {
       throw new ForbiddenException(`User is not authorized for company ${companyId}`);
     }
 
-    // 4. Auto-heal: Ensure UserCompany record exists so future relational queries succeed
-    if (!hasUserCompanyLink) {
+    // 4. Auto-heal: Ensure UserCompany link exists for this user
+    if (!userCompany) {
       try {
         await this.prisma.userCompany.create({
           data: {
@@ -47,7 +43,7 @@ export class CategoryService {
           },
         });
       } catch (_) {
-        // Ignore if concurrent create happened
+        // Ignore if created concurrently
       }
     }
 
