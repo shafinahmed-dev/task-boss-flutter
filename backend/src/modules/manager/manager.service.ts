@@ -30,7 +30,7 @@ export class ManagerService {
   async getOverview(tenantId: string, authorizedCompanyIds: string[], userId: string, requestedCompanyId?: string, period: 'today' | 'week' | 'month' | 'all' = 'month') {
     let managerPersonalBalance = 0;
     const managerCustodianAccounts = await this.prisma.custodianAccount.findMany({
-      where: { linkedUserId: userId, isArchived: false },
+      where: { linkedUserId: userId },
       include: { wallets: { include: { movements: true } } },
     });
     const supersededRowsForPersonal = await this.prisma.moneyMovement.findMany({
