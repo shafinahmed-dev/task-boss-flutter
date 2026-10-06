@@ -854,7 +854,7 @@ class AppState extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      debugPrint('Error fetching manager transactions: $e');
+      debugPrint('fetchManagerTransactions error: $e');
     }
   }
 }

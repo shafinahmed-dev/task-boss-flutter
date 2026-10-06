@@ -373,7 +373,7 @@ export class ManagerService {
   async getAllTransactions(companyId?: string, reqUser?: any) {
     let targetCompanyId = companyId;
 
-    if (!targetCompanyId || targetCompanyId === 'null' || targetCompanyId === 'undefined') {
+    if (!targetCompanyId || targetCompanyId === 'null' || targetCompanyId === 'undefined' || targetCompanyId === '') {
       const userCompany = await this.prisma.userCompany.findFirst({
         where: { userId: reqUser?.id || reqUser?.sub || reqUser?.userId },
         select: { companyId: true },
@@ -395,7 +395,10 @@ export class ManagerService {
 
     const movements = await this.prisma.moneyMovement.findMany({
       where: {
-        wallet: { companyId: targetCompanyId },
+        OR: [
+          { companyId: targetCompanyId },
+          { wallet: { companyId: targetCompanyId } },
+        ],
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -422,7 +425,7 @@ export class ManagerService {
         direction: isOut ? 'out' : 'in',
         type: isOut ? 'Cash Out' : 'Cash In',
         movementType: tx.movementType || (isOut ? 'Cash Out' : 'Cash In'),
-        note: tx.notes || tx.note || tx.movementType || '',
+        note: tx.notes || tx.note || tx.movementType || 'Transaction',
         segmentName: tx.category?.name || 'General',
         categoryId: tx.categoryId,
         actorName: tx.collector?.name || tx.custodian?.name || tx.user?.name || 'System',

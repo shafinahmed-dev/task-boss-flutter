@@ -52,7 +52,13 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final List<Map<String, dynamic>> rawList = app.managerTransactionsList.cast<Map<String, dynamic>>();
+    
+    List<Map<String, dynamic>> rawList = app.managerTransactions;
+    if (rawList.isEmpty && app.managerOverviewData['recentTransactions'] is List) {
+      final recent = app.managerOverviewData['recentTransactions'] as List;
+      rawList = recent.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+    }
+    
     final query = _searchQuery.trim().toLowerCase();
 
     final filtered = rawList.where((tx) {
@@ -91,9 +97,16 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('All Transactions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text(
+          'All Transactions',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: const Color(0xFF0F172A),
-        foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: Column(

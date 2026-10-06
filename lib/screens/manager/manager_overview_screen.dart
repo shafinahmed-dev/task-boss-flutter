@@ -234,11 +234,20 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Recent Transactions', style: TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
-                          Row(
-                            children: const [
-                              Text('View All', style: TextStyle(color: navyColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                              Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B), size: 18),
-                            ],
+                          InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const ManagerTransactionsScreen()),
+                              );
+                            },
+                            child: Row(
+                              children: const [
+                                Text('View All', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.bold)),
+                                SizedBox(width: 4),
+                                Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF64748B)),
+                              ],
+                            ),
                           ),
                         ],
                       ),
