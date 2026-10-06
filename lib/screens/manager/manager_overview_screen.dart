@@ -29,11 +29,17 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
     });
   }
 
+  double _toDouble(dynamic val) {
+    if (val == null) return 0.0;
+    if (val is num) return val.toDouble();
+    return double.tryParse(val.toString()) ?? 0.0;
+  }
+
+
   String _formatAmount(dynamic val, {bool forceShow = false}) {
     if (!forceShow && _isCashMasked) return '••••••';
-    if (val == null) return '0.00';
-    final n = (val is num) ? val.toDouble() : (double.tryParse(val.toString()) ?? 0.0);
-    return n.toStringAsFixed(2);
+    final d = _toDouble(val);
+    return d.toStringAsFixed(2);
   }
 
   @override
@@ -242,8 +248,8 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                         )
                       else
                         ...recentTx.take(3).map((tx) {
-                          final isCredit = tx['type'] == 'CREDIT' || (tx['amount'] != null && tx['amount'] > 0);
-                          final amount = tx['amount'] ?? 0.0;
+                          final amt = _toDouble(tx['amount']);
+                          final isCredit = tx['type'] == 'CREDIT' || amt > 0;
                           final desc = tx['description'] ?? tx['memo'] ?? 'Transaction';
                           final dateStr = tx['createdAt'] != null ? tx['createdAt'].toString().substring(0, 10) : '';
 
@@ -280,7 +286,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${isCredit ? '+' : '-'}৳ ${_formatAmount(amount.abs())}',
+                                  '${isCredit ? '+' : '-'}৳ ${_formatAmount(amt.abs())}',
                                   style: TextStyle(
                                     color: isCredit ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                                     fontSize: 13,

@@ -188,7 +188,8 @@ export class ManagerService {
 
       recentMovements = movements.filter(m => !supersededIds.has(m.id)).slice(0, 3).map(m => ({
         id: m.id,
-        amount: m.amount,
+        amount: Number(m.amount) || 0,
+        fee: Number(m.fee || 0),
         type: m.direction,
         direction: m.direction,
         description: m.notes || 'Transaction',
@@ -205,16 +206,16 @@ export class ManagerService {
         id: targetComp.id,
         name: targetComp.name,
         code: targetComp.code,
-        totalBalance: targetCompanyBalance,
+        totalBalance: Number(targetCompanyBalance) || 0,
       },
       assignedConcerns,
       velocity: {
-        inflow,
-        outflow,
+        inflow: Number(inflow) || 0,
+        outflow: Number(outflow) || 0,
       },
       recentTransactions: recentMovements,
       topEmployees,
-      managerPersonalBalance,
+      managerPersonalBalance: Number(managerPersonalBalance) || 0,
     };
   }
 

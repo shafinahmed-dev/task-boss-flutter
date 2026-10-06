@@ -1,0 +1,74 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/app_state.dart';
+import '../models/models.dart';
+import '../models/wallet_model.dart';
+
+class CaptureMovementScreen extends StatefulWidget {
+  const CaptureMovementScreen({super.key});
+  @override
+  State<CaptureMovementScreen> createState() => _CaptureState();
+}
+
+class _CaptureState extends State<CaptureMovementScreen> {
+  String _flowType = 'INFLOW';
+  Map<String, dynamic>? _selectedCategory;
+  final TextEditingController _categorySearchCtrl = TextEditingController();
+  final TextEditingController _amtCtl = TextEditingController();
+  final TextEditingController _chgCtl = TextEditingController();
+  final TextEditingController _noteCtl = TextEditingController();
+  String? _selectedWalletId;
+  String? _selectedPaymentMethod;
+  bool _saving = false;
+  String? _error;
+  Map<String, dynamic>? _lastSavedReceipt;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDraft();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final app = context.read<AppState>();
+      if (app.effectiveCompanyId.isEmpty) await app.fetchManagerOverview();
+      final cid = app.effectiveCompanyId;
+      if (cid.isNotEmpty) await app.fetchCategories(companyId: cid);
+    });
+  }
+
+  @override
+  void dispose() {
+    _categorySearchCtrl.dispose();
+    _amtCtl.dispose();
+    _chgCtl.dispose();
+    _noteCtl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _flowType = prefs.getString('draft_flow') ?? 'INFLOW';
+        _amtCtl.text = prefs.getString('draft_amt') ?? '';
+        _chgCtl.text = prefs.getString('draft_chg') ?? '';
+        _noteCtl.text = prefs.getString('draft_note') ?? '';
+      });
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('draft_flow', _flowType);
+    await prefs.setString('draft_amt', _amtCtl.text);
+    await prefs.setString('draft_chg', _chgCtl.text);
+    await prefs.setString('draft_note', _noteCtl.text);
+  }
+
+  Future<void> _clearDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('draft_flow');
+    await prefs.remove('draft_amt');
+    await prefs.remove('draft_chg');
+    await prefs.remove('draft_note');
+  }
