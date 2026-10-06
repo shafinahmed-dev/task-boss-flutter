@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:task_boss/services/app_state.dart';
-import 'package:task_boss/utils/show_receipt_modal.dart';
+import '../../services/app_state.dart';
 
 class ManagerTransactionsScreen extends StatefulWidget {
   const ManagerTransactionsScreen({super.key});
@@ -22,180 +21,148 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _searchCtl.dispose();
+    super.dispose();
+  }
+
+  double _toDouble(dynamic val) {
+    if (val == null) return 0.0;
+    if (val is num) return val.toDouble();
+    return double.tryParse(val.toString()) ?? 0.0;
+  }
+
   String _formatAmount(dynamic val) {
-    if (val == null) return '0.00';
-    final n = (val is num) ? val.toDouble() : (double.tryParse(val.toString()) ?? 0.0);
-    return n.toStringAsFixed(2);
+    final d = _toDouble(val);
+    return d.toStringAsFixed(2);
+  }
+
+  String _formatDateTime(dynamic iso) {
+    if (iso == null || iso.toString().isEmpty) return 'Recent';
+    final d = DateTime.tryParse(iso.toString())?.toLocal();
+    if (d == null) return iso.toString();
+    final year = d.year.toString();
+    final month = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    final hour = d.hour > 12 ? d.hour - 12 : (d.hour == 0 ? 12 : d.hour);
+    final minute = d.minute.toString().padLeft(2, '0');
+    final ampm = d.hour >= 12 ? 'PM' : 'AM';
+    return '$year-$month-$day • $hour:$minute $ampm';
   }
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final txList = app.managerTransactionsList.where((tx) {
-      if (_searchQuery.isEmpty) return true;
-      final q = _searchQuery.toLowerCase();
-      final w = tx['wallet']?['name']?.toString().toLowerCase() ?? '';
-      final c = tx['collector']?['name']?.toString().toLowerCase() ?? '';
-      final a = tx['amount']?.toString() ?? '';
-      final s = tx['segmentName']?.toString().toLowerCase() ?? tx['category']?['name']?.toString().toLowerCase() ?? '';
-      final n = tx['note']?.toString().toLowerCase() ?? '';
-      return w.contains(q) || c.contains(q) || a.contains(q) || s.contains(q) || n.contains(q);
+    final List<Map<String, dynamic>> rawList = app.managerTransactionsList.cast<Map<String, dynamic>>();
+
+    final query = _searchQuery.trim().toLowerCase();
+    final filtered = rawList.where((tx) {
+      if (query.isEmpty) return true;
+      final seg = (tx['segmentName'] ?? tx['category']?['name'] ?? '').toString().toLowerCase();
+      final note = (tx['note'] ?? tx['movementType'] ?? '').toString().toLowerCase();
+      final actor = (tx['actorName'] ?? tx['user']?['name'] ?? '').toString().toLowerCase();
+      return seg.contains(query) || note.contains(query) || actor.contains(query);
     }).toList();
-    final matchedSegment = _searchQuery.isNotEmpty 
-      ? app.concernCategories.firstWhere((c) => c['name']?.toString().toLowerCase() == _searchQuery.toLowerCase(), orElse: () => {})
-      : {};
-    
-    double segmentInflow = 0;
-    double segmentOutflow = 0;
-    if (matchedSegment.isNotEmpty) {
-      for (final tx in app.managerTransactionsList) {
-        if (tx['category']?['id'] == matchedSegment['id']) {
-          final amt = (tx['amount'] is num) ? (tx['amount'] as num).toDouble() : (double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0);
-          if (tx['direction'] == 'in') segmentInflow += amt;
-          else segmentOutflow += amt;
+
+    final isSegmentMatch = query.isNotEmpty && rawList.any((tx) {
+      final seg = (tx['segmentName'] ?? tx['category']?['name'] ?? '').toString().toLowerCase();
+      return seg == query;
+    });
+
+    double segmentInflow = 0.0;
+    double segmentOutflow = 0.0;
+    String matchedSegmentTitle = '';
+
+    if (isSegmentMatch) {
+      for (final tx in rawList) {
+        final seg = (tx['segmentName'] ?? tx['category']?['name'] ?? '').toString().toLowerCase();
+        if (seg == query) {
+          matchedSegmentTitle = tx['segmentName']?.toString() ?? tx['category']?['name']?.toString() ?? query;
+          final amt = _toDouble(tx['amount']);
+          final isOut = tx['direction'] == 'out' || tx['type'] == 'Cash Out' || tx['type'] == 'EXPENSE' || tx['movementType'] == 'Cash Out';
+          if (isOut) {
+            segmentOutflow += amt;
+          } else {
+            segmentInflow += amt;
+          }
         }
       }
     }
-    final segmentNet = segmentInflow - segmentOutflow;
-
-
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('All Transactions', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF1E2638),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('All Transactions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: const Color(0xFF0F172A),
+        foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.white,
             child: TextField(
               controller: _searchCtl,
               onChanged: (val) => setState(() => _searchQuery = val),
               decoration: InputDecoration(
-                hintText: 'Search...',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
+                hintText: 'Search by segment, note, or actor...',
+                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF64748B)),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        onPressed: () {
+                          _searchCtl.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
                 filled: true,
-                fillColor: const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                fillColor: const Color(0xFFF1F5F9),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
               ),
             ),
           ),
-          if (matchedSegment.isNotEmpty) ...[
+          if (isSegmentMatch)
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(14), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))]),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('📁 ${matchedSegment['name']}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Expanded(child: Text(matchedSegmentTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis)),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: const Color(0xFF334155), borderRadius: BorderRadius.circular(6)), child: const Text('Segment Book', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.bold))),
+                  ]),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('In: +৳ ${_formatAmount(segmentInflow)}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
-                      Text('Out: -৳ ${_formatAmount(segmentOutflow)}', style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
-                      Text('Net: ৳ ${_formatAmount(segmentNet)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ],
-                  )
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('Total Inflow', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                      const SizedBox(height: 2),
+                      Text('+৳ ${_formatAmount(segmentInflow)}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 14)),
+                    ]),
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('Total Outflow', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                      const SizedBox(height: 2),
+                      Text('-৳ ${_formatAmount(segmentOutflow)}', style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 14)),
+                    ]),
+                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      const Text('Net Balance', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                      const SizedBox(height: 2),
+                      Text('৳ ${_formatAmount(segmentInflow - segmentOutflow)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    ]),
+                  ]),
                 ],
               ),
-            )
-          ],
-              controller: _searchCtl,
-              onChanged: (val) => setState(() => _searchQuery = val),
-              decoration: InputDecoration(
-                hintText: 'Search...',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
-                filled: true,
-                fillColor: const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
             ),
-          ),
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => app.fetchManagerTransactions(),
-              color: const Color(0xFF1E2638),
-              child: txList.isEmpty
-                  ? const Center(child: Text('No transactions found.', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)))
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: txList.length,
-                      itemBuilder: (context, index) {
-                        final tx = txList[index];
-                        final amount = _formatAmount(tx['amount']);
-                        final isIn = (tx['direction'] ?? 'IN').toString().toUpperCase() == 'IN';
-                        final walletName = tx['wallet']?['name'] ?? 'Wallet';
-                        final employeeName = tx['collector']?['name'] ?? tx['custodian']?['name'] ?? 'Employee';
-                        final dateStr = tx['createdAt'] != null ? tx['createdAt'].toString().substring(0, 10) : '';
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE2E8F0)), borderRadius: BorderRadius.circular(12)),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.all(12),
-                            leading: CircleAvatar(
-                              backgroundColor: isIn ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
-                              child: Icon(isIn ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: isIn ? const Color(0xFF16A34A) : const Color(0xFFDC2626)),
-                            ),
-                            title: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(walletName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
-                                Text('${isIn ? '+' : '-'}৳ $amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isIn ? const Color(0xFF16A34A) : const Color(0xFFDC2626))),
-                              ],
-                            ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 4.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(tx['segmentName'] ?? tx['category']?['name'] ?? 'General', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-                                  const SizedBox(height: 2),
-                                  Text('By: ${tx['actorName'] ?? employeeName} (${tx['actorRole'] ?? 'Staff'})', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                                  const SizedBox(height: 2),
-                                  Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-                                ],
-                              ),
-                            ),
-                            onTap: () {
-                              final receiptNo = tx['receiptNo'] ?? tx['_id']?.toString().substring(0, 8).toUpperCase() ?? 'REC';
-                              final date = tx['createdAt'] != null ? DateTime.tryParse(tx['createdAt'].toString()) ?? DateTime.now() : DateTime.now();
-                              final type = tx['direction'] ?? 'IN';
-                              final categoryOrRecipient = tx['collector']?['name'] ?? tx['custodian']?['name'] ?? 'Employee';
-                              final wallet = tx['wallet']?['name'] ?? 'Wallet';
-                              final method = tx['method'] ?? 'Transfer';
-                              final note = tx['note'] ?? 'Manager Transaction';
-                              final amount = (tx['amount'] is num) ? (tx['amount'] as num).toDouble() : (double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0);
-                              final fee = (tx['fee'] is num) ? (tx['fee'] as num).toDouble() : (double.tryParse(tx['fee']?.toString() ?? '0') ?? 0.0);
-
-                              showReceiptModal(
-                                context,
-                                receiptNo: receiptNo,
-                                date: date,
-                                type: type,
-                                categoryOrRecipient: categoryOrRecipient,
-                                wallet: wallet,
-                                method: method,
-                                note: note,
-                                amount: amount,
-                                fee: fee,
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+            child: filtered.isEmpty
+                ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade400), const SizedBox(height: 8), Text(_searchQuery.isNotEmpty ? 'No matching transactions found.' : 'No transactions recorded yet.', style: TextStyle(color: Colors.grey.shade600, fontSize: 14))]))
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    itemCount: filtered.length,
+      
