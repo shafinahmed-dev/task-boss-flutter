@@ -10,14 +10,13 @@ class SuiteTransactionsScreen extends StatefulWidget {
 }
 
 class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
-  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(() => setState(() => _searchQuery = _searchController.text.trim().toLowerCase()));
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
@@ -50,7 +49,7 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
   Widget _buildTransactionList(List<Map<String, dynamic>> transactions) {
@@ -70,13 +69,19 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
         itemCount: transactions.length,
         itemBuilder: (context, index) {
           final tx = transactions[index];
-          final type = (tx['type'] ?? 'INFLOW').toString().toUpperCase();
-          final isInflow = type == 'INFLOW' || type == 'IN';
-          final amount = tx['amount'] ?? 0.0;
-          final description = tx['description'] ?? 'Transaction';
-          final concernCode = (tx['concernCode'] ?? '').toString().toUpperCase();
+          final concernCode = (tx['companyCode'] ?? tx['company']?['code'] ?? 'CONCERN').toString().toUpperCase();
+          final segment = (tx['segmentName'] ?? tx['category']?['name'] ?? 'General').toString();
+          final titleText = '$concernCode • $segment';
+
+          final isOut = tx['direction'] == 'out' || tx['type'] == 'Cash Out' || tx['type'] == 'EXPENSE';
+          final amt = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
+          final formattedAmt = isOut ? '-৳ ${amt.toStringAsFixed(2)}' : '+৳ ${amt.toStringAsFixed(2)}';
+          final color = isOut ? const Color(0xFFEF4444) : const Color(0xFF10B981);
+          final iconBg = isOut ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4);
+          final icon = isOut ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded;
+
           final createdAt = tx['createdAt'];
-          final actorName = tx['actorName'] ?? 'System';
+          final actorName = tx['actorName'] ?? tx['user']?['name'] ?? 'System';
 
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
@@ -93,13 +98,13 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: isInflow ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+                    color: iconBg,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
                   child: Icon(
-                    isInflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                    color: isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                    icon,
+                    color: color,
                     size: 20,
                   ),
                 ),
@@ -108,22 +113,26 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(description, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      Text(
+                        titleText,
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          if (concernCode.isNotEmpty) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                              decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(4)),
-                              child: Text(concernCode, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          Expanded(
-                            child: Text(_formatDate(createdAt), style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ),
-                        ],
+                      Text(
+                        _formatDate(createdAt),
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -132,9 +141,23 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('${isInflow ? '+' : '-'}৳ ${_formatAmount(amount)}', style: TextStyle(color: isInflow ? const Color(0xFF10B981) : const Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
+                    Text(
+                      formattedAmt,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(actorName, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w500)),
+                    Text(
+                      actorName,
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -147,14 +170,24 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final transactions = context.watch<AppState>().suiteTransactions.where((tx) {
-      if (_searchQuery.isEmpty) return true;
-      final q = _searchQuery;
-      return (tx['description'] ?? '').toString().toLowerCase().contains(q) ||
-          (tx['concernName'] ?? '').toString().toLowerCase().contains(q) ||
-          (tx['concernCode'] ?? '').toString().toLowerCase().contains(q) ||
-          (tx['amount'] ?? '').toString().toLowerCase().contains(q) ||
-          (tx['actorName'] ?? '').toString().toLowerCase().contains(q);
+    final rawList = context.watch<AppState>().suiteTransactions;
+    final query = _searchQuery.trim().toLowerCase();
+
+    final transactions = rawList.where((tx) {
+      if (query.isEmpty) return true;
+      final code = (tx['companyCode'] ?? tx['company']?['code'] ?? '').toString().toLowerCase();
+      final company = (tx['companyName'] ?? tx['company']?['name'] ?? '').toString().toLowerCase();
+      final segment = (tx['segmentName'] ?? tx['category']?['name'] ?? '').toString().toLowerCase();
+      final actor = (tx['actorName'] ?? tx['user']?['name'] ?? '').toString().toLowerCase();
+      final note = (tx['note'] ?? '').toString().toLowerCase();
+      final amt = (tx['amount'] ?? '').toString();
+
+      return code.contains(query) ||
+          company.contains(query) ||
+          segment.contains(query) ||
+          actor.contains(query) ||
+          note.contains(query) ||
+          amt.contains(query);
     }).toList();
 
     return Scaffold(
@@ -172,36 +205,36 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14),
-                      decoration: const InputDecoration(
-                        hintText: 'Search transactions...',
-                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  if (_searchController.text.isNotEmpty)
-                    InkWell(
-                      onTap: () => _searchController.clear(),
-                      child: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 18),
-                    ),
-                ],
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: InputDecoration(
+                hintText: 'Search transactions...',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF1E2638)),
+                ),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
               ),
             ),
           ),

@@ -119,10 +119,24 @@ export class SuiteController {
 
   @Get('suite/transactions')
   @HttpCode(HttpStatus.OK)
-  async getSuiteTransactions(@Req() req: any) {
+  async getSuiteTransactions(@Req() req: any, @Query('companyId') companyId?: string, @Query('range') range?: string, @Query('search') search?: string) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) throw new BadRequestException('No tenant associated');
-    return this.suiteService.getSuiteTransactions(tenantId);
+    return this.suiteService.getSuiteTransactions(tenantId, companyId, range, search);
+  }
+
+  @Get('suite/overview')
+  @HttpCode(HttpStatus.OK)
+  async getSuiteOverview(@Req() req: any, @Query('range') range?: string, @Query('companyId') companyId?: string) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('No tenant associated');
+    return this.suiteService.getSuiteOverview(tenantId, range, companyId);
+  }
+
+  @Post('suite/transfer')
+  @HttpCode(HttpStatus.CREATED)
+  async executeInterConcernTransfer(@Req() req: any, @Body() dto: { fromCompanyId: string, toCompanyId: string, fromWalletId: string, toWalletId: string, amount: number, note?: string }) {
+    return this.suiteService.executeInterConcernTransfer(dto, req.user);
   }
 
 

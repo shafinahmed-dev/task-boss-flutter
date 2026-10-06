@@ -35,6 +35,9 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get managerEmployeesList => _managerConcernEmployees;
   List<Map<String, dynamic>> _suiteTransactions = [];
   List<Map<String, dynamic>> get suiteTransactions => _suiteTransactions;
+  Map<String, dynamic> _suiteOverview = {};
+  Map<String, dynamic> get suiteOverview => _suiteOverview;
+
   String? _selectedManagerCompanyId;
   String? get selectedManagerCompanyId => _selectedManagerCompanyId;
   Map<String, dynamic> _managerOverviewData = {};
@@ -678,20 +681,66 @@ class AppState extends ChangeNotifier {
       // offline fallback
     }
   }
-  Future<void> fetchSuiteTransactions() async {
+  Future<void> fetchSuiteTransactions({String? companyId, String? range, String? search}) async {
     if (token == null) return;
     try {
-      final url = Uri.parse('$apiBaseUrl/suite/transactions');
-      final resp = await authRequest('GET', url);
+      final queryParams = <String, String>{};
+      if (companyId != null) queryParams['companyId'] = companyId;
+      if (range != null) queryParams['range'] = range;
+      if (search != null) queryParams['search'] = search;
+      final uri = Uri.parse('$apiBaseUrl/suite/transactions').replace(queryParameters: queryParams);
+      final resp = await authRequest('GET', uri);
       if (resp.statusCode == 200) {
-        final List list = jsonDecode(resp.body);
+        final decoded = jsonDecode(resp.body);
+        final List list = decoded['transactions'] ?? [];
         _suiteTransactions = list.map((item) => Map<String, dynamic>.from(item)).toList();
         notifyListeners();
       }
     } catch (e) {
-      // offline fallback
+      debugPrint('Error fetching suite transactions: $e');
     }
   }
+
+  Future<void> fetchSuiteOverview({String? companyId, String? range}) async {
+    if (token == null) return;
+    try {
+      final queryParams = <String, String>{};
+      if (companyId != null) queryParams['companyId'] = companyId;
+      if (range != null) queryParams['range'] = range;
+      final uri = Uri.parse('$apiBaseUrl/suite/overview').replace(queryParameters: queryParams);
+      final resp = await authRequest('GET', uri);
+      if (resp.statusCode == 200) {
+        _suiteOverview = Map<String, dynamic>.from(jsonDecode(resp.body));
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error fetching suite overview: $e');
+    }
+  }
+
+  Future<void> executeInterConcernTransfer({
+    required String fromWalletId,
+    required String toWalletId,
+    required double amount,
+    String? note,
+  }) async {
+    final resp = await authRequest(
+      'POST',
+      Uri.parse('$apiBaseUrl/suite/transfer'),
+      body: {
+        'fromWalletId': fromWalletId,
+        'toWalletId': toWalletId,
+        'amount': amount,
+        'note': note ?? '',
+      },
+    );
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      notifyListeners();
+      return;
+    }
+    throw Exception(jsonDecode(resp.body)['message'] ?? 'Transfer failed');
+  }
+
 
 
 

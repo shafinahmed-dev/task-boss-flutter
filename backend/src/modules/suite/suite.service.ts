@@ -440,72 +440,64 @@ export class SuiteService {
     return { success: true, message: 'Password updated successfully' };
   }
 
-  async getSuiteTransactions(tenantId: string) {
-    const supersededRows = await this.prisma.moneyMovement.findMany({
-      where: { editedFromId: { not: null } },
-      select: { editedFromId: true },
+
+  async getSuiteTransactions(tenantId: string, companyId?: string, range?: string, search?: string) {
+    const companies = await this.prisma.company.findMany({ where: { tenantId } });
+    if (!companies.length) return { success: true, transactions: [] };
+    
+    let targetIds = companies.map(c => c.id);
+    if (companyId && companyId !== 'null' && companyId !== '') {
+       targetIds = targetIds.filter(id => id === companyId);
+    }
+    
+    let startDate;
+    const now = new Date();
+    if (range === 'today') startDate = new Date(now.setHours(0,0,0,0));
+    else if (range === 'this_week') { const d = new Date(now.setHours(0,0,0,0)); d.setDate(d.getDate() - d.getDay()); startDate = d; }
+    else if (range === 'this_month') startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const movementsWhere = { wallet: { companyId: { in: targetIds } } } as any;
+    if (startDate) movementsWhere.createdAt = { gte: startDate };
+    
+    const movements = await (this.prisma.moneyMovement as any).findMany({
+      where: movementsWhere, orderBy: { createdAt: 'desc' },
+      include: { category: true, collector: true, custodian: true, wallet: true }
     });
-    const supersededIds = new Set(supersededRows.map((r) => r.editedFromId).filter(Boolean) as string[]);
+    
+    const companyMap = new Map();
+    companies.forEach(c => companyMap.set(c.id, c));
 
-    const movements = await this.prisma.moneyMovement.findMany({
-      where: {
-        custodian: {
-          company: {
-            tenantId,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      include: {
-        wallet: {
-          select: {
-            id: true,
-            name: true,
-            company: {
-              select: {
-                name: true,
-                code: true,
-              },
-            },
-          },
-        },
-        collector: {
-          select: {
-            id: true,
-            name: true,
-            role: true,
-          },
-        },
-      },
+    let filtered = movements.map((tx: any) => {
+      const c = companyMap.get(tx.wallet?.companyId);
+      
+      const companyCode = c?.code || (c?.name ? c.name.split(' ').map((w: string) => w[0]).join('').toUpperCase() : 'CONCERN');
+      const segmentName = tx.category?.name || 'General';
+      const isOut = tx.direction === 'out' || tx.direction === 'OUT' || tx.type === 'CASH_OUT' || tx.type === 'EXPENSE' || tx.movementType === 'Cash Out' || tx.movementType === 'Expense';
+
+      return {
+        id: tx.id,
+        companyId: tx.wallet?.companyId,
+        companyName: c?.name || 'Unknown Concern',
+        companyCode: companyCode,
+        segmentName: segmentName,
+        amount: Number(tx.amount || 0),
+        fee: Number(tx.fee || 0),
+        direction: isOut ? 'out' : 'in',
+        type: isOut ? 'Cash Out' : 'Cash In',
+        note: tx.note || tx.notes || tx.movementType || '',
+        actorName: tx.user?.name || tx.collector?.name || tx.custodian?.name || 'System',
+        actorRole: tx.user?.role || tx.collector?.role || 'STAFF',
+        createdAt: tx.createdAt.toISOString(),
+      };
     });
 
-    return movements
-      .filter((m) => !supersededIds.has(m.id))
-      .map((m) => {
-        const direction = m.direction.toUpperCase();
-        const type = direction === 'IN' ? 'INFLOW' : 'OUTFLOW';
-        const amount = Number(m.amount) || 0;
-        const description = m.notes || m.entryTag || 'Transaction';
-        const walletObj = m.wallet as any;
-        const concernName = walletObj?.company?.name || 'General';
-        const concernCode = walletObj?.company?.code || '';
-        const collectorObj = m.collector as any;
-        const actorName = collectorObj?.name || 'System';
 
-        return {
-          id: m.id,
-          amount,
-          type,
-          description,
-          createdAt: m.createdAt.toISOString(),
-          concernName,
-          concernCode,
-          actorName,
-        };
-      });
+    if (search && search.trim() !== '') {
+       const q = search.trim().toLowerCase();
+       filtered = filtered.filter((f: any) => f.segmentName.toLowerCase().includes(q) || f.actorName.toLowerCase().includes(q) || f.companyName.toLowerCase().includes(q) || f.note.toLowerCase().includes(q));
+    }
+    return { success: true, transactions: filtered };
   }
-
   async getConcernBreakdown(tenantId: string, id: string) {
     const company = await this.prisma.company.findFirst({
       where: { id, tenantId },
@@ -585,5 +577,116 @@ export class SuiteService {
       },
       members,
     };
+  }
+
+  async getSuiteOverview(tenantId: string, range?: string, companyId?: string) {
+    const companies = await this.prisma.company.findMany({ 
+      where: { tenantId }, 
+      include: { users: { include: { user: { include: { custodianAccounts: true } } } } } 
+    });
+    
+    let targetIds = companies.map(c => c.id);
+    if (companyId && companyId !== 'null' && companyId !== '') {
+       targetIds = targetIds.filter(id => id === companyId);
+    }
+    const targetCompanies = companies.filter(c => targetIds.includes(c.id));
+    
+    let startDate;
+    const now = new Date();
+    if (range === 'today') startDate = new Date(now.setHours(0,0,0,0));
+    else if (range === 'this_week') { const d = new Date(now.setHours(0,0,0,0)); d.setDate(d.getDate() - d.getDay()); startDate = d; }
+    else if (range === 'this_month') startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const movementsWhere = { wallet: { companyId: { in: targetIds } } } as any;
+    if (startDate) movementsWhere.createdAt = { gte: startDate };
+    const movements = await (this.prisma.moneyMovement as any).findMany({
+       where: movementsWhere,
+       include: { wallet: true }
+    });
+    
+    const supersededRows = await this.prisma.moneyMovement.findMany({ where: { editedFromId: { not: null } }, select: { editedFromId: true } });
+    const supersededIds = new Set(supersededRows.map((r) => r.editedFromId).filter(Boolean));
+
+    let consolidatedBalance = 0;
+    let inflow = 0; let outflow = 0; 
+    const companyStats = {} as any;
+    for (const comp of targetCompanies) companyStats[comp.id] = { inflow: 0, outflow: 0, bal: 0 };
+    
+    for (const m of movements) {
+      if (supersededIds.has(m.id)) continue;
+      const isOut = m.direction === 'out' || m.direction === 'OUT' || m.type === 'CASH_OUT' || m.type === 'EXPENSE' || m.movementType === 'Cash Out' || m.movementType === 'Expense';
+      const amt = Number(m.amount || 0); const mappedDir = isOut ? 'out' : 'in';
+      if (mappedDir === 'in') inflow += amt; else outflow += amt;
+      const cId = m.wallet?.companyId;
+      if (cId && companyStats[cId]) { if (mappedDir === 'in') companyStats[cId].inflow += amt; else companyStats[cId].outflow += amt; }
+    }
+    
+    const allMovements = await (this.prisma.moneyMovement as any).findMany({
+       where: { wallet: { companyId: { in: targetIds } } },
+       include: { wallet: true, custodian: { include: { user: true } } }
+    });
+    
+    const wBals = new Map();
+    for (const m of allMovements) {
+       if (supersededIds.has(m.id)) continue;
+       const isOut = m.direction === 'out' || m.direction === 'OUT' || m.type === 'CASH_OUT' || m.type === 'EXPENSE' || m.movementType === 'Cash Out' || m.movementType === 'Expense';
+       const amt = Number(m.amount || 0); const fee = Number(m.fee || 0);
+       const dir = isOut ? -1 : 1;
+       const wId = m.walletId;
+       if (!wBals.has(wId)) wBals.set(wId, { cId: m.wallet.companyId, custName: m.custodian?.user?.name || m.custodian?.name || 'Unknown', bal: 0 });
+       const w = wBals.get(wId);
+       w.bal += (dir === 1 ? amt : -(amt + fee));
+    }
+    
+    for (const w of wBals.values()) {
+       if (w.bal > 0) {
+          consolidatedBalance += w.bal;
+          if (companyStats[w.cId]) companyStats[w.cId].bal += w.bal;
+       }
+    }
+    
+    const companyMap = new Map();
+    companies.forEach(c => companyMap.set(c.id, c));
+    
+    const custodianExposure = [];
+    for (const w of wBals.values()) {
+       if (w.bal > 0) {
+          const c = companyMap.get(w.cId);
+          custodianExposure.push({
+             custodianName: w.custName,
+             concernCode: c?.code || 'Gen',
+             concernName: c?.name || 'General',
+             balance: w.bal
+          });
+       }
+    }
+    custodianExposure.sort((a,b) => b.balance - a.balance);
+    const topExposure = custodianExposure.slice(0, 20);
+    
+    const netVelocity = inflow - outflow;
+    const perCompanyPerformance = targetCompanies.map((comp) => {
+      let activeCustodiansCount = 0;
+      for (const uc of (comp.users as any) || []) {
+        if (uc.user?.custodianAccounts?.length) activeCustodiansCount += uc.user.custodianAccounts.length;
+      }
+      return { id: comp.id, name: comp.name, code: comp.code, currentBalance: companyStats[comp.id]?.bal || 0, inflow: companyStats[comp.id]?.inflow || 0, outflow: companyStats[comp.id]?.outflow || 0, activeCustodiansCount };
+    });
+    
+    return { success: true, consolidatedBalance, inflow, outflow, netVelocity, companies: perCompanyPerformance, custodianExposure: topExposure };
+  }
+
+  async executeInterConcernTransfer(dto: { fromCompanyId: string, toCompanyId: string, fromWalletId: string, toWalletId: string, amount: number, note?: string }, reqUser: any) {
+    if (!dto.fromWalletId || !dto.toWalletId) throw new BadRequestException('Source and destination wallets required');
+    if (dto.amount <= 0) throw new BadRequestException('Amount must be greater than 0');
+    return await this.prisma.$transaction(async (tx: any) => {
+      const fromW = await tx.wallet.findUnique({ where: { id: dto.fromWalletId } });
+      const toW = await tx.wallet.findUnique({ where: { id: dto.toWalletId } });
+      if (!fromW || !toW) throw new BadRequestException('Invalid wallets');
+      
+      const uniquePrefix = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+      await tx.moneyMovement.create({ data: { idempotencyKey: `tx_out_${uniquePrefix}`, walletId: fromW.id, direction: 'out', amount: dto.amount, channel: 'cash', collectorId: reqUser?.id || reqUser?.sub, custodianId: fromW.custodianId, entryTag: 'INTER_COMPANY_TRANSFER', notes: dto.note || 'Inter-concern transfer out', occurredAt: new Date() } as any });
+      await tx.moneyMovement.create({ data: { idempotencyKey: `tx_in_${uniquePrefix}`, walletId: toW.id, direction: 'in', amount: dto.amount, channel: 'cash', collectorId: reqUser?.id || reqUser?.sub, custodianId: toW.custodianId, entryTag: 'INTER_COMPANY_TRANSFER', notes: dto.note || 'Inter-concern transfer in', occurredAt: new Date() } as any });
+      return { success: true, message: 'Inter-concern transfer completed successfully' };
+    });
   }
 }
