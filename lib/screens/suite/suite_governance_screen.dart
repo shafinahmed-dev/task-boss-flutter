@@ -527,6 +527,42 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     );
   }
 
+  Widget _buildConcernBadge(dynamic data) {
+    String badgeText = '';
+
+    if (data is Map) {
+      if (data['concernBadge'] != null && data['concernBadge'].toString().isNotEmpty) {
+        badgeText = data['concernBadge'].toString();
+      } else if (data['companyCodes'] is List && (data['companyCodes'] as List).isNotEmpty) {
+        badgeText = (data['companyCodes'] as List).join(' • ');
+      } else if (data['companyCode'] != null) {
+        badgeText = data['companyCode'].toString();
+      }
+    }
+
+    // Strip any accidental brackets
+    badgeText = badgeText.replaceAll('[', '').replaceAll(']', '').trim();
+    if (badgeText.isEmpty) badgeText = 'TDC';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        badgeText,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
+
   Widget _buildManageTab(BuildContext context, AppState app) {
     final concerns = app.concerns;
     final managers = app.managers;
@@ -654,14 +690,9 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                           children: [
                             Row(
                               children: [
-                                Text(m['name'] ?? '', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
+                                Text(m['name'] ?? 'Manager', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
                                 const SizedBox(width: 8),
-                                if (compList.isNotEmpty && (compList[0]['code'] ?? '').toString().isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(6)),
-                                    child: Text(compList[0]['code'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                  ),
+                                _buildConcernBadge(m),
                               ],
                             ),
                             const SizedBox(height: 2),
@@ -689,19 +720,6 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                       IconButton(icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)), onPressed: () => _confirmDeleteManager(context, mId)),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  if (compList.length > 1)
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: compList.skip(1).map<Widget>((comp) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                          child: Text(comp['code'] ?? comp['name'] ?? '', style: const TextStyle(color: Color(0xFF475569), fontSize: 11, fontWeight: FontWeight.w600)),
-                        );
-                      }).toList(),
-                    ),
                   const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -762,15 +780,9 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                           children: [
                             Row(
                               children: [
-                                Text(e['name'] ?? '', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
-                                if (compCode.isNotEmpty) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(4)),
-                                    child: Text('[$compCode]', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
+                                Text(e['name'] ?? 'Staff', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 8),
+                                _buildConcernBadge(e),
                               ],
                             ),
                             const SizedBox(height: 2),

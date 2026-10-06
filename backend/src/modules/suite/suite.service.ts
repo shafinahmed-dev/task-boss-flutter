@@ -166,10 +166,23 @@ export class SuiteService {
           balance += calculateWalletBalance(w);
         }
       }
+
+      const managerCompanyCodes = ((m as any).companies || []).map((uc: any) => {
+        const comp = uc.company;
+        if (!comp) return 'CONCERN';
+        return comp.code || (comp.name ? comp.name.split(' ').map((w: string) => w[0]).join('').toUpperCase() : 'CONCERN');
+      });
+
+      if (managerCompanyCodes.length === 0) {
+        managerCompanyCodes.push('TDC');
+      }
+
       return {
         id: m.id, handle: m.handle, name: m.name, email: m.email, phone: m.phone, designation: m.designation,
         department: m.department, role: m.role, rawPassword: m.rawPassword ?? null, companies: (m as any).companies?.map((uc: any) => uc.company) ?? [], createdAt: m.createdAt,
         balance,
+        companyCodes: managerCompanyCodes,
+        concernBadge: managerCompanyCodes.join(' • '),
       };
     });
   }
@@ -496,6 +509,15 @@ export class SuiteService {
         }
       }
 
+      const empCompanyCodes = (emp.companies || []).map((uc: any) => {
+        const comp = uc.company;
+        return comp?.code || comp?.name?.split(' ').map((w: string) => w[0]).join('').toUpperCase() || 'TDC';
+      });
+
+      if (empCompanyCodes.length === 0) {
+        empCompanyCodes.push('TDC');
+      }
+
       return {
         id: emp.id,
         name: emp.name,
@@ -509,6 +531,8 @@ export class SuiteService {
         managerName: managerName,
         balance: Number(balance),
         rawPassword: emp.rawPassword || '••••••••',
+        companyCodes: empCompanyCodes,
+        concernBadge: empCompanyCodes.join(' • '),
       };
     });
 
