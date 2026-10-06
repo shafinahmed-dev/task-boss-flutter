@@ -49,28 +49,51 @@ export class CustodyService {
       return existing;
     }
 
-    // Validate both custodians exist in same company
-    const [from, to] = await Promise.all([
-      this.prisma.custodianAccount.findUnique({
-        where: { id: dto.fromCustodianId },
-      }),
-      this.prisma.custodianAccount.findUnique({
-        where: { id: dto.toCustodianId },
-      }),
-    ]);
+    // 1. Fetch sender custodian by ID directly
+    const senderCustodian = await this.prisma.custodianAccount.findUnique({
+      where: { id: dto.fromCustodianId },
+      include: { company: true },
+    });
 
-    if (!from || from.companyId !== dto.companyId) {
-      throw new NotFoundException(
-        `Sender custodian ${dto.fromCustodianId} not found in company ${dto.companyId}`,
-      );
+    if (!senderCustodian) {
+      throw new BadRequestException('Unable to complete handover. Sender account could not be found.');
     }
-    if (!to || to.companyId !== dto.companyId) {
-      throw new NotFoundException(
-        `Receiver custodian ${dto.toCustodianId} not found in company ${dto.companyId}`,
-      );
+
+    // 3. Operational company is naturally the custodian wallet's company
+    const operationalCompanyId = senderCustodian.companyId;
+
+    // Fetch original requested recipient custodian to understand who they are
+    const originalToCustodian = await this.prisma.custodianAccount.findUnique({
+      where: { id: dto.toCustodianId },
+    });
+    if (!originalToCustodian || !originalToCustodian.linkedUserId) {
+      throw new BadRequestException('Unable to complete handover. Recipient account could not be resolved.');
     }
-    if (dto.fromCustodianId === dto.toCustodianId) {
-      throw new ConflictException('Cannot transfer to the same custodian');
+
+    const receiverUserId = originalToCustodian.linkedUserId;
+
+    // 4. Resolve / Auto-heal recipient custodian under the operational company
+    let receiverCustodian = await this.prisma.custodianAccount.findFirst({
+      where: {
+        linkedUserId: receiverUserId,
+        companyId: operationalCompanyId,
+      },
+    });
+
+    if (!receiverCustodian) {
+      // If recipient doesn't have a custodian account in this concern yet, auto-create it
+      receiverCustodian = await this.prisma.custodianAccount.create({
+        data: {
+          linkedUserId: receiverUserId,
+          companyId: operationalCompanyId,
+          name: originalToCustodian.name,
+          type: 'person',
+        },
+      });
+    }
+
+    if (senderCustodian.id === receiverCustodian.id) {
+      throw new ConflictException('Unable to complete handover. Cannot transfer to the same account.');
     }
 
     let fromWalletId = dto.fromWalletId || dto.metadata?.fromWalletId || dto.metadata?.walletId;
@@ -82,7 +105,7 @@ export class CustodyService {
       });
       if (!wallet || wallet.custodianId !== dto.fromCustodianId) {
         throw new NotFoundException(
-          `Sender wallet ${fromWalletId} not found or does not belong to sender custodian`,
+          `Unable to complete handover. Wallet is invalid or does not belong to your account.`,
         );
       }
 
@@ -103,7 +126,7 @@ export class CustodyService {
       const totalNeeded = dto.amount + feeVal;
       if (currentBalance < totalNeeded) {
         throw new BadRequestException(
-          `Insufficient wallet balance (Available: ৳${currentBalance.toFixed(2)}, Required: ৳${totalNeeded.toFixed(2)})`,
+          `Ensure you have sufficient balance (Available: ৳${currentBalance.toFixed(2)}, Required: ৳${totalNeeded.toFixed(2)}).`,
         );
       }
     }
@@ -114,8 +137,9 @@ export class CustodyService {
     const created = await this.prisma.custodyTransfer.create({
       data: {
         idempotencyKey: dto.idempotencyKey,
-        fromCustodianId: dto.fromCustodianId,
-        toCustodianId: dto.toCustodianId,
+        companyId: operationalCompanyId,
+        fromCustodianId: senderCustodian.id,
+        toCustodianId: receiverCustodian.id,
         fromWalletId: fromWalletId ?? null,
         toWalletId: dto.toWalletId ?? null,
         amount: new Decimal(dto.amount),
@@ -150,7 +174,7 @@ export class CustodyService {
       where: { id: transferId },
     });
     if (!transfer) {
-      throw new NotFoundException(`Transfer ${transferId} not found`);
+      throw new NotFoundException("Unable to complete handover. Transfer could not be found.");
     }
     if (transfer.status === 'confirmed') {
       return transfer; // already confirmed — idempotent
@@ -280,7 +304,7 @@ export class CustodyService {
       where: { id: transferId },
     });
     if (!transfer) {
-      throw new NotFoundException(`Transfer ${transferId} not found`);
+      throw new NotFoundException("Unable to complete handover. Transfer could not be found.");
     }
     if (transfer.status === 'confirmed') {
       throw new ConflictException('Cannot dispute a confirmed transfer');

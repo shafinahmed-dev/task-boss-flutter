@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/screens/account_screen.dart';
-import 'package:task_boss/screens/notifications_screen.dart';
+import 'package:task_boss/widgets/notifications_sheet.dart';
 
 class AppHeaderBar extends StatefulWidget {
   const AppHeaderBar({super.key});
@@ -175,42 +175,31 @@ class _AppHeaderBarState extends State<AppHeaderBar> {
   }
 
   Widget _buildNotificationBell(BuildContext context, int pendingCount) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(6),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            const Icon(
-              Icons.notifications_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-            if (pendingCount > 0)
-              Positioned(
-                right: 0,
-                top: 0,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF161F2E),
-                      width: 1.5,
-                    ),
+    return IconButton(
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
+          if (pendingCount > 0)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFF161F2E),
+                    width: 1.5,
                   ),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
+      onPressed: () => NotificationsSheet.show(context),
     );
   }
 }
