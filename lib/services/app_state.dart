@@ -722,14 +722,28 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchManagerOverview({String? companyId, String period = 'month'}) async {
-    final cid = companyId ?? _selectedManagerCompanyId ?? '';
-    if (token == null) return;
+  Future<void> fetchManagerOverview({String? companyId, String? range}) async {
     try {
-      final url = Uri.parse('$apiBaseUrl/manager/overview?companyId=$cid&period=$period');
-      final resp = await authRequest('GET', url);
-      if (resp.statusCode == 200) {
-        _managerOverviewData = Map<String, dynamic>.from(jsonDecode(resp.body));
+      final cid = companyId ?? _selectedManagerCompanyId ?? '';
+      if (cid.isEmpty && _selectedManagerCompanyId == null) {
+        // Will be assigned on first load if missing
+      }
+      if (token == null) return;
+      
+      final query = range != null && range.isNotEmpty
+          ? '?companyId=$cid&range=$range'
+          : '?companyId=$cid';
+          
+      final url = Uri.parse('$apiBaseUrl/manager/overview$query');
+      final response = await authRequest('GET', url);
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          _managerOverviewData = Map<String, dynamic>.from(decoded);
+        } else if (decoded is Map) {
+          _managerOverviewData = Map<String, dynamic>.from(decoded);
+        }
         
         if (_selectedManagerCompanyId == null || _selectedManagerCompanyId!.isEmpty) {
           final comp = _managerOverviewData['company'] as Map<String, dynamic>?;
@@ -744,7 +758,9 @@ class AppState extends ChangeNotifier {
         
         notifyListeners();
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('fetchManagerOverview error: $e');
+    }
   }
 
   Future<void> fetchManagerConcernEmployees({String? companyId}) async {

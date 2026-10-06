@@ -8,14 +8,14 @@ export class ManagerController {
   constructor(private readonly managerService: ManagerService) {}
 
   @Get('overview')
-  async getOverview(@Req() req: any, @Query('companyId') companyId?: string, @Query('period') period: 'today'|'week'|'month'|'all' = 'month') {
+  async getOverview(@Req() req: any, @Query('companyId') companyId?: string, @Query('range') range?: string) {
     if (req.user?.role === 'EMPLOYEE') throw new ForbiddenException();
     const tenantId = req.user?.tenantId;
     const authorizedCompanyIds = req.user?.companyIds;
     const userId = req.user?.id || req.user?.sub || req.user?.userId;
     if (!tenantId || !authorizedCompanyIds || !userId) throw new BadRequestException('Invalid user context');
     const targetCompanyId = (!companyId || companyId === '') ? authorizedCompanyIds[0] : companyId;
-    return this.managerService.getOverview(tenantId, authorizedCompanyIds, userId, targetCompanyId, period);
+    return this.managerService.getOverview(tenantId, authorizedCompanyIds, userId, targetCompanyId, range);
   }
 
   @Get('transactions')

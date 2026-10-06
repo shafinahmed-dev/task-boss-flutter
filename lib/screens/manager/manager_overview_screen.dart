@@ -17,14 +17,14 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
   static const Color borderColor = Color(0xFFE2E8F0);
 
   bool _isCashMasked = false;
-  String _selectedPeriod = 'month';
+  String _selectedFilter = 'this_month';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final app = context.read<AppState>();
-      app.fetchManagerOverview(period: _selectedPeriod);
+      app.fetchManagerOverview(range: _selectedFilter);
       app.fetchManagerConcernEmployees();
     });
   }
@@ -53,8 +53,10 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
     final staffList = (ov['employees'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? topEmployees;
     
     final companyTotalBalance = company['totalBalance'] ?? 0.0;
-    final inflow = ov['totalInflow'] ?? 0.0;
-    final outflow = ov['totalOutflow'] ?? 0.0;
+    final rawInflow = ov['inflow'] ?? ov['totalInflow'] ?? 0.0;
+    final rawOutflow = ov['outflow'] ?? ov['totalOutflow'] ?? 0.0;
+    final inflowAmt = _toDouble(rawInflow);
+    final outflowAmt = _toDouble(rawOutflow);
     final personalCash = ov['personalCash'] ?? 0.0;
 
     return Scaffold(
@@ -62,7 +64,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            await app.fetchManagerOverview(period: _selectedPeriod);
+            await app.fetchManagerOverview(range: _selectedFilter);
             await app.fetchManagerConcernEmployees();
           },
           color: navyColor,
@@ -143,11 +145,11 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                     children: [
                       _buildPeriodChip('Today', 'today', app),
                       const SizedBox(width: 8),
-                      _buildPeriodChip('This Week', 'week', app),
+                      _buildPeriodChip('This Week', 'this_week', app),
                       const SizedBox(width: 8),
-                      _buildPeriodChip('This Month', 'month', app),
+                      _buildPeriodChip('This Month', 'this_month', app),
                       const SizedBox(width: 8),
-                      _buildPeriodChip('All Time', 'all', app),
+                      _buildPeriodChip('All Time', 'all_time', app),
                     ],
                   ),
                 ),
@@ -176,7 +178,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                             children: [
                               const Text('Inflow', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
                               const SizedBox(height: 2),
-                              Text('৳ ${_formatAmount(inflow)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                              Text('৳ ${_formatAmount(inflowAmt)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ],
@@ -205,7 +207,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                             children: [
                               const Text('Outflow', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
                               const SizedBox(height: 2),
-                              Text('৳ ${_formatAmount(outflow)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                              Text('৳ ${_formatAmount(outflowAmt)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ],
@@ -394,9 +396,12 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
 
 
   Widget _buildPeriodChip(String label, String value, AppState app) {
-    final isSelected = _selectedPeriod == value;
+    final isSelected = _selectedFilter == value;
     return InkWell(
-      onTap: () => setState(() => _selectedPeriod = value),
+      onTap: () {
+        setState(() => _selectedFilter = value);
+        app.fetchManagerOverview(range: value);
+      },
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

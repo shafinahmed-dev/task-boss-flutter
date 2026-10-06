@@ -27,7 +27,7 @@ export class ManagerService {
     return Math.max(0, balance);
   }
 
-  async getOverview(tenantId: string, authorizedCompanyIds: string[], userId: string, requestedCompanyId?: string, period: 'today' | 'week' | 'month' | 'all' = 'month') {
+  async getOverview(tenantId: string, authorizedCompanyIds: string[], userId: string, requestedCompanyId?: string, range: string = 'month') {
     let managerPersonalBalance = 0;
     const managerCustodianAccounts = await this.prisma.custodianAccount.findMany({
       where: { linkedUserId: userId },
@@ -56,6 +56,57 @@ export class ManagerService {
     }
     if (!authorizedCompanyIds.includes(targetCompanyId)) {
       throw new ForbiddenException('Not authorized for this concern');
+    }
+
+    try {
+      // Backfill missing directions for legacy/recent records
+      await (this.prisma.moneyMovement as any).updateMany({
+        where: {
+          companyId: targetCompanyId,
+          direction: null,
+          OR: [
+            { type: { in: ['CASH_IN', 'INFLOW', 'in'] } },
+            { movementType: { in: ['Cash In', 'Inflow'] } },
+          ],
+        },
+        data: { direction: 'in' },
+      });
+
+      await (this.prisma.moneyMovement as any).updateMany({
+        where: {
+          companyId: targetCompanyId,
+          direction: null,
+          OR: [
+            { type: { in: ['CASH_OUT', 'EXPENSE', 'OUTFLOW', 'out'] } },
+            { movementType: { in: ['Cash Out', 'Expense', 'Outflow'] } },
+          ],
+        },
+        data: { direction: 'out' },
+      });
+    } catch (e) {
+      // Non-blocking log if schema lacks updateMany
+    }
+
+    let dateFilter: any = {};
+    if (range) {
+      const normalized = range.toLowerCase().replace(/[\s_-]+/g, '');
+      const now = new Date();
+
+      if (normalized === 'today') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        dateFilter = { createdAt: { gte: start } };
+      } else if (normalized === 'thisweek' || normalized === 'week') {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        const start = new Date(now.getFullYear(), now.getMonth(), diff);
+        start.setHours(0, 0, 0, 0);
+        dateFilter = { createdAt: { gte: start } };
+      } else if (normalized === 'thismonth' || normalized === 'month') {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        dateFilter = { createdAt: { gte: start } };
+      } else if (normalized === 'alltime' || normalized === 'all') {
+        dateFilter = {};
+      }
     }
 
     const assignedCompanies = await this.prisma.company.findMany({
@@ -138,16 +189,6 @@ export class ManagerService {
       rawPassword: item.user.rawPassword ?? null,
     }));
 
-    const now = new Date();
-    let startDate = new Date(0);
-    if (period === 'today') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else if (period === 'week') {
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    } else if (period === 'month') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-
     const targetWalletIds: string[] = [];
     for (const uc of targetComp.users) {
       for (const ca of uc.user.custodianAccounts) {
@@ -157,15 +198,47 @@ export class ManagerService {
       }
     }
 
-    let inflow = 0;
-    let outflow = 0;
+    let totalInflow = 0;
+    let totalOutflow = 0;
     let recentMovements: any[] = [];
 
     if (targetWalletIds.length > 0) {
+      try {
+        const inflowAgg: any = await (this.prisma.moneyMovement as any).aggregate({
+          where: {
+            walletId: { in: targetWalletIds },
+            ...dateFilter,
+            OR: [
+              { direction: { in: ['in', 'IN'] } },
+              { type: { in: ['CASH_IN', 'INFLOW'] } },
+              { movementType: { in: ['Cash In', 'Inflow'] } },
+            ],
+          },
+          _sum: { amount: true },
+        });
+
+        const outflowAgg: any = await (this.prisma.moneyMovement as any).aggregate({
+          where: {
+            walletId: { in: targetWalletIds },
+            ...dateFilter,
+            OR: [
+              { direction: { in: ['out', 'OUT'] } },
+              { type: { in: ['CASH_OUT', 'EXPENSE', 'OUTFLOW'] } },
+              { movementType: { in: ['Cash Out', 'Expense', 'Outflow'] } },
+            ],
+          },
+          _sum: { amount: true },
+        });
+        totalInflow = Number(inflowAgg?._sum?.amount || 0);
+        totalOutflow = Number(outflowAgg?._sum?.amount || 0);
+      } catch (e) {
+        // Fallback for aggregations handled in next block
+      }
+
       const movements = await this.prisma.moneyMovement.findMany({
         where: {
           walletId: { in: targetWalletIds },
-          createdAt: { gte: startDate },
+          ...dateFilter,
         },
         orderBy: { createdAt: 'desc' },
         include: {
@@ -176,14 +249,25 @@ export class ManagerService {
         },
       });
 
-      for (const m of movements) {
-        if (supersededIds.has(m.id)) continue;
-        const amt = Number(m.amount) || 0;
-        const dir = m.direction?.toLowerCase() || 'in';
-        if (dir === 'in') {
-          inflow += amt;
-        } else {
-          outflow += amt;
+      if (totalInflow === 0 && totalOutflow === 0) {
+        for (const m of movements) {
+          if (supersededIds.has(m.id)) continue;
+          const amt = Number(m.amount) || 0;
+          let dir = m.direction?.toLowerCase();
+          if (!dir) {
+             const mAny = m as any;
+             if (['inflow','cash_in','cash in'].includes(mAny.type?.toLowerCase() || '') || ['inflow','cash_in','cash in'].includes(mAny.movementType?.toLowerCase() || '')) {
+                dir = 'in';
+             } else if (['outflow','expense','cash_out','cash out'].includes(mAny.type?.toLowerCase() || '') || ['outflow','expense','cash_out','cash out'].includes(mAny.movementType?.toLowerCase() || '')) {
+                dir = 'out';
+             }
+          }
+          const finalDir = dir || 'in';
+          if (finalDir === 'in') {
+            totalInflow += amt;
+          } else {
+            totalOutflow += amt;
+          }
         }
       }
 
@@ -204,19 +288,28 @@ export class ManagerService {
       }));
     }
 
+    const companyData = {
+      id: targetComp.id,
+      name: targetComp.name,
+      code: targetComp.code,
+      totalBalance: Number(targetCompanyBalance) || 0,
+    };
+
     return {
-      company: {
-        id: targetComp.id,
-        name: targetComp.name,
-        code: targetComp.code,
-        totalBalance: Number(targetCompanyBalance) || 0,
-      },
-      assignedConcerns,
+      company: companyData,
+      balance: Number(targetCompanyBalance) || 0,
+      totalBalance: Number(targetCompanyBalance) || 0,
+      inflow: totalInflow,
+      totalInflow: totalInflow,
+      outflow: totalOutflow,
+      totalOutflow: totalOutflow,
       velocity: {
-        inflow: Number(inflow) || 0,
-        outflow: Number(outflow) || 0,
+        inflow: totalInflow,
+        outflow: totalOutflow,
       },
       recentTransactions: recentMovements,
+      custodians: [],
+      assignedConcerns,
       topEmployees,
       managerPersonalBalance: Number(managerPersonalBalance) || 0,
     };
