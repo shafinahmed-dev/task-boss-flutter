@@ -621,7 +621,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Managing Accounts (${managers.length})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            Text('Managers (${managers.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             ElevatedButton.icon(
               onPressed: () => _showAddManagerModal(context),
               icon: const Icon(Icons.add, size: 16),
@@ -667,6 +667,22 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                             const SizedBox(height: 2),
                             Text('@${m['handle'] ?? ''}', style: const TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.w600)),
                           ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Text(
+                          '৳ ${_formatAmount(m['balance'])}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF16A34A),
+                          ),
                         ),
                       ),
                       IconButton(icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)), onPressed: () => _showEditManagerModal(context, m)),
@@ -718,7 +734,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Employee Accounts (${employees.length} Staff)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            Text('Employees (${employees.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
           ],
         ),
         const SizedBox(height: 12),
@@ -758,7 +774,14 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                               ],
                             ),
                             const SizedBox(height: 2),
-                            Text('@${e['handle'] ?? ''} • ${e['designation'] ?? 'Staff'}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                            Text(
+                              '@${e['handle'] ?? ''} • ${e['designation'] ?? 'Staff'} • Managed by ${e['managerName'] ?? 'Manager'}',
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
                       ),

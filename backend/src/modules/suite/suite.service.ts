@@ -131,13 +131,47 @@ export class SuiteService {
   async getManagers(tenantId: string) {
     const managers = await this.prisma.user.findMany({
       where: { tenantId, role: 'MANAGER' },
-      include: { companies: { include: { company: { select: { id: true, name: true, code: true } } } } },
+      include: { 
+        companies: { include: { company: { select: { id: true, name: true, code: true } } } },
+        custodianAccounts: {
+          include: { wallets: { include: { movements: true } } }
+        }
+      },
       orderBy: { createdAt: 'desc' },
     });
-    return managers.map(m => ({
-      id: m.id, handle: m.handle, name: m.name, email: m.email, phone: m.phone, designation: m.designation,
-      department: m.department, role: m.role, rawPassword: m.rawPassword ?? null, companies: m.companies?.map(uc => uc.company) ?? [], createdAt: m.createdAt,
-    }));
+
+    const supersededRows = await this.prisma.moneyMovement.findMany({
+      where: { editedFromId: { not: null } },
+      select: { editedFromId: true },
+    });
+    const supersededIds = new Set(supersededRows.map((r) => r.editedFromId).filter(Boolean) as string[]);
+
+    const calculateWalletBalance = (wallet: any) => {
+      let balance = 0;
+      for (const m of wallet.movements) {
+        if (supersededIds.has(m.id)) continue;
+        const amt = Number(m.amount) || 0;
+        const fee = m.fee ? Number(m.fee) : 0;
+        if (m.direction.toUpperCase() === 'IN') balance += amt;
+        else balance -= (amt + fee);
+      }
+      return Math.max(0, balance);
+    };
+
+    return managers.map(m => {
+      let balance = 0;
+      for (const ca of m.custodianAccounts) {
+        for (const w of ca.wallets) {
+          if (w.isArchived) continue;
+          balance += calculateWalletBalance(w);
+        }
+      }
+      return {
+        id: m.id, handle: m.handle, name: m.name, email: m.email, phone: m.phone, designation: m.designation,
+        department: m.department, role: m.role, rawPassword: m.rawPassword ?? null, companies: (m as any).companies?.map((uc: any) => uc.company) ?? [], createdAt: m.createdAt,
+        balance,
+      };
+    });
   }
 
   async provisionManager(tenantId: string, dto: ProvisionManagerDto) {
@@ -401,12 +435,28 @@ export class SuiteService {
       return Math.max(0, balance);
     };
 
-    return employees.map(e => {
+    return Promise.all(employees.map(async e => {
       let balance = 0;
       for (const ca of e.custodianAccounts) {
         for (const w of ca.wallets) {
           if (w.isArchived) continue;
           balance += calculateWalletBalance(w);
+        }
+      }
+      const primaryCompanyId = e.companies?.[0]?.companyId;
+      let managerName = 'Concern Manager';
+      if (primaryCompanyId) {
+        const companyManager = await this.prisma.userCompany.findFirst({
+          where: {
+            companyId: primaryCompanyId,
+            role: 'MANAGER',
+          },
+          include: {
+            user: { select: { name: true } },
+          },
+        });
+        if (companyManager?.user?.name) {
+          managerName = companyManager.user.name;
         }
       }
       const primaryCompany = e.companies?.[0]?.company ?? null;
@@ -421,11 +471,12 @@ export class SuiteService {
         role: e.role,
         rawPassword: e.rawPassword ?? null,
         balance,
+        managerName,
         company: primaryCompany,
         companies: e.companies?.map(uc => uc.company) ?? [],
         createdAt: e.createdAt,
       };
-    });
+    }));
   }
 
   async updateUserPassword(tenantId: string, userId: string, newPassword: string) {
