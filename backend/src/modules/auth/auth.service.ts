@@ -120,7 +120,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(`We couldn't find an account for "${identifier}". Please check your handle.`);
     }
 
     // Verify password
@@ -129,7 +129,7 @@ export class AuthService {
       user.passwordHash,
     );
     if (!passwordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Incorrect password. Please check and try again.');
     }
 
     // Build authorized company IDs

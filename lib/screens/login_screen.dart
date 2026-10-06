@@ -103,16 +103,20 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         final data = jsonDecode(resp.body);
         final msg = data['message'];
-        final errStr = msg is List ? msg.join(', ') : (msg?.toString() ?? 'Login failed');
-        throw Exception(errStr);
+        throw Exception(msg is List ? msg.join(', ') : (msg?.toString() ?? 'Invalid credentials. Please try again.'));
       }
-    } catch (e, stack) {
-      debugPrint('Login connection error: $e\n$stack');
-      String errorMsg = 'Login failed. Network or server error: ${e.toString()}';
-      if (e.toString().contains('SocketException') || e.toString().contains('ClientException') || e.toString().contains('Failed host lookup')) {
-        errorMsg = 'Unable to reach server. Please check your internet connection.';
-      } else if (e.toString().contains('TimeoutException')) {
+    } catch (e) {
+      String errorMsg;
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('socketexception') || errStr.contains('clientexception') || errStr.contains('failed host lookup') || errStr.contains('connection')) {
+        errorMsg = 'Unable to connect to the server. Please check your internet connection.';
+      } else if (errStr.contains('timeoutexception')) {
         errorMsg = 'Request timed out. Please try again.';
+      } else {
+        errorMsg = e.toString().replaceAll('Exception: ', '').replaceAll('FormatException: ', '').trim();
+        if (errorMsg.isEmpty || errorMsg.contains('null')) {
+          errorMsg = 'Incorrect handle or password. Please try again.';
+        }
       }
       setState(() => _error = errorMsg);
     } finally {
@@ -241,9 +245,32 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                if (_error != null) ...[
-                  const SizedBox(height: 16),
-                  Text(_error!, style: const TextStyle(color: AppTheme.expenseText, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                if (_error != null && _error!.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(
+                              color: Color(0xFFB91C1C),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 24),
                 TextButton.icon(
