@@ -12,23 +12,13 @@ class SuiteTransactionsScreen extends StatefulWidget {
 class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
-  }
-
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    try {
-      await context.read<AppState>().fetchSuiteTransactions();
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading transactions: $e')));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AppState>().fetchSuiteTransactions();
+    });
   }
 
   String _formatAmount(dynamic val) {
@@ -53,7 +43,7 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
     super.dispose();
   }
   Widget _buildTransactionList(List<Map<String, dynamic>> transactions) {
-    if (_isLoading && context.read<AppState>().suiteTransactions.isEmpty) {
+    if (context.read<AppState>().isSuiteLoading && context.read<AppState>().suiteTransactions.isEmpty) {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF1E2638)));
     }
     if (transactions.isEmpty) {
@@ -62,7 +52,7 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
       );
     }
     return RefreshIndicator(
-      onRefresh: _loadData,
+      onRefresh: () => context.read<AppState>().fetchSuiteTransactions(),
       color: const Color(0xFF1E2638),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -170,7 +160,16 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final rawList = context.watch<AppState>().suiteTransactions;
+    final app = context.watch<AppState>();
+
+    if (app.isSuiteLoading && app.suiteTransactions.isEmpty) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8FAFC),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final rawList = app.suiteTransactions;
     final query = _searchQuery.trim().toLowerCase();
 
     final transactions = rawList.where((tx) {

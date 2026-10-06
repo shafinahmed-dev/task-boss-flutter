@@ -34,6 +34,9 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get suiteEmployees => _suiteEmployees;
   List<Map<String, dynamic>> get managerEmployeesList => _managerConcernEmployees;
   List<Map<String, dynamic>> _suiteTransactions = [];
+  bool _isSuiteLoading = false;
+  bool get isSuiteLoading => _isSuiteLoading;
+
   List<Map<String, dynamic>> get suiteTransactions => _suiteTransactions;
   Map<String, dynamic> _suiteOverview = {};
   Map<String, dynamic> get suiteOverview => _suiteOverview;
@@ -683,21 +686,25 @@ class AppState extends ChangeNotifier {
   }
   Future<void> fetchSuiteTransactions({String? companyId, String? range, String? search}) async {
     if (token == null) return;
+    _isSuiteLoading = true;
+    notifyListeners();
     try {
       final queryParams = <String, String>{};
-      if (companyId != null) queryParams['companyId'] = companyId;
-      if (range != null) queryParams['range'] = range;
-      if (search != null) queryParams['search'] = search;
+      if (companyId != null && companyId.isNotEmpty) queryParams['companyId'] = companyId;
+      if (range != null && range.isNotEmpty) queryParams['range'] = range;
+      if (search != null && search.isNotEmpty) queryParams['search'] = search;
       final uri = Uri.parse('$apiBaseUrl/suite/transactions').replace(queryParameters: queryParams);
       final resp = await authRequest('GET', uri);
-      if (resp.statusCode == 200) {
+      if (resp.statusCode == 200 || resp.statusCode == 201) {
         final decoded = jsonDecode(resp.body);
         final List list = decoded['transactions'] ?? [];
         _suiteTransactions = list.map((item) => Map<String, dynamic>.from(item)).toList();
-        notifyListeners();
       }
     } catch (e) {
       debugPrint('Error fetching suite transactions: $e');
+    } finally {
+      _isSuiteLoading = false;
+      notifyListeners();
     }
   }
 

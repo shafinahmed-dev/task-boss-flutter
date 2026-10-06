@@ -441,119 +441,98 @@ export class SuiteService {
   }
 
 
-  async getSuiteTransactions(tenantId: string, companyId?: string, range?: string, search?: string) {
+  async getSuiteTransactions(
+    tenantId: string,
+    companyId?: string,
+    range?: string,
+    search?: string,
+  ) {
     const companies = await this.prisma.company.findMany({
       where: { tenantId },
       select: { id: true, name: true, code: true },
     });
-    const companyMap = new Map(companies.map(c => [c.id, c]));
+    const companyMap = new Map(companies.map((c) => [c.id, c]));
+    const tenantCompanyIds = companies.map((c) => c.id);
 
-    // Auto-heal: Ensure movements reflect their category's or author's true company
-    try {
-      const misplacedCategoryMovements = await (this.prisma.moneyMovement as any).findMany({
-        where: {
-          tenantId,
-          categoryId: { not: null },
-        },
-        select: {
-          id: true,
-          companyId: true,
-          category: { select: { companyId: true } },
-        },
-      });
-
-      for (const m of misplacedCategoryMovements) {
-        if (m.category?.companyId && m.companyId !== m.category.companyId) {
-          await (this.prisma.moneyMovement as any).update({
-            where: { id: m.id },
-            data: { companyId: m.category.companyId },
-          });
-        }
-      }
-
-      const movementsToCheck = await (this.prisma.moneyMovement as any).findMany({
-        where: { tenantId },
-        select: {
-          id: true,
-          companyId: true,
-          userId: true,
-          user: {
-            select: {
-              companies: { select: { companyId: true }, take: 1 },
-            },
+    // Re-align categories created by TDC managers to TDC if needed
+    const tdcCompany = companies.find((c) =>
+      c.name.toLowerCase().includes('task design') || c.code === 'TDC'
+    );
+    if (tdcCompany) {
+      try {
+        await this.prisma.transactionCategory.updateMany({
+          where: {
+            companyId: { in: tenantCompanyIds },
+            name: { in: ['Office Supplies', 'Barakah Condominium', 'General'] },
           },
-        },
-      });
-
-      for (const m of movementsToCheck) {
-        const userCompanyId = m.user?.companies?.[0]?.companyId;
-        if (userCompanyId && (!m.companyId || m.companyId !== userCompanyId)) {
-          await (this.prisma.moneyMovement as any).update({
-            where: { id: m.id },
-            data: { companyId: userCompanyId },
-          });
-        }
-      }
-    } catch (e) {
-      // Non-blocking catch
+          data: { companyId: tdcCompany.id },
+        });
+      } catch (_) {}
     }
 
     let startDate;
     const now = new Date();
-    if (range === 'today') startDate = new Date(now.setHours(0,0,0,0));
-    else if (range === 'this_week') { const d = new Date(now.setHours(0,0,0,0)); d.setDate(d.getDate() - d.getDay()); startDate = d; }
-    else if (range === 'this_month') startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (range === 'today') startDate = new Date(now.setHours(0, 0, 0, 0));
+    else if (range === 'this_week') {
+      const d = new Date(now.setHours(0, 0, 0, 0));
+      d.setDate(d.getDate() - d.getDay());
+      startDate = d;
+    } else if (range === 'this_month') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
 
-    const movementsWhere = {
-      tenantId,
-      ...(companyId && companyId !== 'null' && companyId !== 'undefined' && companyId !== '' ? { companyId } : {}),
-    } as any;
+    const movementsWhere: any = {
+      wallet: { companyId: { in: tenantCompanyIds } },
+    };
     if (startDate) movementsWhere.createdAt = { gte: startDate };
 
-    const movements = await (this.prisma.moneyMovement as any).findMany({
+    const movements = await this.prisma.moneyMovement.findMany({
       where: movementsWhere,
       orderBy: { createdAt: 'desc' },
       include: {
-        category: { select: { id: true, name: true, companyId: true } },
-        user: {
+        category: {
+          select: { id: true, name: true, companyId: true },
+        },
+        collector: {
           select: {
             id: true,
             name: true,
             role: true,
-            companies: { select: { companyId: true } },
+            companies: {
+              select: { companyId: true },
+            },
           },
         },
-        wallet: { select: { id: true, name: true, companyId: true } },
+        wallet: {
+          select: { id: true, name: true, companyId: true },
+        },
       },
     });
 
-    let transactions = movements.map((tx: any) => {
-      // Hierarchical company resolution:
-      const resolvedCompanyId =
-        tx.category?.companyId ||
-        tx.companyId ||
-        tx.user?.companies?.[0]?.companyId ||
-        tx.wallet?.companyId;
+    let transactions = movements.map((tx) => {
+      const authorCompanyId = tx.collector?.companies?.[0]?.companyId;
+      const categoryCompanyId = tx.category?.companyId;
+      const walletCompanyId = tx.wallet?.companyId;
 
+      const resolvedCompanyId = authorCompanyId || categoryCompanyId || walletCompanyId;
       const comp = resolvedCompanyId ? companyMap.get(resolvedCompanyId) : null;
 
-      // Code priority: company.code -> uppercase initials -> 'CONCERN' (NEVER default to companies[0]!)
       const companyCode = comp?.code
         ? comp.code
         : comp?.name
         ? comp.name.split(' ').map((w: string) => w[0]).join('').toUpperCase()
-        : 'CONCERN';
+        : 'TDC';
 
-      const companyName = comp?.name || 'Unknown Concern';
+      const companyName = comp?.name || 'Task Design & Consultancy';
       const segmentName = tx.category?.name || 'General';
 
       const isOut =
         tx.direction === 'out' ||
         tx.direction === 'OUT' ||
-        tx.type === 'CASH_OUT' ||
-        tx.type === 'EXPENSE' ||
-        tx.movementType === 'Cash Out' ||
-        tx.movementType === 'Expense';
+        (tx as any).type === 'CASH_OUT' ||
+        (tx as any).type === 'EXPENSE' ||
+        (tx as any).movementType === 'Cash Out' ||
+        (tx as any).movementType === 'Expense';
 
       return {
         id: tx.id,
@@ -565,27 +544,34 @@ export class SuiteService {
         fee: Number(tx.fee || 0),
         direction: isOut ? 'out' : 'in',
         type: isOut ? 'Cash Out' : 'Cash In',
-        note: tx.note || tx.notes || tx.movementType || '',
-        actorName: tx.user?.name || 'System',
-        actorRole: tx.user?.role || 'STAFF',
+        note: tx.notes || (tx as any).note || (tx as any).movementType || '',
+        actorName: tx.collector?.name || 'System',
+        actorRole: tx.collector?.role || 'STAFF',
         walletName: tx.wallet?.name || 'Cash in Hand',
         createdAt: tx.createdAt.toISOString(),
       };
     });
 
-    if (search && search.trim() !== '') {
-       const q = search.trim().toLowerCase();
-       transactions = transactions.filter((f: any) => 
-         f.companyCode.toLowerCase().includes(q) ||
-         f.companyName.toLowerCase().includes(q) ||
-         f.segmentName.toLowerCase().includes(q) ||
-         f.actorName.toLowerCase().includes(q) ||
-         f.note.toLowerCase().includes(q) ||
-         String(f.amount).toLowerCase().includes(q)
-       );
+    if (companyId && companyId !== 'null' && companyId !== '') {
+      transactions = transactions.filter((t) => t.companyId === companyId);
     }
+
+    if (search && search.trim() !== '') {
+      const q = search.trim().toLowerCase();
+      transactions = transactions.filter(
+        (f) =>
+          f.companyCode.toLowerCase().includes(q) ||
+          f.companyName.toLowerCase().includes(q) ||
+          f.segmentName.toLowerCase().includes(q) ||
+          f.actorName.toLowerCase().includes(q) ||
+          f.note.toLowerCase().includes(q) ||
+          String(f.amount).toLowerCase().includes(q)
+      );
+    }
+
     return { success: true, transactions };
   }
+
   async getConcernBreakdown(tenantId: string, id: string) {
     const company = await this.prisma.company.findFirst({
       where: { id, tenantId },
