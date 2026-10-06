@@ -37,13 +37,33 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
       final w = tx['wallet']?['name']?.toString().toLowerCase() ?? '';
       final c = tx['collector']?['name']?.toString().toLowerCase() ?? '';
       final a = tx['amount']?.toString() ?? '';
-      return w.contains(q) || c.contains(q) || a.contains(q);
+      final s = tx['segmentName']?.toString().toLowerCase() ?? tx['category']?['name']?.toString().toLowerCase() ?? '';
+      final n = tx['note']?.toString().toLowerCase() ?? '';
+      return w.contains(q) || c.contains(q) || a.contains(q) || s.contains(q) || n.contains(q);
     }).toList();
+    final matchedSegment = _searchQuery.isNotEmpty 
+      ? app.concernCategories.firstWhere((c) => c['name']?.toString().toLowerCase() == _searchQuery.toLowerCase(), orElse: () => {})
+      : {};
+    
+    double segmentInflow = 0;
+    double segmentOutflow = 0;
+    if (matchedSegment.isNotEmpty) {
+      for (final tx in app.managerTransactionsList) {
+        if (tx['category']?['id'] == matchedSegment['id']) {
+          final amt = (tx['amount'] is num) ? (tx['amount'] as num).toDouble() : (double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0);
+          if (tx['direction'] == 'in') segmentInflow += amt;
+          else segmentOutflow += amt;
+        }
+      }
+    }
+    final segmentNet = segmentInflow - segmentOutflow;
+
+
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('All Employee Transactions', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text('All Transactions', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF1E2638),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -52,6 +72,40 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
+              controller: _searchCtl,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+          ),
+          if (matchedSegment.isNotEmpty) ...[
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(14)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('📁 ${matchedSegment['name']}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('In: +৳ ${_formatAmount(segmentInflow)}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                      Text('Out: -৳ ${_formatAmount(segmentOutflow)}', style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+                      Text('Net: ৳ ${_formatAmount(segmentNet)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ],
+                  )
+                ],
+              ),
+            )
+          ],
               controller: _searchCtl,
               onChanged: (val) => setState(() => _searchQuery = val),
               decoration: InputDecoration(
@@ -102,7 +156,9 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Staff: $employeeName', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                  Text(tx['segmentName'] ?? tx['category']?['name'] ?? 'General', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                                  const SizedBox(height: 2),
+                                  Text('By: ${tx['actorName'] ?? employeeName} (${tx['actorRole'] ?? 'Staff'})', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                                   const SizedBox(height: 2),
                                   Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                                 ],

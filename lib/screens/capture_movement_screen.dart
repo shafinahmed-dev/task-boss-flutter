@@ -85,12 +85,12 @@ class _CaptureState extends State<CaptureMovementScreen> {
         builder: (ctx, setModalState) => Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 16, left: 16, right: 16, top: 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('New Category / Project Ledger', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            const Text('New Segment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             const SizedBox(height: 16),
             TextField(
               controller: TextEditingController(text: name),
               onChanged: (val) => name = val,
-              decoration: InputDecoration(labelText: 'Category Name', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
+              decoration: InputDecoration(labelText: 'Segment Name', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
             ),
             const SizedBox(height: 16),
             const Text('Applies To', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
@@ -931,7 +931,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
             Icon(Icons.category_outlined, size: 18, color: Color(0xFF0F172A)),
             SizedBox(width: 8),
             Text(
-              'Category / Project Ledger',
+              'Segment',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -941,52 +941,29 @@ class _CaptureState extends State<CaptureMovementScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        // Search & Add Row
-        Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 42,
-                child: TextField(
-                  controller: _categorySearchCtrl,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Search categories or projects...',
-                    hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                  ),
-                ),
+        // Search
+        SizedBox(
+          height: 42,
+          child: TextField(
+            controller: _categorySearchCtrl,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: 'Search or type new segment...',
+              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
             ),
-            if (isManager) ...[
-              const SizedBox(width: 8),
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                  padding: EdgeInsets.zero,
-                  tooltip: 'Add Category',
-                  onPressed: () => _showAddCategoryModal(context, app),
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
         const SizedBox(height: 12),
           // Category Pills or Empty State via clean ternary (no semicolons in list)

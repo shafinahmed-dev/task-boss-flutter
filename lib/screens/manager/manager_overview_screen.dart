@@ -247,11 +247,26 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                           child: Text('No recent transactions under this concern.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
                         )
                       else
-                        ...recentTx.take(3).map((tx) {
+                        ...recentTx.take(10).map((tx) {
+                          final isOutflow = tx['direction'] == 'out' || tx['type'] == 'Cash Out' || tx['type'] == 'EXPENSE';
                           final amt = _toDouble(tx['amount']);
-                          final isCredit = tx['type'] == 'CREDIT' || amt > 0;
-                          final desc = tx['description'] ?? tx['memo'] ?? 'Transaction';
-                          final dateStr = tx['createdAt'] != null ? tx['createdAt'].toString().substring(0, 10) : '';
+                          final amountText = isOutflow ? '-৳ ${_formatAmount(amt)}' : '+৳ ${_formatAmount(amt)}';
+                          final amountColor = isOutflow ? const Color(0xFFEF4444) : const Color(0xFF10B981);
+                          final arrowIcon = isOutflow ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded;
+                          final arrowBg = isOutflow ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4);
+                          
+                          final desc = tx['description'] ?? tx['memo'] ?? tx['segmentName'] ?? 'Transaction';
+                          
+                          DateTime? d = DateTime.tryParse(tx['createdAt']?.toString() ?? '');
+                          String formattedDateTime = '';
+                          if (d != null) {
+                            formattedDateTime = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} • ${d.hour > 12 ? d.hour - 12 : (d.hour == 0 ? 12 : d.hour)}:${d.minute.toString().padLeft(2, '0')} ${d.hour >= 12 ? 'PM' : 'AM'}';
+                          } else {
+                            formattedDateTime = tx['createdAt'] != null ? tx['createdAt'].toString().substring(0, 10) : '';
+                          }
+                          
+                          final actor = tx['actorName'] ?? tx['user']?['name'] ?? 'System';
+                          final role = tx['actorRole'] ?? tx['user']?['role'] ?? 'Staff';
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
@@ -265,12 +280,12 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: (isCredit ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.1),
+                                    color: arrowBg,
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
-                                    isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                                    color: isCredit ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                    arrowIcon,
+                                    color: amountColor,
                                     size: 14,
                                   ),
                                 ),
@@ -281,14 +296,14 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                                     children: [
                                       Text(desc, style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                                       const SizedBox(height: 2),
-                                      Text(dateStr, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                                      Text('$formattedDateTime  •  By: $actor ($role)', style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
                                     ],
                                   ),
                                 ),
                                 Text(
-                                  '${isCredit ? '+' : '-'}৳ ${_formatAmount(amt.abs())}',
+                                  amountText,
                                   style: TextStyle(
-                                    color: isCredit ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                    color: amountColor,
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -297,6 +312,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                             ),
                           );
                         }),
+
                     ],
                   ),
                 ),

@@ -169,24 +169,25 @@ export class ManagerService {
         },
         orderBy: { createdAt: 'desc' },
         include: {
-          wallet: { select: { name: true } },
-          collector: { select: { id: true, name: true } },
-          custodian: { select: { id: true, name: true } },
+          wallet: { select: { id: true, name: true } },
+          collector: { select: { id: true, name: true, role: true } },
+          custodian: { select: { id: true, name: true, type: true } },
+          category: { select: { id: true, name: true, type: true } },
         },
       });
 
       for (const m of movements) {
         if (supersededIds.has(m.id)) continue;
         const amt = Number(m.amount) || 0;
-        const dir = m.direction?.toUpperCase() || 'IN';
-        if (dir === 'IN') {
+        const dir = m.direction?.toLowerCase() || 'in';
+        if (dir === 'in') {
           inflow += amt;
         } else {
           outflow += amt;
         }
       }
 
-      recentMovements = movements.filter(m => !supersededIds.has(m.id)).slice(0, 3).map(m => ({
+      recentMovements = movements.filter(m => !supersededIds.has(m.id)).slice(0, 10).map(m => ({
         id: m.id,
         amount: Number(m.amount) || 0,
         fee: Number(m.fee || 0),
@@ -194,7 +195,9 @@ export class ManagerService {
         direction: m.direction,
         description: m.notes || 'Transaction',
         createdAt: m.createdAt,
-        actorName: m.collector?.name || m.custodian?.name || 'Staff',
+        actorName: m.collector?.name || m.custodian?.name || 'Unknown',
+        actorRole: m.collector?.role || 'STAFF',
+        segmentName: m.category?.name || 'General',
         wallet: m.wallet,
         collector: m.collector,
         custodian: m.custodian,
@@ -305,8 +308,8 @@ export class ManagerService {
 
     return movements.map(m => ({
       id: m.id,
-      amount: m.amount,
-      fee: m.fee ?? 0,
+      amount: Number(m.amount) || 0,
+      fee: Number(m.fee ?? 0),
       direction: m.direction,
       createdAt: m.createdAt,
       wallet: m.wallet,
@@ -314,6 +317,9 @@ export class ManagerService {
       custodian: m.custodian,
       category: m.category,
       note: m.notes,
+      actorName: m.collector?.name || m.custodian?.name || 'Unknown',
+      actorRole: m.collector?.role || 'STAFF',
+      segmentName: m.category?.name || 'General',
     }));
   }
 
