@@ -442,42 +442,123 @@ export class SuiteService {
 
 
   async getSuiteTransactions(tenantId: string, companyId?: string, range?: string, search?: string) {
-    const companies = await this.prisma.company.findMany({ where: { tenantId } });
-    if (!companies.length) return { success: true, transactions: [] };
-    
-    let targetIds = companies.map(c => c.id);
-    if (companyId && companyId !== 'null' && companyId !== '') {
-       targetIds = targetIds.filter(id => id === companyId);
+    const companies = await this.prisma.company.findMany({
+      where: { tenantId },
+      select: { id: true, name: true, code: true },
+    });
+    const companyMap = new Map(companies.map(c => [c.id, c]));
+
+    // Auto-heal: Ensure movements reflect their category's or author's true company
+    try {
+      const misplacedCategoryMovements = await (this.prisma.moneyMovement as any).findMany({
+        where: {
+          tenantId,
+          categoryId: { not: null },
+        },
+        select: {
+          id: true,
+          companyId: true,
+          category: { select: { companyId: true } },
+        },
+      });
+
+      for (const m of misplacedCategoryMovements) {
+        if (m.category?.companyId && m.companyId !== m.category.companyId) {
+          await (this.prisma.moneyMovement as any).update({
+            where: { id: m.id },
+            data: { companyId: m.category.companyId },
+          });
+        }
+      }
+
+      const movementsToCheck = await (this.prisma.moneyMovement as any).findMany({
+        where: { tenantId },
+        select: {
+          id: true,
+          companyId: true,
+          userId: true,
+          user: {
+            select: {
+              companies: { select: { companyId: true }, take: 1 },
+            },
+          },
+        },
+      });
+
+      for (const m of movementsToCheck) {
+        const userCompanyId = m.user?.companies?.[0]?.companyId;
+        if (userCompanyId && (!m.companyId || m.companyId !== userCompanyId)) {
+          await (this.prisma.moneyMovement as any).update({
+            where: { id: m.id },
+            data: { companyId: userCompanyId },
+          });
+        }
+      }
+    } catch (e) {
+      // Non-blocking catch
     }
-    
+
     let startDate;
     const now = new Date();
     if (range === 'today') startDate = new Date(now.setHours(0,0,0,0));
     else if (range === 'this_week') { const d = new Date(now.setHours(0,0,0,0)); d.setDate(d.getDate() - d.getDay()); startDate = d; }
     else if (range === 'this_month') startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    
-    const movementsWhere = { wallet: { companyId: { in: targetIds } } } as any;
-    if (startDate) movementsWhere.createdAt = { gte: startDate };
-    
-    const movements = await (this.prisma.moneyMovement as any).findMany({
-      where: movementsWhere, orderBy: { createdAt: 'desc' },
-      include: { category: true, collector: true, custodian: true, wallet: true }
-    });
-    
-    const companyMap = new Map();
-    companies.forEach(c => companyMap.set(c.id, c));
 
-    let filtered = movements.map((tx: any) => {
-      const c = companyMap.get(tx.wallet?.companyId);
-      
-      const companyCode = c?.code || (c?.name ? c.name.split(' ').map((w: string) => w[0]).join('').toUpperCase() : 'CONCERN');
+    const movementsWhere = {
+      tenantId,
+      ...(companyId && companyId !== 'null' && companyId !== 'undefined' && companyId !== '' ? { companyId } : {}),
+    } as any;
+    if (startDate) movementsWhere.createdAt = { gte: startDate };
+
+    const movements = await (this.prisma.moneyMovement as any).findMany({
+      where: movementsWhere,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        category: { select: { id: true, name: true, companyId: true } },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            companies: { select: { companyId: true } },
+          },
+        },
+        wallet: { select: { id: true, name: true, companyId: true } },
+      },
+    });
+
+    let transactions = movements.map((tx: any) => {
+      // Hierarchical company resolution:
+      const resolvedCompanyId =
+        tx.category?.companyId ||
+        tx.companyId ||
+        tx.user?.companies?.[0]?.companyId ||
+        tx.wallet?.companyId;
+
+      const comp = resolvedCompanyId ? companyMap.get(resolvedCompanyId) : null;
+
+      // Code priority: company.code -> uppercase initials -> 'CONCERN' (NEVER default to companies[0]!)
+      const companyCode = comp?.code
+        ? comp.code
+        : comp?.name
+        ? comp.name.split(' ').map((w: string) => w[0]).join('').toUpperCase()
+        : 'CONCERN';
+
+      const companyName = comp?.name || 'Unknown Concern';
       const segmentName = tx.category?.name || 'General';
-      const isOut = tx.direction === 'out' || tx.direction === 'OUT' || tx.type === 'CASH_OUT' || tx.type === 'EXPENSE' || tx.movementType === 'Cash Out' || tx.movementType === 'Expense';
+
+      const isOut =
+        tx.direction === 'out' ||
+        tx.direction === 'OUT' ||
+        tx.type === 'CASH_OUT' ||
+        tx.type === 'EXPENSE' ||
+        tx.movementType === 'Cash Out' ||
+        tx.movementType === 'Expense';
 
       return {
         id: tx.id,
-        companyId: tx.wallet?.companyId,
-        companyName: c?.name || 'Unknown Concern',
+        companyId: resolvedCompanyId || '',
+        companyName: companyName,
         companyCode: companyCode,
         segmentName: segmentName,
         amount: Number(tx.amount || 0),
@@ -485,18 +566,25 @@ export class SuiteService {
         direction: isOut ? 'out' : 'in',
         type: isOut ? 'Cash Out' : 'Cash In',
         note: tx.note || tx.notes || tx.movementType || '',
-        actorName: tx.user?.name || tx.collector?.name || tx.custodian?.name || 'System',
-        actorRole: tx.user?.role || tx.collector?.role || 'STAFF',
+        actorName: tx.user?.name || 'System',
+        actorRole: tx.user?.role || 'STAFF',
+        walletName: tx.wallet?.name || 'Cash in Hand',
         createdAt: tx.createdAt.toISOString(),
       };
     });
 
-
     if (search && search.trim() !== '') {
        const q = search.trim().toLowerCase();
-       filtered = filtered.filter((f: any) => f.segmentName.toLowerCase().includes(q) || f.actorName.toLowerCase().includes(q) || f.companyName.toLowerCase().includes(q) || f.note.toLowerCase().includes(q));
+       transactions = transactions.filter((f: any) => 
+         f.companyCode.toLowerCase().includes(q) ||
+         f.companyName.toLowerCase().includes(q) ||
+         f.segmentName.toLowerCase().includes(q) ||
+         f.actorName.toLowerCase().includes(q) ||
+         f.note.toLowerCase().includes(q) ||
+         String(f.amount).toLowerCase().includes(q)
+       );
     }
-    return { success: true, transactions: filtered };
+    return { success: true, transactions };
   }
   async getConcernBreakdown(tenantId: string, id: string) {
     const company = await this.prisma.company.findFirst({
