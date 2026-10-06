@@ -404,10 +404,47 @@ export class SuiteService {
   }
 
   async getSuiteEmployees(tenantId: string) {
+    // 1. Fetch all managers under this tenant in one query
+    const managers = await this.prisma.user.findMany({
+      where: {
+        tenantId,
+        role: 'MANAGER',
+      },
+      select: {
+        id: true,
+        name: true,
+        companies: {
+          select: { companyId: true },
+        },
+      },
+    });
+
+    // Map companyId -> Manager Name
+    const companyManagerMap = new Map<string, string>();
+    for (const mgr of managers) {
+      if (mgr.companies) {
+        for (const uc of mgr.companies) {
+          if (!companyManagerMap.has(uc.companyId)) {
+            companyManagerMap.set(uc.companyId, mgr.name);
+          }
+        }
+      }
+    }
+
+    // 2. Fetch all employees with companies and wallets included
     const employees = await this.prisma.user.findMany({
-      where: { tenantId, role: 'EMPLOYEE' },
+      where: {
+        tenantId,
+        role: 'EMPLOYEE',
+      },
       include: {
-        companies: { include: { company: true } },
+        companies: {
+          include: {
+            company: {
+              select: { id: true, name: true, code: true },
+            },
+          },
+        },
         custodianAccounts: {
           include: {
             wallets: { include: { movements: true } },
@@ -435,48 +472,47 @@ export class SuiteService {
       return Math.max(0, balance);
     };
 
-    return Promise.all(employees.map(async e => {
+    // 3. Synchronously map employees with zero risk of unhandled Promise rejections
+    const serializedEmployees = employees.map((emp) => {
+      const firstCompanyRel = emp.companies?.[0];
+      const companyId = firstCompanyRel?.companyId;
+      const companyCode = firstCompanyRel?.company?.code || 'TDC';
+      const companyName = firstCompanyRel?.company?.name || 'Task Design & Consultancy';
+
+      // Lookup manager from map or fallback to first manager in tenant
+      const managerName = companyId
+        ? companyManagerMap.get(companyId) || (managers[0]?.name ?? 'Shovon Ahmed')
+        : (managers[0]?.name ?? 'Shovon Ahmed');
+
       let balance = 0;
-      for (const ca of e.custodianAccounts) {
-        for (const w of ca.wallets) {
-          if (w.isArchived) continue;
-          balance += calculateWalletBalance(w);
+      if (emp.custodianAccounts) {
+        for (const ca of emp.custodianAccounts) {
+          if (ca.wallets) {
+            for (const w of ca.wallets) {
+              if (w.isArchived) continue;
+              balance += calculateWalletBalance(w);
+            }
+          }
         }
       }
-      const primaryCompanyId = e.companies?.[0]?.companyId;
-      let managerName = 'Concern Manager';
-      if (primaryCompanyId) {
-        const companyManager = await this.prisma.userCompany.findFirst({
-          where: {
-            companyId: primaryCompanyId,
-            role: 'MANAGER',
-          },
-          include: {
-            user: { select: { name: true } },
-          },
-        });
-        if (companyManager?.user?.name) {
-          managerName = companyManager.user.name;
-        }
-      }
-      const primaryCompany = e.companies?.[0]?.company ?? null;
+
       return {
-        id: e.id,
-        name: e.name,
-        handle: e.handle,
-        email: e.email,
-        phone: e.phone,
-        designation: e.designation,
-        department: e.department,
-        role: e.role,
-        rawPassword: e.rawPassword ?? null,
-        balance,
-        managerName,
-        company: primaryCompany,
-        companies: e.companies?.map(uc => uc.company) ?? [],
-        createdAt: e.createdAt,
+        id: emp.id,
+        name: emp.name,
+        handle: emp.handle,
+        designation: emp.designation || 'Staff',
+        department: emp.department || '',
+        companyId: companyId || '',
+        companyCode: companyCode,
+        companyName: companyName,
+        company: firstCompanyRel?.company || null,
+        managerName: managerName,
+        balance: Number(balance),
+        rawPassword: emp.rawPassword || '••••••••',
       };
-    }));
+    });
+
+    return { success: true, employees: serializedEmployees };
   }
 
   async updateUserPassword(tenantId: string, userId: string, newPassword: string) {

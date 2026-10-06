@@ -675,13 +675,23 @@ class AppState extends ChangeNotifier {
     try {
       final url = Uri.parse('$apiBaseUrl/suite/employees');
       final resp = await authRequest('GET', url);
-      if (resp.statusCode == 200) {
-        final List list = jsonDecode(resp.body);
-        _suiteEmployees = list.map((item) => Map<String, dynamic>.from(item)).toList();
+      if (resp.statusCode == 200 || resp.statusCode == 201) {
+        final decoded = jsonDecode(resp.body);
+
+        if (decoded is Map && decoded['employees'] is List) {
+          _suiteEmployees = (decoded['employees'] as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        } else if (decoded is List) {
+          _suiteEmployees = decoded
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        }
         notifyListeners();
       }
     } catch (e) {
       // offline fallback
+      debugPrint('Error fetching suite employees: $e');
     }
   }
   Future<void> fetchSuiteTransactions({String? companyId, String? range, String? search}) async {
