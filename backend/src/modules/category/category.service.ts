@@ -5,6 +5,56 @@ import { PrismaService } from '../../database/prisma.service.js';
 export class CategoryService {
   constructor(private prisma: PrismaService) {}
 
+  private async validateAndAuthorizeCompany(userId: string, tenantId: string, userRole: string, companyId: string) {
+    // 1. Verify company exists and belongs to the user's tenant
+    const company = await this.prisma.company.findFirst({
+      where: { id: companyId, tenantId: tenantId },
+    });
+
+    if (!company) {
+      throw new ForbiddenException('Company not found in this workspace');
+    }
+
+    // 2. Suite Admins have universal access across their tenant
+    if (userRole === 'SUITE_ADMIN') {
+      return company;
+    }
+
+    // 3. Check UserCompany join table or primaryCompanyId
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, primaryCompanyId: true },
+    });
+
+    const hasUserCompanyLink = await this.prisma.userCompany.findFirst({
+      where: { userId: userId, companyId: companyId },
+    });
+
+    const isAssigned = hasUserCompanyLink || user?.primaryCompanyId === companyId || userRole === 'MANAGER';
+
+    if (!isAssigned) {
+      throw new ForbiddenException(`User is not authorized for company ${companyId}`);
+    }
+
+    // 4. Auto-heal: Ensure UserCompany record exists so future relational queries succeed
+    if (!hasUserCompanyLink) {
+      try {
+        await this.prisma.userCompany.create({
+          data: {
+            userId: userId,
+            companyId: company.id,
+            role: userRole,
+          },
+        });
+      } catch (_) {
+        // Ignore if concurrent create happened
+      }
+    }
+
+    return company;
+  }
+
+
   async getCategories(reqUser: any, companyId?: string, type?: string) {
     let targetCompanyId = companyId;
 
@@ -30,14 +80,7 @@ export class CategoryService {
       throw new BadRequestException('No concern found for this workspace');
     }
 
-    // Verify company belongs to user's tenant
-    const company = await this.prisma.company.findFirst({
-      where: { id: targetCompanyId, tenantId: reqUser.tenantId },
-    });
-
-    if (!company) {
-      throw new ForbiddenException('Invalid or unauthorized companyId');
-    }
+    await this.validateAndAuthorizeCompany(reqUser.id, reqUser.tenantId, reqUser.role, targetCompanyId);
 
     const where: any = { companyId: targetCompanyId };
     if (type && type.trim() !== '') {
@@ -80,14 +123,7 @@ export class CategoryService {
       throw new BadRequestException('No concern found for this workspace');
     }
 
-    // Verify company exists and belongs to user's tenant
-    const company = await this.prisma.company.findFirst({
-      where: { id: targetCompanyId, tenantId: reqUser.tenantId },
-    });
-
-    if (!company) {
-      throw new ForbiddenException('Invalid or unauthorized companyId');
-    }
+    await this.validateAndAuthorizeCompany(reqUser.id, reqUser.tenantId, reqUser.role, targetCompanyId);
 
     const name = dto.name?.trim();
     if (!name) {
@@ -99,10 +135,19 @@ export class CategoryService {
     }
 
     try {
-      const category = await this.prisma.transactionCategory.create({
-        data: {
-          name,
-          type,
+      const category = await this.prisma.transactionCategory.upsert({
+        where: {
+          companyId_name: {
+            companyId: targetCompanyId,
+            name: name,
+          },
+        },
+        update: {
+          type: type,
+        },
+        create: {
+          name: name,
+          type: type,
           companyId: targetCompanyId,
           tenantId: reqUser.tenantId,
           createdById: reqUser.id,
@@ -194,9 +239,7 @@ export class CategoryService {
     if (!category) {
       throw new NotFoundException('Category not found');
     }
-    if (category.tenantId !== reqUser.tenantId) {
-      throw new ForbiddenException('Unauthorized');
-    }
+    await this.validateAndAuthorizeCompany(reqUser.id, reqUser.tenantId, reqUser.role, category.companyId);
 
     const data: any = {};
     if (dto.name !== undefined) {
@@ -233,9 +276,7 @@ export class CategoryService {
     if (!category) {
       throw new NotFoundException('Category not found');
     }
-    if (category.tenantId !== reqUser.tenantId) {
-      throw new ForbiddenException('Unauthorized');
-    }
+    await this.validateAndAuthorizeCompany(reqUser.id, reqUser.tenantId, reqUser.role, category.companyId);
 
     const movementsCount = await this.prisma.moneyMovement.count({
       where: { categoryId: id },
