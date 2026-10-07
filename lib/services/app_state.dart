@@ -18,6 +18,36 @@ class AppState extends ChangeNotifier {
 
   double balance = 0.0;
   int pendingCount = 0;
+  List<Map<String, dynamic>> _pendingTransfers = [];
+  List<Map<String, dynamic>> get pendingTransfers => _pendingTransfers;
+
+  int get notificationCount {
+    int count = _pendingTransfers.length;
+    final recent = _managerOverviewData['recentTransactions'] as List? ?? [];
+    if (count == 0 && recent.isNotEmpty) {
+      count = recent.take(3).length;
+    }
+    return count;
+  }
+
+  Future<void> fetchPendingTransfers() async {
+    try {
+      final response = await authRequest('GET', Uri.parse('$apiBaseUrl/custody/transfers/pending'));
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          _pendingTransfers = (decoded as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        } else if (decoded is Map && decoded['transfers'] is List) {
+          _pendingTransfers = (decoded['transfers'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchPendingTransfers error: $e');
+    }
+  }
+
+
   bool isReady = false;
   List<Wallet> wallets = [];
 
@@ -825,6 +855,7 @@ class AppState extends ChangeNotifier {
           _managerOverviewData = Map<String, dynamic>.from(decoded);
         }
         notifyListeners();
+        await fetchPendingTransfers();
       }
     } catch (e) {
       debugPrint('fetchManagerOverview error: $e');

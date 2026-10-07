@@ -238,6 +238,7 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
           );
         }
         await app.refreshBalance();
+        await app.fetchPendingTransfers();
       } else {
         final errBody = jsonDecode(res.body);
         final errMsg = errBody['message'];

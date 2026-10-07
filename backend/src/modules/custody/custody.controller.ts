@@ -109,6 +109,15 @@ export class CustodyController {
   }
 
   /**
+   * GET /custody/transfers/pending
+   */
+  @Get('transfers/pending')
+  async getPendingTransfers(@Req() req: any, @Query('custodianId') queryCustodianId?: string) {
+    const custodianId = queryCustodianId || req?.user?.custodianId;
+    return this.custodyService.getPendingTransfers(custodianId, req?.user);
+  }
+
+  /**
    * GET /custody/custodians
    * List all custodians for the company.
    */

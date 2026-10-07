@@ -7,6 +7,7 @@ import 'package:task_boss/screens/suite/suite_governance_screen.dart';
 import 'package:task_boss/screens/operations_tabs.dart';
 import 'package:task_boss/screens/wallets_screen.dart';
 import 'package:task_boss/screens/account_screen.dart';
+import 'package:task_boss/widgets/notifications_sheet.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -92,17 +93,31 @@ class _MainNavigationState extends State<MainNavigation> {
               ),
               const SizedBox(width: 8),
               // Notification Bell
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.notifications_outlined,
-                  color: Color(0xFF0F172A),
-                  size: 18,
+              InkWell(
+                onTap: () => NotificationsSheet.show(context),
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Badge(
+                      isLabelVisible: appState.notificationCount > 0,
+                      label: Text(
+                        '${appState.notificationCount}',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      backgroundColor: const Color(0xFFEF4444),
+                      child: const Icon(
+                        Icons.notifications_none_rounded,
+                        color: Color(0xFF0F172A),
+                        size: 18,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],

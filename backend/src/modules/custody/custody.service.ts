@@ -383,6 +383,44 @@ export class CustodyService {
     }
   }
 
+  async getPendingTransfers(custodianId?: string, reqUser?: any) {
+    const userId = reqUser?.id || reqUser?.sub;
+    let userCustodianIds: string[] = [];
+    if (custodianId) {
+      userCustodianIds.push(custodianId);
+    }
+    if (userId) {
+      const custodians = await this.prisma.custodianAccount.findMany({
+        where: { linkedUserId: userId },
+        select: { id: true },
+      });
+      userCustodianIds.push(...custodians.map(c => c.id));
+    }
+    const whereClause: any = { status: 'pending' };
+    if (userCustodianIds.length > 0) {
+      whereClause.OR = [
+        { fromCustodianId: { in: userCustodianIds } },
+        { toCustodianId: { in: userCustodianIds } },
+      ];
+    }
+    const pending = await this.prisma.custodyTransfer.findMany({
+      where: whereClause,
+      include: {
+        fromCustodian: { select: { id: true, name: true, linkedUser: { select: { id: true, name: true, role: true } } } },
+        toCustodian: { select: { id: true, name: true, linkedUser: { select: { id: true, name: true, role: true } } } },
+      },
+      orderBy: { requestedAt: 'desc' },
+    });
+    return pending.map(t => {
+      const meta = this.transferMetadata.get(t.id) || this.transferMetadata.get(t.idempotencyKey) || (typeof t.metadata === 'object' ? t.metadata : {});
+      return {
+        ...t,
+        metadata: meta,
+      };
+    });
+  }
+
+
   /**
    * GET /custody/notifications?custodianId=...&companyId=...
    *
