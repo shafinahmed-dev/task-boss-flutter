@@ -391,13 +391,11 @@ export class CustodyService {
       include: {
         fromCustodian: {
           include: {
-            user: { select: { id: true, name: true, handle: true, role: true } },
             linkedUser: { select: { id: true, name: true, role: true } },
           },
         },
         toCustodian: {
           include: {
-            user: { select: { id: true, name: true, handle: true, role: true } },
             linkedUser: { select: { id: true, name: true, role: true } },
           },
         },
