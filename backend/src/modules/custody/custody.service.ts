@@ -3,6 +3,7 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -572,6 +573,91 @@ export class CustodyService {
       console.error('[CUSTODY SERVICE] getTransfers error:', err);
       return [];
     }
+  }
+
+  async cancelTransfer(id: string, reqUser: any) {
+    const transfer = await this.prisma.custodyTransfer.findUnique({
+      where: { id },
+      include: { fromCustodian: true },
+    });
+
+    if (!transfer) {
+      throw new BadRequestException('Transfer record not found.');
+    }
+
+    if (transfer.status !== 'pending') {
+      throw new BadRequestException(`Transfer cannot be cancelled because it is already ${transfer.status}.`);
+    }
+
+    const meta = (transfer.metadata as any) || {};
+    const isSender =
+      transfer.fromCustodian?.linkedUserId === reqUser.id ||
+      meta.senderUserId === reqUser.id ||
+      reqUser.role === 'SUITE_ADMIN';
+
+    if (!isSender) {
+      throw new ForbiddenException('Only the sender can cancel this handover.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.custodyTransfer.update({
+        where: { id },
+        data: {
+          status: 'cancelled',
+          confirmedAt: new Date(),
+          metadata: {
+            ...meta,
+            cancelledBy: reqUser.name,
+            cancelledAt: new Date().toISOString(),
+          },
+        },
+      });
+    });
+
+    return { success: true, message: 'Handover cancelled successfully.' };
+  }
+
+  async declineTransfer(id: string, reqUser: any) {
+    const transfer = await this.prisma.custodyTransfer.findUnique({
+      where: { id },
+      include: { toCustodian: true },
+    });
+
+    if (!transfer) {
+      throw new BadRequestException('Transfer record not found.');
+    }
+
+    if (transfer.status !== 'pending') {
+      throw new BadRequestException(`Transfer cannot be declined because it is already ${transfer.status}.`);
+    }
+
+    const meta = (transfer.metadata as any) || {};
+    const isReceiver =
+      transfer.toCustodian?.linkedUserId === reqUser.id ||
+      meta.receiverUserId === reqUser.id ||
+      meta.recipientUserId === reqUser.id ||
+      reqUser.role === 'SUITE_ADMIN';
+
+    if (!isReceiver) {
+      throw new ForbiddenException('Only the intended recipient can decline this handover.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.custodyTransfer.update({
+        where: { id },
+        data: {
+          status: 'declined',
+          confirmedAt: new Date(),
+          metadata: {
+            ...meta,
+            declinedBy: reqUser.name,
+            declinedAt: new Date().toISOString(),
+          },
+        },
+      });
+    });
+
+    return { success: true, message: 'Handover declined.' };
   }
 
 }

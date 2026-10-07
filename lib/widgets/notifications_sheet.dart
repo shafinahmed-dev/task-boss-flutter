@@ -29,6 +29,8 @@ class NotificationsSheet extends StatefulWidget {
 }
 
 class _NotificationsSheetState extends State<NotificationsSheet> {
+  String? _processingId;
+
   @override
   void initState() {
     super.initState();
@@ -109,45 +111,107 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                 ),
               ),
               if (!isIncoming)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
+                OutlinedButton.icon(
+                  onPressed: _processingId == transferId
+                      ? null
+                      : () async {
+                          setState(() => _processingId = transferId);
+                          final success = await context.read<AppState>().cancelHandover(transferId);
+                          if (mounted) setState(() => _processingId = null);
+                          if (success && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Handover cancelled successfully.'),
+                                backgroundColor: Color(0xFF64748B),
+                              ),
+                            );
+                          }
+                        },
+                  icon: const Icon(Icons.close_rounded, size: 14),
+                  label: Text(
+                    _processingId == transferId ? '...' : 'Cancel',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                   ),
-                  child: const Text('Pending', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                    side: const BorderSide(color: Color(0xFFFCA5A5)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    minimumSize: const Size(0, 30),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
                 ),
             ],
           ),
           if (isIncoming) ...[
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  final success = await context.read<AppState>().acceptHandover(transferId);
-                  if (success && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Received ৳ $amt successfully!'),
-                        backgroundColor: const Color(0xFF10B981),
-                      ),
-                    );
-                    Navigator.of(context, rootNavigator: true).pop();
-                  }
-                },
-                icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                label: const Text('Accept & Receive Cash', style: TextStyle(fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            Row(
+              children: [
+                // Decline Button
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _processingId == transferId
+                        ? null
+                        : () async {
+                            setState(() => _processingId = transferId);
+                            final success = await context.read<AppState>().declineHandover(transferId);
+                            if (mounted) setState(() => _processingId = null);
+                            if (success && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Handover declined.'),
+                                  backgroundColor: Color(0xFFEF4444),
+                                ),
+                              );
+                            }
+                          },
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    label: Text(
+                      _processingId == transferId ? '...' : 'Decline',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFEF4444),
+                      side: const BorderSide(color: Color(0xFFFCA5A5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
-              ),
+                const SizedBox(width: 10),
+                // Accept Button
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _processingId == transferId
+                        ? null
+                        : () async {
+                            setState(() => _processingId = transferId);
+                            final success = await context.read<AppState>().acceptHandover(transferId);
+                            if (mounted) setState(() => _processingId = null);
+                            if (success && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Received ৳ $amt successfully!'),
+                                  backgroundColor: const Color(0xFF10B981),
+                                ),
+                              );
+                              Navigator.of(context, rootNavigator: true).pop();
+                            }
+                          },
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: Text(
+                      _processingId == transferId ? '...' : 'Accept',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ],

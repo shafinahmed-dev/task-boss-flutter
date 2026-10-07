@@ -91,6 +91,50 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
+  Future<bool> cancelHandover(String transferId) async {
+    try {
+      final response = await authRequest(
+        'POST',
+        Uri.parse('$apiBaseUrl/custody/transfers/$transferId/cancel'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await fetchPendingTransfers();
+        await refreshUserData();
+        if (currentUser?.role == 'MANAGER') {
+          await fetchManagerOverview();
+        }
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('cancelHandover error: $e');
+    }
+    return false;
+  }
+
+  Future<bool> declineHandover(String transferId) async {
+    try {
+      final response = await authRequest(
+        'POST',
+        Uri.parse('$apiBaseUrl/custody/transfers/$transferId/decline'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await fetchPendingTransfers();
+        await refreshUserData();
+        if (currentUser?.role == 'MANAGER') {
+          await fetchManagerOverview();
+        }
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('declineHandover error: $e');
+    }
+    return false;
+  }
+
 
   bool isReady = false;
   List<Wallet> wallets = [];

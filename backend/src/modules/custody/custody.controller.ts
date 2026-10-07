@@ -53,6 +53,16 @@ export class CustodyController {
     return this.custodyService.disputeTransfer(id);
   }
 
+  @Post('transfers/:id/cancel')
+  async cancelTransfer(@Param('id') id: string, @Req() req: any) {
+    return this.custodyService.cancelTransfer(id, req.user);
+  }
+
+  @Post('transfers/:id/decline')
+  async declineTransfer(@Param('id') id: string, @Req() req: any) {
+    return this.custodyService.declineTransfer(id, req.user);
+  }
+
   /**
    * GET /custody/transfers?custodianId=...
    * Returns all custody transfers involving this custodian (incoming and outgoing).
