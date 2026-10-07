@@ -288,6 +288,35 @@ export class ManagerService {
       }));
     }
 
+    const usersWithCustodianAccounts = await this.prisma.user.findMany({
+      where: {
+        custodianAccounts: {
+          some: { companyId: targetCompanyId },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        handle: true,
+        designation: true,
+        custodianAccounts: {
+          where: { companyId: targetCompanyId },
+          select: { id: true, balance: true },
+        },
+      },
+    });
+
+    const serializedCustodians = usersWithCustodianAccounts.flatMap((u) =>
+      u.custodianAccounts.map((c) => ({
+        id: c.id,
+        userId: u.id,
+        name: u.name || 'Staff',
+        handle: u.handle || '',
+        designation: u.designation || 'Team Member',
+        balance: Number((c as any).balance || 0),
+      }))
+    );
+
     const companyData = {
       id: targetComp.id,
       name: targetComp.name,
@@ -308,7 +337,7 @@ export class ManagerService {
         outflow: totalOutflow,
       },
       recentTransactions: recentMovements,
-      custodians: [],
+      custodians: serializedCustodians,
       assignedConcerns,
       topEmployees,
       managerPersonalBalance: Number(managerPersonalBalance) || 0,

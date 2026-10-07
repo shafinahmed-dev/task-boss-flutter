@@ -50,7 +50,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
     final concerns = (ov['assignedConcerns'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
     final topEmployees = (ov['topEmployees'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
     final recentTx = (ov['recentTransactions'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
-    final staffList = (ov['employees'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? topEmployees;
+    final staffList = (ov['custodians'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
     
     final companyTotalBalance = company['totalBalance'] ?? 0.0;
     final rawInflow = ov['inflow'] ?? ov['totalInflow'] ?? 0.0;
@@ -343,7 +343,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Assigned Staff Custodians', style: TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                        const Text('Team Members', style: TextStyle(color: darkSlate, fontSize: 16, fontWeight: FontWeight.bold)),
                         InkWell(
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManagerStaffScreen())),
                           child: const Text('Manage', style: TextStyle(color: navyColor, fontSize: 12, fontWeight: FontWeight.bold)),
@@ -354,13 +354,14 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                     if (staffList.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text('No staff assigned under this concern.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                        child: Text('No team members assigned.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
                       )
                     else
-                      ...staffList.take(4).map((staff) {
-                        final name = staff['name'] ?? staff['fullName'] ?? 'Staff Member';
-                        final role = staff['role'] ?? 'Custodian';
-                        final phone = staff['phone'] ?? staff['mobile'] ?? '';
+                      ...staffList.take(4).map((item) {
+                        final name = item['name'] ?? 'Team Member';
+                        final designation = (item['designation'] != null && item['designation'].toString().isNotEmpty)
+                            ? item['designation'].toString()
+                            : 'Team Member';
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
@@ -374,7 +375,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                               CircleAvatar(
                                 radius: 18,
                                 backgroundColor: navyColor.withOpacity(0.1),
-                                child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'S', style: const TextStyle(color: navyColor, fontWeight: FontWeight.bold)),
+                                child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'T', style: const TextStyle(color: navyColor, fontWeight: FontWeight.bold)),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -383,11 +384,32 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                                   children: [
                                     Text(name, style: const TextStyle(color: darkSlate, fontSize: 13, fontWeight: FontWeight.bold)),
                                     const SizedBox(height: 2),
-                                    Text('$role • $phone', style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                                    Text(
+                                      designation,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B), size: 18),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0FDF4),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                                ),
+                                child: Text(
+                                  '৳ ${_formatAmount(item['balance'])}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF16A34A),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         );
