@@ -137,7 +137,6 @@ export class CustodyService {
     const created = await this.prisma.custodyTransfer.create({
       data: {
         idempotencyKey: dto.idempotencyKey,
-        companyId: operationalCompanyId,
         fromCustodianId: senderCustodian.id,
         toCustodianId: receiverCustodian.id,
         fromWalletId: fromWalletId ?? null,
@@ -145,7 +144,15 @@ export class CustodyService {
         amount: new Decimal(dto.amount),
         fee: feeVal > 0 ? new Decimal(feeVal) : null,
         notes: dto.notes ?? null,
-        metadata: dto.metadata ? dto.metadata : undefined,
+        metadata: {
+          companyId: operationalCompanyId,
+          walletId: fromWalletId ?? null,
+          walletName: senderCustodian?.name || 'Cash in Hand',
+          paymentMethod: channelVal || 'Physical Cash',
+          fee: Number(feeVal || 0),
+          note: dto.notes || (dto as any).note || '',
+          ...(typeof dto.metadata === 'object' && dto.metadata !== null ? dto.metadata : {}),
+        },
         status: 'pending',
       },
     });
