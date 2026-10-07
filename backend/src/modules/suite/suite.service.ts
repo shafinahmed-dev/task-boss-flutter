@@ -174,7 +174,7 @@ export class SuiteService {
       });
 
       if (managerCompanyCodes.length === 0) {
-        managerCompanyCodes.push('TDC');
+        managerCompanyCodes.push('CONCERN');
       }
 
       return {
@@ -489,13 +489,13 @@ export class SuiteService {
     const serializedEmployees = employees.map((emp) => {
       const firstCompanyRel = emp.companies?.[0];
       const companyId = firstCompanyRel?.companyId;
-      const companyCode = firstCompanyRel?.company?.code || 'TDC';
-      const companyName = firstCompanyRel?.company?.name || 'Task Design & Consultancy';
+      const companyCode = firstCompanyRel?.company?.code || 'CONCERN';
+      const companyName = firstCompanyRel?.company?.name || 'Workspace Concern';
 
       // Lookup manager from map or fallback to first manager in tenant
       const managerName = companyId
-        ? companyManagerMap.get(companyId) || (managers[0]?.name ?? 'Shovon Ahmed')
-        : (managers[0]?.name ?? 'Shovon Ahmed');
+        ? companyManagerMap.get(companyId) || (managers[0]?.name ?? 'Concern Manager')
+        : (managers[0]?.name ?? 'Concern Manager');
 
       let balance = 0;
       if (emp.custodianAccounts) {
@@ -511,11 +511,11 @@ export class SuiteService {
 
       const empCompanyCodes = (emp.companies || []).map((uc: any) => {
         const comp = uc.company;
-        return comp?.code || comp?.name?.split(' ').map((w: string) => w[0]).join('').toUpperCase() || 'TDC';
+        return comp?.code || comp?.name?.split(' ').map((w: string) => w[0]).join('').toUpperCase() || 'CONCERN';
       });
 
       if (empCompanyCodes.length === 0) {
-        empCompanyCodes.push('TDC');
+        empCompanyCodes.push('CONCERN');
       }
 
       return {
@@ -564,22 +564,6 @@ export class SuiteService {
     });
     const companyMap = new Map(companies.map((c) => [c.id, c]));
     const tenantCompanyIds = companies.map((c) => c.id);
-
-    // Re-align categories created by TDC managers to TDC if needed
-    const tdcCompany = companies.find((c) =>
-      c.name.toLowerCase().includes('task design') || c.code === 'TDC'
-    );
-    if (tdcCompany) {
-      try {
-        await this.prisma.transactionCategory.updateMany({
-          where: {
-            companyId: { in: tenantCompanyIds },
-            name: { in: ['Office Supplies', 'Barakah Condominium', 'General'] },
-          },
-          data: { companyId: tdcCompany.id },
-        });
-      } catch (_) {}
-    }
 
     let startDate;
     const now = new Date();
@@ -632,9 +616,9 @@ export class SuiteService {
         ? comp.code
         : comp?.name
         ? comp.name.split(' ').map((w: string) => w[0]).join('').toUpperCase()
-        : 'TDC';
+        : 'CONCERN';
 
-      const companyName = comp?.name || 'Task Design & Consultancy';
+      const companyName = comp?.name || 'Workspace Concern';
       const segmentName = tx.category?.name || 'General';
 
       const isOut =

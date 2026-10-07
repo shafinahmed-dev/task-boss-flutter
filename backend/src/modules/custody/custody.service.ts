@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../database/prisma.service.js';
 import { Decimal } from '@prisma/client/runtime/library';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 
 // ── DTOs ─────────────────────────────────────────────────────────────────
 
@@ -176,54 +177,48 @@ export class CustodyService {
    * POST /custody/transfers/:id/confirm
    * Receiver confirms acceptance. Status becomes 'confirmed'.
    */
-  async confirmTransfer(transferId: string, toWalletId?: string) {
+  async confirmTransfer(transferId: string, reqUser?: any) {
     const transfer = await this.prisma.custodyTransfer.findUnique({
       where: { id: transferId },
+      include: {
+        fromCustodian: { include: { linkedUser: true } },
+        toCustodian: { include: { linkedUser: true } },
+      },
     });
+
     if (!transfer) {
       throw new NotFoundException("Unable to complete handover. Transfer could not be found.");
     }
     if (transfer.status === 'confirmed') {
-      return transfer; // already confirmed — idempotent
+      return { success: true, message: 'Transfer already confirmed', transfer };
     }
     if (transfer.status === 'disputed') {
       throw new ConflictException('Cannot confirm a disputed transfer');
     }
 
-    let targetToWalletId = toWalletId || transfer.toWalletId || null;
+    let targetToWalletId = transfer.toWalletId;
     if (!targetToWalletId) {
       const defaultWallet =
-        (await this.prisma.wallet.findFirst({
+        await this.prisma.wallet.findFirst({
           where: { custodianId: transfer.toCustodianId, isDefault: true, isArchived: false },
-        })) ||
-        (await this.prisma.wallet.findFirst({
+        }) ||
+        await this.prisma.wallet.findFirst({
           where: { custodianId: transfer.toCustodianId, isArchived: false },
-        }));
+        });
       targetToWalletId = defaultWallet?.id || null;
     }
 
-    const meta =
-      this.transferMetadata.get(transfer.id) ||
-      this.transferMetadata.get(transfer.idempotencyKey);
-    const feeVal = meta?.fee || (transfer.fee ? Number(transfer.fee) : 0);
-    const channelVal = meta?.channel || 'cash';
+    const meta = typeof transfer.metadata === 'object' && transfer.metadata !== null ? transfer.metadata as any : {};
+    const feeVal = Number(transfer.fee || meta.fee || 0);
+    const channelVal = meta.channel || 'cash';
 
-    const fromCustodian = await this.prisma.custodianAccount.findUnique({
-      where: { id: transfer.fromCustodianId },
-      select: { companyId: true, name: true, linkedUserId: true, linkedUser: { select: { id: true, name: true, designation: true } } },
-    });
+    const senderName = transfer.fromCustodian?.linkedUser?.name || transfer.fromCustodian?.name || 'Sender Custodian';
+    const recipientName = transfer.toCustodian?.linkedUser?.name || transfer.toCustodian?.name || 'Recipient Custodian';
+    const receiptNo = meta.voucherNumber || `HND-${transfer.id.substring(0, 8).toUpperCase()}`;
 
-    const toCustodian = await this.prisma.custodianAccount.findUnique({
-      where: { id: transfer.toCustodianId },
-      select: { companyId: true, name: true, linkedUserId: true, linkedUser: { select: { id: true, name: true, designation: true } } },
-    });
-
-    const senderName = fromCustodian?.linkedUser?.name || fromCustodian?.name || 'Sender Custodian';
-    const recipientName = toCustodian?.linkedUser?.name || toCustodian?.name || 'Recipient Custodian';
-    const receiptNo = `HND-${transfer.id.substring(0, 8).toUpperCase()}`;
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const updatedTransfer = await tx.custodyTransfer.update({
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Update transfer status
+      await tx.custodyTransfer.update({
         where: { id: transferId },
         data: {
           status: 'confirmed',
@@ -232,7 +227,7 @@ export class CustodyService {
         },
       });
 
-      // Sender Outflow Movement
+      // 2. Sender Outflow Movement
       await tx.moneyMovement.create({
         data: {
           idempotencyKey: crypto.randomUUID(),
@@ -242,7 +237,7 @@ export class CustodyService {
           currency: 'BDT',
           channel: channelVal,
           custodianId: transfer.fromCustodianId,
-          collectorId: fromCustodian?.linkedUserId || transfer.fromCustodianId,
+          collectorId: transfer.fromCustodian?.linkedUserId || transfer.fromCustodianId,
           walletId: transfer.fromWalletId || null,
           entryTag: 'handover_out',
           notes: transfer.notes || `Handover sent to ${recipientName}`,
@@ -250,7 +245,7 @@ export class CustodyService {
             transferId: transfer.id,
             voucherNumber: receiptNo,
             recipientName: recipientName,
-            paymentMethod: channelVal || 'Physical Cash',
+            paymentMethod: channelVal,
             movementType: 'Cash Out',
             baseAmount: Number(transfer.amount),
             fee: feeVal,
@@ -260,7 +255,7 @@ export class CustodyService {
         },
       });
 
-      // Recipient Inflow Movement
+      // 3. Recipient Inflow Movement
       await tx.moneyMovement.create({
         data: {
           idempotencyKey: crypto.randomUUID(),
@@ -270,7 +265,7 @@ export class CustodyService {
           currency: 'BDT',
           channel: channelVal,
           custodianId: transfer.toCustodianId,
-          collectorId: toCustodian?.linkedUserId || transfer.toCustodianId,
+          collectorId: transfer.toCustodian?.linkedUserId || transfer.toCustodianId,
           walletId: targetToWalletId,
           entryTag: 'handover_in',
           notes: transfer.notes || `Handover received from ${senderName}`,
@@ -278,7 +273,7 @@ export class CustodyService {
             transferId: transfer.id,
             voucherNumber: receiptNo,
             senderName: senderName,
-            paymentMethod: channelVal || 'Physical Cash',
+            paymentMethod: channelVal,
             movementType: 'Cash In',
             baseAmount: Number(transfer.amount),
             fee: 0,
@@ -287,19 +282,10 @@ export class CustodyService {
           syncStatus: 'synced',
         },
       });
-
-      return updatedTransfer;
     });
 
-    console.log('[Handover Confirm] Created movements for sender and receiver:', transfer.id);
-
-    return {
-      ...updated,
-      receiptNo,
-      fee: feeVal,
-      channel: channelVal,
-      metadata: meta || { baseAmount: Number(transfer.amount), fee: feeVal, channel: channelVal },
-    };
+    console.log('[Handover Confirm] Created movements for sender and receiver via ledger:', transferId);
+    return { success: true, message: 'Handover accepted successfully' };
   }
 
   /**
@@ -383,41 +369,65 @@ export class CustodyService {
     }
   }
 
-  async getPendingTransfers(custodianId?: string, reqUser?: any) {
+  async getPendingTransfers(reqUser?: any) {
     const userId = reqUser?.id || reqUser?.sub;
-    let userCustodianIds: string[] = [];
-    if (custodianId) {
-      userCustodianIds.push(custodianId);
-    }
+    const custodianIds: string[] = [];
     if (userId) {
       const custodians = await this.prisma.custodianAccount.findMany({
         where: { linkedUserId: userId },
         select: { id: true },
       });
-      userCustodianIds.push(...custodians.map(c => c.id));
+      custodianIds.push(...custodians.map(c => c.id));
     }
-    const whereClause: any = { status: 'pending' };
-    if (userCustodianIds.length > 0) {
-      whereClause.OR = [
-        { fromCustodianId: { in: userCustodianIds } },
-        { toCustodianId: { in: userCustodianIds } },
-      ];
-    }
-    const pending = await this.prisma.custodyTransfer.findMany({
-      where: whereClause,
+
+    const transfers = await this.prisma.custodyTransfer.findMany({
+      where: {
+        status: 'pending',
+        OR: custodianIds.length > 0 ? [
+          { fromCustodianId: { in: custodianIds } },
+          { toCustodianId: { in: custodianIds } },
+        ] : undefined,
+      },
       include: {
-        fromCustodian: { select: { id: true, name: true, linkedUser: { select: { id: true, name: true, role: true } } } },
-        toCustodian: { select: { id: true, name: true, linkedUser: { select: { id: true, name: true, role: true } } } },
+        fromCustodian: {
+          include: {
+            user: { select: { id: true, name: true, handle: true, role: true } },
+            linkedUser: { select: { id: true, name: true, role: true } },
+          },
+        },
+        toCustodian: {
+          include: {
+            user: { select: { id: true, name: true, handle: true, role: true } },
+            linkedUser: { select: { id: true, name: true, role: true } },
+          },
+        },
       },
       orderBy: { requestedAt: 'desc' },
     });
-    return pending.map(t => {
-      const meta = this.transferMetadata.get(t.id) || this.transferMetadata.get(t.idempotencyKey) || (typeof t.metadata === 'object' ? t.metadata : {});
+
+    const serialized = transfers.map((t) => {
+      const isSender = custodianIds.includes(t.fromCustodianId);
+      const rawMeta = this.transferMetadata.get(t.id) || this.transferMetadata.get(t.idempotencyKey) || (typeof t.metadata === 'object' ? t.metadata : {});
+      const meta = (rawMeta || {}) as Record<string, any>;
+      const senderName = t.fromCustodian?.linkedUser?.name || t.fromCustodian?.name || 'Sender';
+      const receiverName = t.toCustodian?.linkedUser?.name || t.toCustodian?.name || meta.recipientName || 'Staff';
+
       return {
-        ...t,
-        metadata: meta,
+        id: t.id,
+        amount: Number(t.amount || 0),
+        fee: Number(t.fee || 0),
+        status: t.status,
+        voucherNumber: meta.voucherNumber || 'HND-TRANSFER',
+        note: t.notes || meta.note || '',
+        isSender,
+        isIncoming: !isSender,
+        senderName,
+        receiverName,
+        createdAt: t.requestedAt?.toISOString() || new Date().toISOString(),
       };
     });
+
+    return { success: true, transfers: serialized };
   }
 
 

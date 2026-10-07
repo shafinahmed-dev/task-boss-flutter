@@ -28,41 +28,43 @@ export class ManagerService {
   }
 
   async getOverview(companyId?: string, range?: string, reqUser?: any) {
-  // 1. Fetch user's assigned companies
-  const userCompanies = await this.prisma.userCompany.findMany({
-    where: { userId: reqUser?.id },
-    include: {
-      company: {
-        select: { id: true, name: true, code: true },
+    // 1. Fetch user's assigned companies (Concerns)
+    const userCompanies = await this.prisma.userCompany.findMany({
+      where: { userId: reqUser?.id },
+      include: {
+        company: {
+          select: { id: true, name: true, code: true },
+        },
       },
-    },
-  });
-
-  const assignedConcerns = userCompanies
-    .map((uc) => uc.company)
-    .filter(Boolean);
-
-  // 2. Resolve target company (Use passed companyId, or first assigned company, or TDC)
-  let targetCompanyId = companyId;
-  if (!targetCompanyId || targetCompanyId === 'null' || targetCompanyId === 'undefined' || targetCompanyId === '') {
-    targetCompanyId = assignedConcerns[0]?.id;
-  }
-
-  let company: any = assignedConcerns.find((c) => c.id === targetCompanyId);
-  if (!company && targetCompanyId) {
-    company = await this.prisma.company.findUnique({
-      where: { id: targetCompanyId },
-      select: { id: true, name: true, code: true },
     });
-  }
 
-  if (!company) {
-    company = {
-      id: targetCompanyId || '',
-      name: 'Task Design & Consultlancy',
-      code: 'TDC',
-    };
-  }
+    const assignedConcerns = userCompanies
+      .map((uc) => uc.company)
+      .filter(Boolean);
+
+    // 2. Resolve target company (Use passed companyId, or dynamically resolve primary)
+    let targetCompanyId = companyId;
+    if (!targetCompanyId || targetCompanyId === 'null' || targetCompanyId === 'undefined' || targetCompanyId === '') {
+      targetCompanyId = assignedConcerns[0]?.id;
+    }
+
+    // 3. Fetch company details from DB
+    let company: any = assignedConcerns.find((c) => c.id === targetCompanyId);
+    if (!company && targetCompanyId) {
+      company = await this.prisma.company.findUnique({
+        where: { id: targetCompanyId },
+        select: { id: true, name: true, code: true },
+      });
+    }
+
+    // 4. Fallback to generic state if no company found
+    if (!company) {
+      company = {
+        id: targetCompanyId || '',
+        name: 'Workspace Concern',
+        code: 'CONCERN',
+      };
+    }
 
   // 3. REUSE PROVEN TRANSACTIONS METHOD (Guarantees exact matching data)
   const txResult = await this.getAllTransactions(targetCompanyId, reqUser);
@@ -131,13 +133,6 @@ export class ManagerService {
 
   // 3. Consolidated Cash = Manager Cash + Team Cash
   let consolidatedTotal = managerBalance + teamBalance;
-
-  // Fallback to 100,000 if active manager has funds in workspace
-  if (consolidatedTotal === 0 && managerBalance > 0) {
-    consolidatedTotal = managerBalance;
-  } else if (consolidatedTotal === 0) {
-    consolidatedTotal = 100000;
-  }
 
   return {
     success: true,

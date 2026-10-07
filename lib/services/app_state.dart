@@ -20,14 +20,23 @@ class AppState extends ChangeNotifier {
   int pendingCount = 0;
   List<Map<String, dynamic>> _pendingTransfers = [];
   List<Map<String, dynamic>> get pendingTransfers => _pendingTransfers;
+  List<Map<String, dynamic>> _employeeTransactions = [];
+  List<Map<String, dynamic>> get employeeTransactions => _employeeTransactions;
+  List<Map<String, dynamic>> get transactions => _employeeTransactions;
 
   int get notificationCount {
     int count = _pendingTransfers.length;
-    final recent = _managerOverviewData['recentTransactions'] as List? ?? [];
+    final recent = (_managerOverviewData['recentTransactions'] as List?) ?? _employeeTransactions;
     if (count == 0 && recent.isNotEmpty) {
       count = recent.take(3).length;
     }
     return count;
+  }
+
+  Future<void> refreshUserData() async {
+    await _fetchBalanceData();
+    await fetchPendingTransfers();
+    notifyListeners();
   }
 
   Future<void> fetchPendingTransfers() async {
@@ -35,16 +44,40 @@ class AppState extends ChangeNotifier {
       final response = await authRequest('GET', Uri.parse('$apiBaseUrl/custody/transfers/pending'));
       if (response.statusCode == 200 || response.statusCode == 201) {
         final decoded = jsonDecode(response.body);
+        List<dynamic> raw = [];
         if (decoded is List) {
-          _pendingTransfers = (decoded as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          raw = decoded;
         } else if (decoded is Map && decoded['transfers'] is List) {
-          _pendingTransfers = (decoded['transfers'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          raw = decoded['transfers'];
         }
+        _pendingTransfers = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         notifyListeners();
       }
     } catch (e) {
       debugPrint('fetchPendingTransfers error: $e');
     }
+  }
+
+  Future<bool> acceptHandover(String transferId) async {
+    try {
+      final response = await authRequest(
+        'POST',
+        Uri.parse('$apiBaseUrl/custody/transfers/$transferId/confirm'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await fetchPendingTransfers();
+        await refreshUserData(); // Refreshes user balance (updating Shafin to ৳ 20,000!)
+        if (currentUser?.role == 'MANAGER') {
+          await fetchManagerOverview();
+        }
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('acceptHandover error: $e');
+    }
+    return false;
   }
 
 
@@ -272,6 +305,8 @@ class AppState extends ChangeNotifier {
               : (cachedDepartment.isNotEmpty ? cachedDepartment : parsedUser.department),
         );
         await _fetchBalanceData();
+        await fetchPendingTransfers();
+
       } catch (e) {
         // failed to parse
       }
@@ -390,6 +425,8 @@ class AppState extends ChangeNotifier {
     try {
       await _fetchBalanceData();
     } catch (e) {
+      await fetchPendingTransfers();
+
       debugPrint('Error fetching balance data on login: $e');
     }
     notifyListeners();
@@ -578,6 +615,8 @@ class AppState extends ChangeNotifier {
       if (notifResp.statusCode == 200) {
         final data = jsonDecode(notifResp.body);
         final pending = data['pendingTransfers'] as List? ?? [];
+        final movements = data['recentMovements'] as List? ?? [];
+        _employeeTransactions = movements.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         pendingCount = pending.where((t) {
           final status = (t['status'] ?? '').toString().toLowerCase();
           final isIncoming = t['toCustodianId'] == user!.custodianId || t['to_custodian_id'] == user!.custodianId;
