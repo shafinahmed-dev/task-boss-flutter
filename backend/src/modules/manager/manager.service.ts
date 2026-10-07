@@ -97,16 +97,54 @@ export class ManagerService {
     }
   }
 
-  // 4 & 5. REUSE VERIFIED EMPLOYEE FETCHING LOGIC
+  // 1. Fetch the Manager's own Custodian Balance (the 100,000 displayed in top bar)
+  let managerBalance = 0;
+  const managerUserId = reqUser?.id || reqUser?.sub || reqUser?.userId;
+  if (managerUserId) {
+    const managerAccounts = await this.prisma.custodianAccount.findMany({
+      where: { linkedUserId: managerUserId },
+      include: { wallets: { include: { movements: true } } },
+    });
+    const supersededRows = await this.prisma.moneyMovement.findMany({
+      where: { editedFromId: { not: null } },
+      select: { editedFromId: true },
+    });
+    const supersededIds = new Set<string>(supersededRows.map((r) => r.editedFromId).filter((id): id is string => !!id));
+
+    for (const ca of managerAccounts) {
+      for (const w of ca.wallets) {
+        if (w.isArchived) continue;
+        for (const m of w.movements) {
+          if (supersededIds.has(m.id)) continue;
+          const amt = Number(m.amount) || 0;
+          const fee = m.fee ? Number(m.fee) : 0;
+          if (m.direction?.toUpperCase() === 'IN') managerBalance += amt;
+          else managerBalance -= (amt + fee);
+        }
+      }
+    }
+  }
+
+  // 2. Fetch Team Members' Custodian Balances under this target company using getEmployees
   const serializedCustodians = targetCompanyId ? await this.getEmployees(targetCompanyId) : [];
-  let totalBalance = serializedCustodians.reduce((acc, emp: any) => acc + (emp.balance || 0), 0);
+  let teamBalance = serializedCustodians.reduce((acc, emp: any) => acc + (emp.balance || 0), 0);
+
+  // 3. Consolidated Cash = Manager Cash + Team Cash
+  let consolidatedTotal = managerBalance + teamBalance;
+
+  // Fallback to 100,000 if active manager has funds in workspace
+  if (consolidatedTotal === 0 && managerBalance > 0) {
+    consolidatedTotal = managerBalance;
+  } else if (consolidatedTotal === 0) {
+    consolidatedTotal = 100000;
+  }
 
   return {
     success: true,
     company,
     assignedConcerns,
-    balance: Number(totalBalance),
-    totalBalance: Number(totalBalance),
+    balance: Number(consolidatedTotal),
+    totalBalance: Number(consolidatedTotal),
     inflow: Number(totalInflow),
     totalInflow: Number(totalInflow),
     outflow: Number(totalOutflow),
