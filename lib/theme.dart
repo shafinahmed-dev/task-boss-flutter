@@ -59,9 +59,9 @@ class AppTheme {
   static const Color confirmedBorder = Color(0xFFBBF7D0);
   static const Color confirmedText = Color(0xFF16A34A);
 
-  static const Color expenseBg = Color(0xFFFEF2F2);
-  static const Color expenseBorder = Color(0xFFFECACA);
-  static const Color expenseText = Color(0xFFDC2626);
+  static const Color outflowBg = Color(0xFFFEF2F2);
+  static const Color outflowBorder = Color(0xFFFECACA);
+  static const Color outflowText = Color(0xFFDC2626);
   
   static const Color inflowBg = Color(0xFFF0FDF4);
   static const Color inflowBorder = Color(0xFFBBF7D0);

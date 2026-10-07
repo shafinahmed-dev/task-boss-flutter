@@ -463,8 +463,8 @@ class _NotificationRowState extends State<_NotificationRow> {
                               child: OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(vertical: 11),
-                                  foregroundColor: AppTheme.expenseText,
-                                  side: const BorderSide(color: AppTheme.expenseBorder),
+                                  foregroundColor: AppTheme.outflowText,
+                                  side: const BorderSide(color: AppTheme.outflowBorder),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
                                 onPressed: widget.isProcessing ? null : widget.onReject,

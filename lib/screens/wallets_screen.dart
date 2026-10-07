@@ -109,7 +109,7 @@ class _WalletsScreenState extends State<WalletsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text('Add New Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
-                    if (modalError != null) Text(modalError!, style: const TextStyle(color: AppTheme.expenseText, fontWeight: FontWeight.bold)),
+                    if (modalError != null) Text(modalError!, style: const TextStyle(color: AppTheme.outflowText, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Row(
                       children: ['CASH', 'MFS', 'BANK'].map((t) => Expanded(
@@ -297,7 +297,7 @@ class _WalletsScreenState extends State<WalletsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text('Wallet Transfer', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryText)),
-                    if (modalError != null) Text(modalError!, style: const TextStyle(color: AppTheme.expenseText, fontWeight: FontWeight.bold)),
+                    if (modalError != null) Text(modalError!, style: const TextStyle(color: AppTheme.outflowText, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     const Text('From Wallet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
                     const SizedBox(height: 6),
@@ -575,8 +575,8 @@ class _WalletsScreenState extends State<WalletsScreen> {
                     if (modalError != null)
                       Container(
                         padding: const EdgeInsets.all(10), margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(color: AppTheme.expenseBg, border: Border.all(color: AppTheme.expenseBorder), borderRadius: BorderRadius.circular(8)),
-                        child: Text(modalError!, style: const TextStyle(color: AppTheme.expenseText, fontSize: 13)),
+                        decoration: BoxDecoration(color: AppTheme.outflowBg, border: Border.all(color: AppTheme.outflowBorder), borderRadius: BorderRadius.circular(8)),
+                        child: Text(modalError!, style: const TextStyle(color: AppTheme.outflowText, fontSize: 13)),
                       ),
                     TextField(controller: nameCtl, decoration: InputDecoration(
                         labelText: 'Wallet Name *',
@@ -684,7 +684,7 @@ class _WalletsScreenState extends State<WalletsScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppTheme.expenseText),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.outflowText),
             onPressed: () async {
               Navigator.pop(ctx);
               final app = context.read<AppState>();

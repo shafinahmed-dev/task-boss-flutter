@@ -391,7 +391,7 @@ class _RegisterCompanyFormState extends State<_RegisterCompanyForm> {
         ),
         const SizedBox(height: 24),
         if (_error != null) ...[
-          Text(_error!, style: const TextStyle(color: AppTheme.expenseText, fontWeight: FontWeight.bold)),
+          Text(_error!, style: const TextStyle(color: AppTheme.outflowText, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
         ],
         ElevatedButton(

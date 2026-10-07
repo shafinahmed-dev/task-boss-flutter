@@ -803,11 +803,11 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: AppTheme.expenseBg,
-          border: Border.all(color: AppTheme.expenseBorder),
+          color: AppTheme.outflowBg,
+          border: Border.all(color: AppTheme.outflowBorder),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Text(t, style: const TextStyle(color: AppTheme.expenseText, fontWeight: FontWeight.bold)),
+        child: Text(t, style: const TextStyle(color: AppTheme.outflowText, fontWeight: FontWeight.bold)),
       );
 
   Widget _row(String label, String value, {bool bold = false}) => Padding(

@@ -55,10 +55,13 @@ class AccountScreen extends StatefulWidget {
 
 class _AccountScreenState extends State<AccountScreen> {
   bool _loading = true;
-  double _inf = 0, _outf = 0, _exp = 0;
+  double _inf = 0, _outf = 0;
+  String _formatAmount(dynamic val) {
+    final d = _toDouble(val);
+    return d % 1 == 0 ? d.toStringAsFixed(0) : d.toStringAsFixed(2);
+  }
   List<dynamic> _inflowItems = [];
   List<dynamic> _outflowItems = [];
-  List<dynamic> _expenseItems = [];
 
   @override
   void initState() {
@@ -82,10 +85,9 @@ class _AccountScreenState extends State<AccountScreen> {
         app.authRequest('GET', tUri).catchError((_) => http.Response('[]', 500)),
       ]);
 
-      double i = 0, o = 0, e = 0;
+      double i = 0, o = 0;
       final List<dynamic> infs = [];
       final List<dynamic> outfs = [];
-      final List<dynamic> exps = [];
 
       // 1. Process Movements
       if (results[0].statusCode == 200) {
@@ -99,11 +101,18 @@ class _AccountScreenState extends State<AccountScreen> {
           final fee = _toDouble(m['fee'] ?? m['metadata']?['fee']);
           final dir = (m['direction'] ?? '').toString().toLowerCase();
           final tag = (m['entryTag'] ?? '').toString().toLowerCase();
+          
           if (tag == 'internal_transfer') {
-            // Internal transfers between sub-ledger wallets do not count toward external Inflows/Outflows
-            final fee = _toDouble(m['fee'] ?? m['metadata']?['fee']);
             if (fee > 0 && dir == 'out') {
-              e += fee;
+              o += fee;
+              outfs.add({
+                'uiType': 'fee',
+                'title': 'Transfer Fee',
+                'amount': fee,
+                'date': m['date'],
+                'notes': m['notes'] ?? m['note'] ?? m['metadata']?['note'] ?? m['metadata']?['notes'],
+                'channel': m['channel'] ?? m['metadata']?['channel'],
+              });
             }
             continue;
           }
@@ -118,8 +127,8 @@ class _AccountScreenState extends State<AccountScreen> {
             o += amt;
             outfs.add(m);
             if (fee > 0) {
-              e += fee;
-              exps.add({
+              o += fee;
+              outfs.add({
                 'uiType': 'fee',
                 'title': 'Handover Fee',
                 'amount': fee,
@@ -135,35 +144,29 @@ class _AccountScreenState extends State<AccountScreen> {
           final movementType = (m['metadata']?['movementType'] ?? '').toString().toLowerCase();
           final categoryStr = (m['metadata']?['category'] ?? '').toString();
 
-          final bool isExpense = dirTab == 'expense' ||
-                                 movementType == 'expense' ||
-                                 (tag == 'business_expense' && dirTab != 'out' && movementType != 'cash out');
-
-          final bool isCashOut = (dir == 'out' && !isExpense) ||
-                                 dirTab == 'out' ||
-                                 movementType == 'cash out' ||
-                                 tag == 'outflow';
-
-          final bool isCashIn = dir == 'in' || dirTab == 'in' || movementType == 'cash in';
+          final bool isCashIn = dir == 'in' || dirTab == 'in' || movementType == 'cash in' || tag == 'inflow';
+          final bool isCashOut = !isCashIn;
 
           if (isCashIn) {
             i += amt;
             infs.add(m);
             if (fee > 0) {
-              e += fee;
-            }
-          } else if (isExpense) {
-            e += amt;
-            exps.add(m);
-            if (fee > 0) {
-              e += fee;
+              o += fee;
+              outfs.add({
+                'uiType': 'fee',
+                'title': 'Movement Fee (${categoryStr.isNotEmpty ? categoryStr : (tag.isNotEmpty ? tag : "Cash In")})',
+                'amount': fee,
+                'date': m['date'],
+                'notes': m['notes'] ?? m['note'] ?? m['metadata']?['note'] ?? m['metadata']?['notes'],
+                'channel': m['channel'] ?? m['metadata']?['channel'],
+              });
             }
           } else if (isCashOut) {
             o += amt;
             outfs.add(m);
             if (fee > 0) {
-              e += fee;
-              exps.add({
+              o += fee;
+              outfs.add({
                 'uiType': 'fee',
                 'title': 'Movement Fee (${categoryStr.isNotEmpty ? categoryStr : (tag.isNotEmpty ? tag : "Cash Out")})',
                 'amount': fee,
@@ -196,16 +199,13 @@ class _AccountScreenState extends State<AccountScreen> {
 
       infs.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
       outfs.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
-      exps.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
 
       if (mounted) {
         setState(() {
           _inf = i;
           _outf = o;
-          _exp = e;
           _inflowItems = infs;
           _outflowItems = outfs;
-          _expenseItems = exps;
         });
       }
     } catch (_) {
@@ -301,9 +301,9 @@ class _AccountScreenState extends State<AccountScreen> {
                 width: 280,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.expenseText,
-                    side: const BorderSide(color: AppTheme.expenseBorder),
-                    backgroundColor: AppTheme.expenseBg.withValues(alpha: 0.5),
+                    foregroundColor: AppTheme.outflowText,
+                    side: const BorderSide(color: AppTheme.outflowBorder),
+                    backgroundColor: AppTheme.outflowBg.withValues(alpha: 0.5),
                     minimumSize: const Size(double.infinity, 44),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -333,7 +333,7 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.expenseText,
+              backgroundColor: AppTheme.outflowText,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -424,11 +424,71 @@ class _AccountScreenState extends State<AccountScreen> {
           Divider(color: Colors.white.withValues(alpha: 0.15), height: 1),
           Row(
             children: [
-              _buildMicroStat('Inflows', _inf, const Color(0xFF4ADE80), true, () => _showDetailsModal('Inflow Transactions', _inflowItems, AppTheme.inflowText)),
-              Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.15)),
-              _buildMicroStat('Outflows', _outf, const Color(0xFFF87171), false, () => _showDetailsModal('Outflow Transactions', _outflowItems, AppTheme.pendingAccent)),
-              Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.15)),
-              _buildMicroStat('Expenses', _exp, const Color(0xFFFBBF24), false, () => _showDetailsModal('Expense Transactions', _expenseItems, AppTheme.expenseText)),
+              Expanded(
+                child: InkWell(
+                  onTap: () => _showDetailsModal('Inflow Transactions', _inflowItems, AppTheme.inflowText),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Inflows',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '+৳ ${_formatAmount(_inf)}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF10B981),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                height: 32,
+                width: 1,
+                color: Colors.white.withValues(alpha: 0.12),
+              ),
+              Expanded(
+                child: InkWell(
+                  onTap: () => _showDetailsModal('Outflow Transactions', _outflowItems, AppTheme.pendingAccent),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Outflows',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '-৳ ${_formatAmount(_outf)}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFEF4444),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -436,24 +496,6 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  Widget _buildMicroStat(String label, double val, Color color, bool isIn, VoidCallback onTap) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w500, letterSpacing: 0.5)),
-              const SizedBox(height: 6),
-              Text('${isIn ? '+' : '-'}৳${val.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   void _showDetailsModal(String title, List<dynamic> items, Color accentColor) {
     showModalBottomSheet(
@@ -529,7 +571,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryText))),
-                  Text('৳${amt.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.expenseText)),
+                  Text('৳${amt.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.outflowText)),
                 ],
               ),
               if (dateStr.isNotEmpty) ...[
@@ -585,7 +627,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                   Text(
                     '${isOut ? '-' : '+'}৳${amt.toStringAsFixed(2)}',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isOut ? AppTheme.expenseText : AppTheme.inflowText),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isOut ? AppTheme.outflowText : AppTheme.inflowText),
                   ),
                 ],
               ),
@@ -599,7 +641,7 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
               if (fee > 0) ...[
                 const SizedBox(height: 2),
-                Text('Fee: ৳${fee.toStringAsFixed(2)}', style: const TextStyle(color: AppTheme.expenseText, fontSize: 11, fontStyle: FontStyle.italic)),
+                Text('Fee: ৳${fee.toStringAsFixed(2)}', style: const TextStyle(color: AppTheme.outflowText, fontSize: 11, fontStyle: FontStyle.italic)),
               ],
               if (channel.isNotEmpty) ...[
                 const SizedBox(height: 2),
@@ -639,18 +681,10 @@ class _AccountScreenState extends State<AccountScreen> {
         ? "${dt.toLocal().year}-${dt.toLocal().month.toString().padLeft(2,'0')}-${dt.toLocal().day.toString().padLeft(2,'0')} ${dt.toLocal().hour.toString().padLeft(2,'0')}:${dt.toLocal().minute.toString().padLeft(2,'0')}"
         : '';
 
-    final bool isExpense = dirTab == 'expense' ||
-                           movementType == 'expense' ||
-                           (tag == 'business_expense' && dirTab != 'out' && movementType != 'cash out');
-
-    final bool isCashOut = (dir == 'out' && !isExpense) ||
-                           dirTab == 'out' ||
-                           movementType == 'cash out' ||
-                           tag == 'outflow';
-
     final bool isCashIn = dir == 'in' || dirTab == 'in' || movementType == 'cash in';
+    final bool isCashOut = !isCashIn;
 
-    String badgeLabel = isCashIn ? 'CASH IN' : (isCashOut ? 'CASH OUT' : 'EXPENSE');
+    String badgeLabel = isCashIn ? 'INFLOW' : 'OUTFLOW';
     if (channel.isNotEmpty) badgeLabel += ' • $channel';
 
     Color badgeBg;
@@ -717,7 +751,7 @@ class _AccountScreenState extends State<AccountScreen> {
               children: [
                 Text(dateStr, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 11)),
                 if (fee > 0)
-                  Text('Fee: ৳${fee.toStringAsFixed(2)}', style: const TextStyle(color: AppTheme.expenseText, fontSize: 11, fontStyle: FontStyle.italic, fontWeight: FontWeight.bold)),
+                  Text('Fee: ৳${fee.toStringAsFixed(2)}', style: const TextStyle(color: AppTheme.outflowText, fontSize: 11, fontStyle: FontStyle.italic, fontWeight: FontWeight.bold)),
               ],
             ),
             if (channel.isNotEmpty) ...[
@@ -1265,8 +1299,8 @@ class _SecuritySheetState extends State<_SecuritySheet> {
                         Expanded(
                           child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.expenseText,
-                              side: const BorderSide(color: AppTheme.expenseBorder),
+                              foregroundColor: AppTheme.outflowText,
+                              side: const BorderSide(color: AppTheme.outflowBorder),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),

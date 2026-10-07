@@ -766,7 +766,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
-                      color: AppTheme.expenseText,
+                      color: AppTheme.outflowText,
                     ),
                   ),
               ],
