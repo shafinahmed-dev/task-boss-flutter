@@ -28,165 +28,93 @@ export class ManagerService {
   }
 
   async getOverview(companyId?: string, range?: string, reqUser?: any) {
-    try {
-    let targetCompanyId = companyId;
-    if (!targetCompanyId || targetCompanyId === 'null' || targetCompanyId === 'undefined' || targetCompanyId === '') {
-      if (reqUser?.id) {
-        const userCompany = await this.prisma.userCompany.findFirst({
-          where: { userId: reqUser.id },
-          select: { companyId: true },
-        });
-        targetCompanyId = userCompany?.companyId;
-      }
-      if (!targetCompanyId && reqUser?.tenantId) {
-        const firstCompany = await this.prisma.company.findFirst({
-          where: { tenantId: reqUser.tenantId },
-          select: { id: true },
-        });
-        targetCompanyId = firstCompany?.id;
-      }
-      if (!targetCompanyId) {
-        const tdcCompany = await this.prisma.company.findFirst({
-          where: {
-            OR: [
-              { code: 'TDC' },
-              { name: { contains: 'Task Design', mode: 'insensitive' } },
-            ],
-          },
-          select: { id: true },
-        });
-        targetCompanyId = tdcCompany?.id;
-      }
-    }
-
-    let company = null;
-    if (targetCompanyId) {
-      company = await this.prisma.company.findUnique({
-        where: { id: targetCompanyId },
+  // 1. Fetch user's assigned companies
+  const userCompanies = await this.prisma.userCompany.findMany({
+    where: { userId: reqUser?.id },
+    include: {
+      company: {
         select: { id: true, name: true, code: true },
-      });
-    }
-    if (!company) company = { id: targetCompanyId || '', name: 'Task Design & Consultlancy', code: 'TDC' };
-
-    let assignedConcerns: any[] = [];
-    if (reqUser?.id) {
-      const ucs = await this.prisma.userCompany.findMany({
-        where: { userId: reqUser.id },
-        include: { company: true },
-      });
-      assignedConcerns = ucs.map(uc => uc.company).filter(Boolean);
-    }
-    if (assignedConcerns.length === 0 && reqUser?.tenantId) {
-      assignedConcerns = await this.prisma.company.findMany({
-        where: { tenantId: reqUser.tenantId },
-      });
-    }
-    if (assignedConcerns.length === 0 && company) {
-      assignedConcerns = [company];
-    }
-
-    const supersededRows = await this.prisma.moneyMovement.findMany({
-      where: { editedFromId: { not: null } },
-      select: { editedFromId: true },
-    });
-    const supersededIds = new Set<string>(supersededRows.map((r) => r.editedFromId).filter((id): id is string => !!id));
-
-    let totalBalance = 0;
-    if (targetCompanyId) {
-      const companyCustodianAccounts = await this.prisma.custodianAccount.findMany({
-        where: { companyId: targetCompanyId },
-        include: { wallets: { include: { movements: true } } },
-      });
-      for (const ca of companyCustodianAccounts) {
-        for (const w of ca.wallets) {
-          if (w.isArchived) continue;
-          totalBalance += this.calculateWalletBalance(w, supersededIds);
-        }
-      }
-    }
-    if (totalBalance === 0) totalBalance = 100000;
-
-    const movements = await this.prisma.moneyMovement.findMany({
-      where: {
-        tenantId: reqUser?.tenantId,
-        OR: [
-          { category: { companyId: targetCompanyId } },
-          { wallet: { companyId: targetCompanyId } },
-        ],
       },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-      include: {
-        category: { select: { id: true, name: true, type: true } },
-        collector: { select: { id: true, name: true, role: true } },
-        custodian: { select: { id: true, name: true, type: true } },
-        wallet: { select: { id: true, name: true } },
-      },
+    },
+  });
+
+  const assignedConcerns = userCompanies
+    .map((uc) => uc.company)
+    .filter(Boolean);
+
+  // 2. Resolve target company (Use passed companyId, or first assigned company, or TDC)
+  let targetCompanyId = companyId;
+  if (!targetCompanyId || targetCompanyId === 'null' || targetCompanyId === 'undefined' || targetCompanyId === '') {
+    targetCompanyId = assignedConcerns[0]?.id;
+  }
+
+  let company: any = assignedConcerns.find((c) => c.id === targetCompanyId);
+  if (!company && targetCompanyId) {
+    company = await this.prisma.company.findUnique({
+      where: { id: targetCompanyId },
+      select: { id: true, name: true, code: true },
     });
+  }
 
-    let totalInflow = 0;
-    let totalOutflow = 0;
-    const serializedRecent = movements.map((tx) => {
-      const amt = Number(tx.amount || 0);
-      const mAny = tx as any;
-      const isOut =
-        tx.direction === 'out' ||
-        mAny.type === 'CASH_OUT' ||
-        mAny.type === 'EXPENSE' ||
-        mAny.movementType === 'Cash Out' ||
-        mAny.movementType === 'Expense';
-
-      if (isOut) totalOutflow += amt;
-      else totalInflow += amt;
-
-      return {
-        id: tx.id,
-        amount: amt,
-        fee: Number(tx.fee || 0),
-        direction: isOut ? 'out' : 'in',
-        type: isOut ? 'Cash Out' : 'Cash In',
-        movementType: mAny.movementType || (isOut ? 'Cash Out' : 'Cash In'),
-        note: tx.notes || mAny.movementType || 'Transaction',
-        segmentName: tx.category?.name || 'General',
-        actorName: tx.collector?.name || tx.custodian?.name || 'System',
-        actorRole: tx.collector?.role || 'STAFF',
-        createdAt: tx.createdAt.toISOString(),
-      };
-    });
-
-    const serializedCustodians = targetCompanyId ? await this.getEmployees(targetCompanyId) : [];
-
-    return {
-      success: true,
-      company,
-      balance: Number(totalBalance),
-      totalBalance: Number(totalBalance),
-      inflow: Number(totalInflow),
-      totalInflow: Number(totalInflow),
-      outflow: Number(totalOutflow),
-      totalOutflow: Number(totalOutflow),
-      recentTransactions: serializedRecent,
-      custodians: serializedCustodians,
-      assignedConcerns,
-      topEmployees: serializedCustodians.slice(0, 5),
-    };
-  } catch (err) {
-    console.error('getOverview error:', err);
-    return {
-      success: true,
-      company: { id: companyId || '', name: 'Task Design & Consultlancy', code: 'TDC', totalBalance: 100000 },
-      balance: 100000,
-      totalBalance: 100000,
-      inflow: 0,
-      totalInflow: 0,
-      outflow: 0,
-      totalOutflow: 0,
-      recentTransactions: [],
-      custodians: [],
-      assignedConcerns: [],
-      topEmployees: [],
+  if (!company) {
+    company = {
+      id: targetCompanyId || '',
+      name: 'Task Design & Consultlancy',
+      code: 'TDC',
     };
   }
+
+  // 3. REUSE PROVEN TRANSACTIONS METHOD (Guarantees exact matching data)
+  const txResult = await this.getAllTransactions(targetCompanyId, reqUser);
+  const transactions = txResult?.transactions || [];
+
+  // Filter by date range if specified
+  let filteredTransactions = transactions;
+  if (range && range !== 'all_time') {
+    const now = new Date();
+    filteredTransactions = transactions.filter((t: any) => {
+      const d = new Date(t.createdAt);
+      if (range === 'today') {
+        return d.toDateString() === now.toDateString();
+      } else if (range === 'this_week') {
+        const diff = (now.getTime() - d.getTime()) / (1000 * 3600 * 24);
+        return diff <= 7;
+      } else if (range === 'this_month') {
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+      return true;
+    });
+  }
+
+  // Calculate Inflow & Outflow directly from transactions
+  let totalInflow = 0;
+  let totalOutflow = 0;
+  for (const t of filteredTransactions) {
+    if (t.direction === 'out') {
+      totalOutflow += Number(t.amount || 0);
+    } else {
+      totalInflow += Number(t.amount || 0);
+    }
+  }
+
+  // 4 & 5. REUSE VERIFIED EMPLOYEE FETCHING LOGIC
+  const serializedCustodians = targetCompanyId ? await this.getEmployees(targetCompanyId) : [];
+  let totalBalance = serializedCustodians.reduce((acc, emp: any) => acc + (emp.balance || 0), 0);
+
+  return {
+    success: true,
+    company,
+    assignedConcerns,
+    balance: Number(totalBalance),
+    totalBalance: Number(totalBalance),
+    inflow: Number(totalInflow),
+    totalInflow: Number(totalInflow),
+    outflow: Number(totalOutflow),
+    totalOutflow: Number(totalOutflow),
+    recentTransactions: transactions.slice(0, 5),
+    custodians: serializedCustodians,
+    topEmployees: serializedCustodians.slice(0, 5),
+  };
 }
 
   async getEmployees(companyId: string) {

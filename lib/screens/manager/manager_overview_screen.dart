@@ -513,3 +513,60 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
   }
 }
 
+  Widget _buildCompanyHeader(BuildContext context) {
+    final app = context.watch<AppState>();
+    final overview = app.managerOverviewData;
+    final assignedConcerns = (overview['assignedConcerns'] as List?) ?? [];
+    final currentCompany = overview['company'] as Map? ?? {};
+    final currentCompanyName = currentCompany['name']?.toString() ?? 'Task Design & Consultlancy';
+    final currentCompanyId = currentCompany['id']?.toString() ?? '';
+
+    if (assignedConcerns.length <= 1) {
+      return Text(
+        currentCompanyName,
+        style: const TextStyle(
+          color: Color(0xFF94A3B8),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+
+    return PopupMenuButton<String>(
+      initialValue: currentCompanyId,
+      tooltip: 'Switch Concern',
+      onSelected: (selectedId) {
+        context.read<AppState>().selectManagerCompany(selectedId);
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              currentCompanyName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(Icons.arrow_drop_down_rounded, color: Colors.white, size: 22),
+        ],
+      ),
+      itemBuilder: (context) => assignedConcerns.map<PopupMenuEntry<String>>((c) {
+        final compMap = Map<String, dynamic>.from(c as Map);
+        return PopupMenuItem<String>(
+          value: compMap['id']?.toString() ?? '',
+          child: Text(
+            compMap['name']?.toString() ?? 'Concern',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+
