@@ -21,6 +21,10 @@ class AppState extends ChangeNotifier {
   bool isReady = false;
   List<Wallet> wallets = [];
 
+  String? _selectedCompanyId;
+  List<Map<String, dynamic>> _suiteConcerns = [];
+  List<Map<String, dynamic>> get suiteConcerns => _suiteConcerns;
+
   List<Map<String, dynamic>> _concerns = [];
   List<Map<String, dynamic>> get concerns => _concerns;
 
@@ -123,25 +127,31 @@ class AppState extends ChangeNotifier {
   }
 
   String get effectiveCompanyId {
+    // 1. Explicitly selected company takes precedence
+    if (_selectedCompanyId != null && _selectedCompanyId!.isNotEmpty) {
+      return _selectedCompanyId!;
+    }
     if (_selectedManagerCompanyId != null && _selectedManagerCompanyId!.isNotEmpty) {
       return _selectedManagerCompanyId!;
     }
-    if (user != null) {
-      if (user!.companies != null && user!.companies!.isNotEmpty) {
-        return user!.companies!.first['companyId']?.toString() ??
-               user!.companies!.first['id']?.toString() ?? '';
-      }
-      if (user!.companyId != null && user!.companyId!.isNotEmpty) {
-        return user!.companyId!;
-      }
+
+    // 2. Authenticated user's companyId
+    final u = user;
+    if (u != null && u.companyId != null && u.companyId!.isNotEmpty) {
+      return u.companyId!;
     }
-    if (_suiteConcerns.isNotEmpty) {
-      return _suiteConcerns.first['id']?.toString() ?? '';
+
+    // 3. Cached company ID from manager overview
+    if (_managerOverviewData['company'] is Map &&
+        _managerOverviewData['company']['id'] != null) {
+      return _managerOverviewData['company']['id'].toString();
     }
-    final overviewCid = _managerOverviewData['company']?['id']?.toString();
-    if (overviewCid != null && overviewCid.isNotEmpty) {
-      return overviewCid;
+
+    // 4. First suite concern if loaded
+    if (_suiteConcerns.isNotEmpty && _suiteConcerns.first['id'] != null) {
+      return _suiteConcerns.first['id'].toString();
     }
+
     return '';
   }
 
@@ -805,34 +815,19 @@ class AppState extends ChangeNotifier {
       if (range != null && range.isNotEmpty) queryParams.add('range=$range');
 
       final queryString = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
-      final url = Uri.parse('$apiBaseUrl/manager/overview$queryString');
-      final response = await authRequest('GET', url);
+      final response = await authRequest('GET', Uri.parse('$apiBaseUrl/manager/overview$queryString'));
 
-      debugPrint('fetchManagerOverview [${response.statusCode}]: ${response.body}');
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic>) {
           _managerOverviewData = Map<String, dynamic>.from(decoded);
         } else if (decoded is Map) {
           _managerOverviewData = Map<String, dynamic>.from(decoded);
         }
-        
-        if (_selectedManagerCompanyId == null || _selectedManagerCompanyId!.isEmpty) {
-          final comp = _managerOverviewData['company'] as Map<String, dynamic>?;
-          final concerns = _managerOverviewData['assignedConcerns'] as List?;
-          _selectedManagerCompanyId = comp?['id'] ?? (concerns?.isNotEmpty == true ? concerns![0]['id'] : null);
-        }
-        
-        final companyData = _managerOverviewData['company'] as Map<String, dynamic>?;
-        if (companyData != null && companyData.containsKey('totalBalance')) {
-           balance = _toDouble(companyData['totalBalance']);
-        }
-        
         notifyListeners();
       }
-    } catch (e, stack) {
-      debugPrint('fetchManagerOverview error: $e\n$stack');
+    } catch (e) {
+      debugPrint('fetchManagerOverview error: $e');
     }
   }
 
