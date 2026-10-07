@@ -7,7 +7,7 @@ class NotificationsSheet extends StatefulWidget {
 
   static void show(BuildContext context) {
     // Clear badge upon opening
-    context.read<AppState>().clearNotificationBadge();
+    // Removed
     context.read<AppState>().fetchPendingTransfers();
 
     showModalBottomSheet(
@@ -19,7 +19,7 @@ class NotificationsSheet extends StatefulWidget {
     ).whenComplete(() {
       // Clear badge when dismissed/closed
       if (context.mounted) {
-        context.read<AppState>().clearNotificationBadge();
+        // Removed
       }
     });
   }
@@ -35,7 +35,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppState>().clearNotificationBadge();
+      // Removed
     });
   }
 
@@ -224,10 +224,24 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final pending = app.pendingTransfers;
+    final resolved = app.resolvedTransfers;
     final managerRecent = (app.managerOverviewData['recentTransactions'] as List?);
-    final recent = (managerRecent != null && managerRecent.isNotEmpty)
+    final regularRecent = (managerRecent != null && managerRecent.isNotEmpty)
         ? managerRecent
         : app.employeeTransactions;
+
+    // Combine regular transactions and resolved handover events
+    final combinedActivity = <Map<String, dynamic>>[
+      ...resolved,
+      ...regularRecent.map((e) => Map<String, dynamic>.from(e as Map)),
+    ];
+
+    // Sort combined activity by createdAt descending
+    combinedActivity.sort((a, b) {
+      final da = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(1970);
+      final db = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(1970);
+      return db.compareTo(da);
+    });
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
@@ -291,7 +305,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
           // Content List
           Expanded(
-            child: (pending.isEmpty && recent.isEmpty)
+            child: (pending.isEmpty && combinedActivity.isEmpty)
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -324,13 +338,121 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                         const SizedBox(height: 16),
                       ],
                       // Recent Activity Section
-                      if (recent.isNotEmpty) ...[
+                      if (combinedActivity.isNotEmpty) ...[
                         const Text(
                           'RECENT ACTIVITY',
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 0.5),
                         ),
                         const SizedBox(height: 8),
-                        ...recent.map((item) {
+                        ...combinedActivity.map((item) {
+                          final status = item['status']?.toString();
+                          final isDeclined = status == 'declined';
+                          final isCancelled = status == 'cancelled';
+                          final amt = _formatAmount(item['amount']);
+                          final time = _timeAgo(item['createdAt']);
+
+                          if (isDeclined) {
+                            final declinedBy = item['declinedBy'] ?? 'Recipient';
+                            final voucher = item['voucherNumber'] ?? 'HND-TRANSFER';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF2F2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFFECACA)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEE2E2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.close_rounded, color: Color(0xFFEF4444), size: 18),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Handover Declined: ৳ $amt',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF991B1B)),
+                                        ),
+                                        Text(
+                                          'Declined by $declinedBy • $time • $voucher',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFFB91C1C)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEF4444),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text('Declined', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          if (isCancelled) {
+                            final cancelledBy = item['cancelledBy'] ?? 'Sender';
+                            final voucher = item['voucherNumber'] ?? 'HND-TRANSFER';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE2E8F0),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.block_rounded, color: Color(0xFF64748B), size: 18),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Handover Cancelled: ৳ $amt',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155)),
+                                        ),
+                                        Text(
+                                          'Cancelled by $cancelledBy • $time • $voucher',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF94A3B8),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text('Cancelled', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+
                           final title = item['note'] ?? item['movementType'] ?? 'Transaction';
                           // Resolve actor/sender label dynamically
                           final rawActor = (item['actorName'] ?? item['senderName'] ?? '').toString().trim();
@@ -345,10 +467,8 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                             subtitleLabel = (rawActor.isNotEmpty && rawActor.toLowerCase() != 'system')
                                 ? 'From $rawActor'
                                 : 'From Sender';
-                          }
 
-                          final time = _timeAgo(item['createdAt']);
-                          final amt = _formatAmount(item['amount']);
+                          }
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 10),
