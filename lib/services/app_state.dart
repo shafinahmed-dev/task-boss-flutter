@@ -24,13 +24,20 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get employeeTransactions => _employeeTransactions;
   List<Map<String, dynamic>> get transactions => _employeeTransactions;
 
+  bool _notificationsViewed = false;
+
   int get notificationCount {
-    int count = _pendingTransfers.length;
-    final recent = (_managerOverviewData['recentTransactions'] as List?) ?? _employeeTransactions;
-    if (count == 0 && recent.isNotEmpty) {
-      count = recent.take(3).length;
-    }
-    return count;
+    if (_notificationsViewed) return 0;
+    // Count incoming pending handovers
+    final pendingIncoming = _pendingTransfers
+        .where((t) => t['isIncoming'] == true && t['status'] == 'pending')
+        .length;
+    return pendingIncoming;
+  }
+
+  void clearNotificationBadge() {
+    _notificationsViewed = true;
+    notifyListeners();
   }
 
   Future<void> refreshUserData() async {
@@ -51,6 +58,10 @@ class AppState extends ChangeNotifier {
           raw = decoded['transfers'];
         }
         _pendingTransfers = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        final hasIncoming = _pendingTransfers.any((t) => t['isIncoming'] == true && t['status'] == 'pending');
+        if (hasIncoming) {
+          _notificationsViewed = false;
+        }
         notifyListeners();
       }
     } catch (e) {

@@ -2,18 +2,39 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
 
-class NotificationsSheet extends StatelessWidget {
+class NotificationsSheet extends StatefulWidget {
   const NotificationsSheet({super.key});
 
   static void show(BuildContext context) {
+    // Clear badge upon opening
+    context.read<AppState>().clearNotificationBadge();
     context.read<AppState>().fetchPendingTransfers();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const NotificationsSheet(),
-    );
+    ).whenComplete(() {
+      // Clear badge when dismissed/closed
+      if (context.mounted) {
+        context.read<AppState>().clearNotificationBadge();
+      }
+    });
+  }
+
+  @override
+  State<NotificationsSheet> createState() => _NotificationsSheetState();
+}
+
+class _NotificationsSheetState extends State<NotificationsSheet> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AppState>().clearNotificationBadge();
+    });
   }
 
   String _formatAmount(dynamic val) {
@@ -246,9 +267,22 @@ class NotificationsSheet extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         ...recent.map((item) {
-                          final isOut = item['direction'] == 'out' || item['type'] == 'Cash Out';
                           final title = item['note'] ?? item['movementType'] ?? 'Transaction';
-                          final actor = item['actorName'] ?? 'System';
+                          // Resolve actor/sender label dynamically
+                          final rawActor = (item['actorName'] ?? item['senderName'] ?? '').toString().trim();
+                          final isOut = item['direction'] == 'out' || item['type'] == 'Cash Out';
+
+                          String subtitleLabel;
+                          if (isOut) {
+                            subtitleLabel = (rawActor.isNotEmpty && rawActor.toLowerCase() != 'system')
+                                ? 'By $rawActor'
+                                : 'Outflow';
+                          } else {
+                            subtitleLabel = (rawActor.isNotEmpty && rawActor.toLowerCase() != 'system')
+                                ? 'From $rawActor'
+                                : 'From Sender';
+                          }
+
                           final time = _timeAgo(item['createdAt']);
                           final amt = _formatAmount(item['amount']);
 
@@ -284,7 +318,7 @@ class NotificationsSheet extends StatelessWidget {
                                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                                       ),
                                       Text(
-                                        'By $actor • $time',
+                                        '$subtitleLabel • $time',
                                         style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                                       ),
                                     ],
