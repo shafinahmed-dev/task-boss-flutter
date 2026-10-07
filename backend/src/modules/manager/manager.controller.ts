@@ -15,7 +15,7 @@ export class ManagerController {
     const userId = req.user?.id || req.user?.sub || req.user?.userId;
     if (!tenantId || !authorizedCompanyIds || !userId) throw new BadRequestException('Invalid user context');
     const targetCompanyId = (!companyId || companyId === '') ? authorizedCompanyIds[0] : companyId;
-    return this.managerService.getOverview(tenantId, authorizedCompanyIds, userId, targetCompanyId, range);
+    return this.managerService.getOverview(targetCompanyId, range, req.user);
   }
 
   @Get('transactions')
