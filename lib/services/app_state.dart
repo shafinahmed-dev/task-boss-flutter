@@ -126,15 +126,21 @@ class AppState extends ChangeNotifier {
     if (_selectedManagerCompanyId != null && _selectedManagerCompanyId!.isNotEmpty) {
       return _selectedManagerCompanyId!;
     }
-    if (user?.primaryCompanyId != null && user!.primaryCompanyId!.isNotEmpty) {
-      return user!.primaryCompanyId!;
+    if (user != null) {
+      if (user!.companies != null && user!.companies!.isNotEmpty) {
+        return user!.companies!.first['companyId']?.toString() ??
+               user!.companies!.first['id']?.toString() ?? '';
+      }
+      if (user!.companyId != null && user!.companyId!.isNotEmpty) {
+        return user!.companyId!;
+      }
+    }
+    if (_suiteConcerns.isNotEmpty) {
+      return _suiteConcerns.first['id']?.toString() ?? '';
     }
     final overviewCid = _managerOverviewData['company']?['id']?.toString();
     if (overviewCid != null && overviewCid.isNotEmpty) {
       return overviewCid;
-    }
-    if (wallets.isNotEmpty && wallets.first.companyId.isNotEmpty) {
-      return wallets.first.companyId;
     }
     return '';
   }
@@ -790,19 +796,20 @@ class AppState extends ChangeNotifier {
 
   Future<void> fetchManagerOverview({String? companyId, String? range}) async {
     try {
-      final cid = companyId ?? _selectedManagerCompanyId ?? '';
-      if (cid.isEmpty && _selectedManagerCompanyId == null) {
-        // Will be assigned on first load if missing
-      }
-      if (token == null) return;
-      
-      final query = range != null && range.isNotEmpty
-          ? '?companyId=$cid&range=$range'
-          : '?companyId=$cid';
-          
-      final url = Uri.parse('$apiBaseUrl/manager/overview$query');
+      final cid = (companyId != null && companyId.isNotEmpty)
+          ? companyId
+          : effectiveCompanyId;
+
+      final queryParams = <String>[];
+      if (cid.isNotEmpty) queryParams.add('companyId=$cid');
+      if (range != null && range.isNotEmpty) queryParams.add('range=$range');
+
+      final queryString = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
+      final url = Uri.parse('$apiBaseUrl/manager/overview$queryString');
       final response = await authRequest('GET', url);
-      
+
+      debugPrint('fetchManagerOverview [${response.statusCode}]: ${response.body}');
+
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic>) {
@@ -824,8 +831,8 @@ class AppState extends ChangeNotifier {
         
         notifyListeners();
       }
-    } catch (e) {
-      debugPrint('fetchManagerOverview error: $e');
+    } catch (e, stack) {
+      debugPrint('fetchManagerOverview error: $e\n$stack');
     }
   }
 
