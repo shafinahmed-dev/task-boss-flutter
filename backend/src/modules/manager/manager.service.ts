@@ -198,8 +198,8 @@ export class ManagerService {
     const movements = await this.prisma.moneyMovement.findMany({
       where: {
         OR: [
-          { companyId: targetCompanyId },
           { wallet: { companyId: targetCompanyId } },
+          { category: { companyId: targetCompanyId } },
         ],
       },
       orderBy: { createdAt: 'desc' },
