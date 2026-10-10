@@ -336,13 +336,26 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
         ? managerRecent
         : app.employeeTransactions;
 
-    // Combine regular transactions and resolved handover events
-    final combinedActivity = <Map<String, dynamic>>[
-      ...resolved,
-      ...regularRecent.map((e) => Map<String, dynamic>.from(e as Map)),
-    ];
+    // Combine audit items (declined/cancelled) with ledger movements
+    final combinedActivity = <Map<String, dynamic>>[];
+    final seenVouchers = <String>{};
 
-    // Sort combined activity by createdAt descending
+    // Add audit events first
+    for (final item in resolved) {
+      final v = item['voucherNumber']?.toString() ?? '';
+      if (v.isNotEmpty) seenVouchers.add(v);
+      combinedActivity.add(Map<String, dynamic>.from(item));
+    }
+
+    // Add ledger movements (skipping if already represented by an audit event)
+    for (final raw in regularRecent) {
+      final item = Map<String, dynamic>.from(raw as Map);
+      final v = item['voucherNumber']?.toString() ?? item['metadata']?['voucherNumber']?.toString() ?? '';
+      if (v.isNotEmpty && seenVouchers.contains(v)) continue;
+      combinedActivity.add(item);
+    }
+
+    // Sort newest first
     combinedActivity.sort((a, b) {
       final da = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(1970);
       final db = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(1970);
@@ -456,6 +469,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                           final isCancelled = status == 'cancelled';
                           final amt = _formatAmount(item['amount']);
                           final time = _timeAgo(item['createdAt']);
+                          final voucher = item['voucherNumber'] ?? item['metadata']?['voucherNumber'] ?? '';
 
                           if (isDeclined) {
                             final declinedBy = item['declinedBy'] ?? 'Recipient';
@@ -559,21 +573,35 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                           }
 
 
-                          final title = item['note'] ?? item['movementType'] ?? 'Transaction';
-                          // Resolve actor/sender label dynamically
-                          final rawActor = (item['actorName'] ?? item['senderName'] ?? '').toString().trim();
-                          final isOut = item['direction'] == 'out' || item['type'] == 'Cash Out';
+                          // 3. REGULAR LEDGER MOVEMENT (INFLOW / OUTFLOW)
+                          final isOut = item['direction'] == 'out' || item['type'] == 'CASH_OUT';
+                          final rawTitle = (item['note'] ?? item['movementType'] ?? '').toString().trim();
+                          final title = rawTitle.isNotEmpty ? rawTitle : (isOut ? 'Outflow' : 'Inflow');
 
-                          String subtitleLabel;
-                          if (isOut) {
-                            subtitleLabel = (rawActor.isNotEmpty && rawActor.toLowerCase() != 'system')
-                                ? 'By $rawActor'
-                                : 'Outflow';
+                          // Subtitle resolution
+                          final meta = item['metadata'] is Map ? item['metadata'] as Map : {};
+                          final sender = item['senderName'] ?? meta['senderName'];
+                          final recipient = item['recipientName'] ?? meta['recipientName'];
+                          final actor = item['actorName'] ?? item['userName'];
+                          final channel = item['channel'] ?? meta['channel'] ?? '';
+
+                          String subtitle;
+                          if (!isOut && sender != null && sender.toString().isNotEmpty) {
+                            subtitle = 'From $sender';
+                          } else if (isOut && recipient != null && recipient.toString().isNotEmpty) {
+                            subtitle = 'To $recipient';
+                          } else if (actor != null && actor.toString().isNotEmpty && actor.toString().toLowerCase() != 'system') {
+                            subtitle = 'By $actor';
                           } else {
-                            subtitleLabel = (rawActor.isNotEmpty && rawActor.toLowerCase() != 'system')
-                                ? 'From $rawActor'
-                                : 'From Sender';
+                            subtitle = isOut ? 'Outflow' : 'Inflow';
+                          }
 
+                          if (channel.toString().isNotEmpty) {
+                            subtitle += ' • $channel';
+                          }
+                          subtitle += ' • $time';
+                          if (voucher.toString().isNotEmpty) {
+                            subtitle += ' • $voucher';
                           }
 
                           return Container(
@@ -604,11 +632,12 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        title.toString(),
+                                        title,
                                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                                       ),
+                                      const SizedBox(height: 2),
                                       Text(
-                                        '$subtitleLabel • $time',
+                                        subtitle,
                                         style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                                       ),
                                     ],

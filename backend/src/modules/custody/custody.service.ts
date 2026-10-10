@@ -98,6 +98,18 @@ export class CustodyService {
       throw new ConflictException('Unable to complete handover. Cannot transfer to the same account.');
     }
 
+    // MANDATORY GUARD: Prevent self-handover
+    const isSameUser =
+      (receiverCustodian.linkedUserId && receiverCustodian.linkedUserId === senderCustodian.linkedUserId) ||
+      (senderCustodian.linkedUserId && receiverUserId && senderCustodian.linkedUserId === receiverUserId) ||
+      senderCustodian.id === receiverCustodian.id;
+
+    if (isSameUser) {
+      throw new BadRequestException(
+        'Self-handover is not permitted. You cannot transfer custody to yourself.',
+      );
+    }
+
     let fromWalletId = dto.fromWalletId || dto.metadata?.fromWalletId || dto.metadata?.walletId;
     const feeVal = Number(dto.fee || dto.metadata?.fee || 0);
 
@@ -235,7 +247,12 @@ export class CustodyService {
         },
       });
 
-      // 2. Sender Outflow Movement
+      // 0. Prepare Movement Context
+      const senderUser = transfer.fromCustodian?.linkedUser;
+      const receiverUser = transfer.toCustodian?.linkedUser || reqUser;
+      const voucherNum = receiptNo; // Use the already defined receiptNo
+
+      // 1. Sender Outflow Movement
       await tx.moneyMovement.create({
         data: {
           idempotencyKey: crypto.randomUUID(),
@@ -248,43 +265,45 @@ export class CustodyService {
           collectorId: transfer.fromCustodian?.linkedUserId || transfer.fromCustodianId,
           walletId: transfer.fromWalletId || null,
           entryTag: 'handover_out',
-          notes: transfer.notes || `Handover sent to ${recipientName}`,
+          movementType: 'Handover Sent',
+          notes: `Sent to ${receiverUser?.name || 'Staff'}`,
           metadata: {
             transferId: transfer.id,
-            voucherNumber: receiptNo,
-            recipientName: recipientName,
-            paymentMethod: channelVal,
-            movementType: 'Cash Out',
-            baseAmount: Number(transfer.amount),
-            fee: feeVal,
+            voucherNumber: voucherNum,
+            channel: channelVal,
+            recipientName: receiverUser?.name || 'Staff',
+            recipientUserId: receiverUser?.id || null,
+            senderName: senderUser?.name || reqUser.name,
+            senderUserId: senderUser?.id || reqUser.id,
           },
           occurredAt: new Date(),
           syncStatus: 'synced',
         },
       });
 
-      // 3. Recipient Inflow Movement
+      // 2. Recipient Inflow Movement
       await tx.moneyMovement.create({
         data: {
           idempotencyKey: crypto.randomUUID(),
           direction: 'in',
           amount: transfer.amount,
-          fee: null,
+          fee: 0,
           currency: 'BDT',
           channel: channelVal,
           custodianId: transfer.toCustodianId,
           collectorId: transfer.toCustodian?.linkedUserId || transfer.toCustodianId,
           walletId: targetToWalletId,
           entryTag: 'handover_in',
-          notes: transfer.notes || `Handover received from ${senderName}`,
+          movementType: 'Handover Received',
+          notes: `Received from ${senderUser?.name || 'Manager'}`,
           metadata: {
             transferId: transfer.id,
-            voucherNumber: receiptNo,
-            senderName: senderName,
-            paymentMethod: channelVal,
-            movementType: 'Cash In',
-            baseAmount: Number(transfer.amount),
-            fee: 0,
+            voucherNumber: voucherNum,
+            channel: channelVal,
+            senderName: senderUser?.name || 'Sender',
+            senderUserId: senderUser?.id || null,
+            recipientName: receiverUser?.name || reqUser.name,
+            recipientUserId: receiverUser?.id || reqUser.id,
           },
           occurredAt: new Date(),
           syncStatus: 'synced',
@@ -409,47 +428,52 @@ export class CustodyService {
         },
       },
       orderBy: { requestedAt: 'desc' },
-      take: 20,
+      take: 30,
     });
 
     const pendingList = [];
-    const resolvedList = [];
+    const auditList = [];
 
     for (const t of transfers) {
       const meta = (t.metadata as any) || {};
       const isSender = custodianIds.includes(t.fromCustodianId) || t.fromCustodian?.linkedUserId === userId;
       const senderName = t.fromCustodian?.linkedUser?.name || t.fromCustodian?.name || meta.senderName || 'Sender';
       const receiverName = t.toCustodian?.linkedUser?.name || t.toCustodian?.name || meta.recipientName || 'Receiver';
+      const channel = meta.paymentMethod || meta.channel || 'Physical Cash';
+      const voucher = meta.voucherNumber || 'HND-TRANSFER';
 
       const item = {
         id: t.id,
         amount: Number(t.amount || 0),
         fee: Number(t.fee || 0),
         status: t.status,
-        voucherNumber: meta.voucherNumber || 'HND-TRANSFER',
-        channel: meta.paymentMethod || meta.channel || 'Physical Cash',
-        fromWalletName: meta.walletName || 'Cash Drawer',
+        voucherNumber: voucher,
+        channel: channel,
         note: t.notes || meta.note || '',
         isSender,
         isIncoming: !isSender,
+        direction: isSender ? 'out' : 'in',
         senderName,
         receiverName,
-        declinedBy: meta.declinedBy || (t.status === 'declined' ? receiverName : null),
-        cancelledBy: meta.cancelledBy || (t.status === 'cancelled' ? senderName : null),
+        declinedBy: meta.declinedBy || null,
+        cancelledBy: meta.cancelledBy || null,
         createdAt: (t.confirmedAt || t.requestedAt || new Date()).toISOString(),
       };
 
       if (t.status === 'pending') {
         pendingList.push(item);
-      } else {
-        resolvedList.push(item);
+      } else if (t.status === 'declined' || t.status === 'cancelled') {
+        auditList.push({
+          ...item,
+          title: t.status === 'declined' ? 'Handover Declined' : 'Handover Cancelled',
+        });
       }
     }
 
     return {
       success: true,
       transfers: pendingList,
-      resolvedTransfers: resolvedList,
+      resolvedTransfers: auditList,
     };
   }
 

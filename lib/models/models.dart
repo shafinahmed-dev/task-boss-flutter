@@ -14,6 +14,8 @@ class AuthUser {
   final String designation;
   final String department;
 
+  String? get id => userId;
+
   AuthUser({
     required this.userId,
     required this.handle,

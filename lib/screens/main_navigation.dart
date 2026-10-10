@@ -17,6 +17,14 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AppState>().initialize();
+    });
+  }
+
   int _currentIndex = 0;
   bool _isBalanceVisible = true;
 

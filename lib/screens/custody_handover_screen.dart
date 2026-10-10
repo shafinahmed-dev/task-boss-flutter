@@ -73,13 +73,34 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
         } else if (rawData is Map && rawData['data'] is List) {
           allCustodians = rawData['data'] as List;
         }
-        final others = allCustodians.where((c) {
-          final cId =
-              c['id']?.toString() ?? c['custodianId']?.toString() ?? '';
-          return cId != app.user!.custodianId;
+        final currentUserId = app.user?.id ?? app.user?.userId ?? '';
+        final currentUserName = (app.user?.name ?? '').trim().toLowerCase();
+
+        final filteredRecipients = allCustodians.where((c) {
+          // Extract all possible ID representations
+          final cId = c['id']?.toString() ?? c['custodianId']?.toString() ?? '';
+          final cUserId = c['linkedUserId']?.toString() ?? c['userId']?.toString() ?? c['user']?['id']?.toString() ?? '';
+          final cName = (c['name'] ?? c['user']?['name'] ?? '').toString().trim().toLowerCase();
+
+          // 1. Check ID mismatch
+          if (currentUserId.isNotEmpty) {
+            if (cId == currentUserId || cUserId == currentUserId) {
+              return false; // Exclude self
+            }
+          }
+
+          // 2. Check Name mismatch (fail-safe)
+          if (currentUserName.isNotEmpty && cName.isNotEmpty) {
+            if (cName == currentUserName) {
+              return false; // Exclude self
+            }
+          }
+
+          return true;
         }).toList();
+
         setState(() {
-          _custodians = others;
+          _custodians = filteredRecipients;
           _loadingCustodians = false;
         });
       } else {
