@@ -178,7 +178,7 @@ export class CustodyService {
    * POST /custody/transfers/:id/confirm
    * Receiver confirms acceptance. Status becomes 'confirmed'.
    */
-  async confirmTransfer(transferId: string, reqUser?: any) {
+  async confirmTransfer(transferId: string, reqUser?: any, providedToWalletId?: string) {
     const transfer = await this.prisma.custodyTransfer.findUnique({
       where: { id: transferId },
       include: {
@@ -197,7 +197,14 @@ export class CustodyService {
       throw new ConflictException('Cannot confirm a disputed transfer');
     }
 
-    let targetToWalletId = transfer.toWalletId;
+    let targetToWalletId = providedToWalletId || transfer.toWalletId;
+    if (!targetToWalletId && reqUser?.id) {
+      const userWallet = await this.prisma.wallet.findFirst({
+        where: { custodianId: transfer.toCustodianId, isArchived: false },
+        select: { id: true },
+      });
+      targetToWalletId = userWallet?.id ?? null;
+    }
     if (!targetToWalletId) {
       const defaultWallet =
         await this.prisma.wallet.findFirst({
@@ -370,7 +377,7 @@ export class CustodyService {
     }
   }
 
-  async getPendingTransfers(reqUser?: any) {
+  async getPendingTransfers(reqUser: any) {
     const userId = reqUser?.id || reqUser?.sub;
     const custodianIds: string[] = [];
     if (userId) {
@@ -381,9 +388,9 @@ export class CustodyService {
       custodianIds.push(...custodians.map(c => c.id));
     }
 
+    // 2. Fetch both pending and recently resolved transfers for this user
     const transfers = await this.prisma.custodyTransfer.findMany({
       where: {
-        status: 'pending',
         OR: custodianIds.length > 0 ? [
           { fromCustodianId: { in: custodianIds } },
           { toCustodianId: { in: custodianIds } },
@@ -392,41 +399,58 @@ export class CustodyService {
       include: {
         fromCustodian: {
           include: {
-            linkedUser: { select: { id: true, name: true, role: true } },
+            linkedUser: { select: { id: true, name: true, handle: true, role: true } },
           },
         },
         toCustodian: {
           include: {
-            linkedUser: { select: { id: true, name: true, role: true } },
+            linkedUser: { select: { id: true, name: true, handle: true, role: true } },
           },
         },
       },
       orderBy: { requestedAt: 'desc' },
+      take: 20,
     });
 
-    const serialized = transfers.map((t) => {
-      const isSender = custodianIds.includes(t.fromCustodianId);
-      const rawMeta = this.transferMetadata.get(t.id) || this.transferMetadata.get(t.idempotencyKey) || (typeof t.metadata === 'object' ? t.metadata : {});
-      const meta = (rawMeta || {}) as Record<string, any>;
-      const senderName = t.fromCustodian?.linkedUser?.name || t.fromCustodian?.name || 'Sender';
-      const receiverName = t.toCustodian?.linkedUser?.name || t.toCustodian?.name || meta.recipientName || 'Staff';
+    const pendingList = [];
+    const resolvedList = [];
 
-      return {
+    for (const t of transfers) {
+      const meta = (t.metadata as any) || {};
+      const isSender = custodianIds.includes(t.fromCustodianId) || t.fromCustodian?.linkedUserId === userId;
+      const senderName = t.fromCustodian?.linkedUser?.name || t.fromCustodian?.name || meta.senderName || 'Sender';
+      const receiverName = t.toCustodian?.linkedUser?.name || t.toCustodian?.name || meta.recipientName || 'Receiver';
+
+      const item = {
         id: t.id,
         amount: Number(t.amount || 0),
         fee: Number(t.fee || 0),
         status: t.status,
         voucherNumber: meta.voucherNumber || 'HND-TRANSFER',
+        channel: meta.paymentMethod || meta.channel || 'Physical Cash',
+        fromWalletName: meta.walletName || 'Cash Drawer',
         note: t.notes || meta.note || '',
         isSender,
         isIncoming: !isSender,
         senderName,
         receiverName,
-        createdAt: t.requestedAt?.toISOString() || new Date().toISOString(),
+        declinedBy: meta.declinedBy || (t.status === 'declined' ? receiverName : null),
+        cancelledBy: meta.cancelledBy || (t.status === 'cancelled' ? senderName : null),
+        createdAt: (t.confirmedAt || t.requestedAt || new Date()).toISOString(),
       };
-    });
 
-    return { success: true, transfers: serialized };
+      if (t.status === 'pending') {
+        pendingList.push(item);
+      } else {
+        resolvedList.push(item);
+      }
+    }
+
+    return {
+      success: true,
+      transfers: pendingList,
+      resolvedTransfers: resolvedList,
+    };
   }
 
 
@@ -651,6 +675,7 @@ export class CustodyService {
           metadata: {
             ...meta,
             declinedBy: reqUser.name,
+            declinedByUserId: reqUser.id,
             declinedAt: new Date().toISOString(),
           },
         },

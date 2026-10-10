@@ -20,24 +20,22 @@ class AppState extends ChangeNotifier {
   int pendingCount = 0;
   List<Map<String, dynamic>> _pendingTransfers = [];
   List<Map<String, dynamic>> get pendingTransfers => _pendingTransfers;
+
+  List<Map<String, dynamic>> _resolvedTransfers = [];
+  List<Map<String, dynamic>> get resolvedTransfers => _resolvedTransfers;
   List<Map<String, dynamic>> _employeeTransactions = [];
   List<Map<String, dynamic>> get employeeTransactions => _employeeTransactions;
   List<Map<String, dynamic>> get transactions => _employeeTransactions;
 
-  bool _notificationsViewed = false;
 
   int get notificationCount {
-    if (_notificationsViewed) return 0;
-    // Count incoming pending handovers
-    final pendingIncoming = _pendingTransfers
+    return _pendingTransfers
         .where((t) => t['isIncoming'] == true && t['status'] == 'pending')
         .length;
-    return pendingIncoming;
   }
 
-  void clearNotificationBadge() {
-    _notificationsViewed = true;
-    notifyListeners();
+  Future<void> initialize() async {
+    await fetchPendingTransfers();
   }
 
   Future<void> refreshUserData() async {
@@ -51,16 +49,21 @@ class AppState extends ChangeNotifier {
       final response = await authRequest('GET', Uri.parse('$apiBaseUrl/custody/transfers/pending'));
       if (response.statusCode == 200 || response.statusCode == 201) {
         final decoded = jsonDecode(response.body);
-        List<dynamic> raw = [];
-        if (decoded is List) {
-          raw = decoded;
-        } else if (decoded is Map && decoded['transfers'] is List) {
-          raw = decoded['transfers'];
-        }
-        _pendingTransfers = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        final hasIncoming = _pendingTransfers.any((t) => t['isIncoming'] == true && t['status'] == 'pending');
-        if (hasIncoming) {
-          _notificationsViewed = false;
+        if (decoded is Map) {
+          if (decoded['transfers'] is List) {
+            _pendingTransfers = (decoded['transfers'] as List)
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+          }
+          if (decoded['resolvedTransfers'] is List) {
+            _resolvedTransfers = (decoded['resolvedTransfers'] as List)
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+          }
+        } else if (decoded is List) {
+          _pendingTransfers = decoded
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
         }
         notifyListeners();
       }
@@ -69,16 +72,21 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<bool> acceptHandover(String transferId) async {
+  Future<bool> acceptHandover(String transferId, {String? toWalletId}) async {
     try {
+      final payload = <String, dynamic>{};
+      if (toWalletId != null && toWalletId.isNotEmpty) {
+        payload['toWalletId'] = toWalletId;
+      }
       final response = await authRequest(
         'POST',
         Uri.parse('$apiBaseUrl/custody/transfers/$transferId/confirm'),
         headers: {'Content-Type': 'application/json'},
+        body: payload.isNotEmpty ? jsonEncode(payload) : null,
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         await fetchPendingTransfers();
-        await refreshUserData(); // Refreshes user balance (updating Shafin to ৳ 20,000!)
+        await refreshUserData(); // Refreshes user balance
         if (currentUser?.role == 'MANAGER') {
           await fetchManagerOverview();
         }

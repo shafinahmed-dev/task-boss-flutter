@@ -38,9 +38,10 @@ export class CustodyController {
   @HttpCode(HttpStatus.OK)
   async confirmTransfer(
     @Param('id') id: string,
+    @Body() body?: { toWalletId?: string },
     @Req() req?: any,
   ) {
-    return this.custodyService.confirmTransfer(id, req?.user);
+    return this.custodyService.confirmTransfer(id, req?.user, body?.toWalletId);
   }
 
   /**
