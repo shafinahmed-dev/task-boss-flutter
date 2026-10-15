@@ -72,6 +72,30 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchSuiteMovements({
+    required String direction,
+    required String range,
+  }) async {
+    try {
+      final response = await authRequest('GET', Uri.parse('$apiBaseUrl/suite/movements?direction=$direction&range=$range'));
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['movements'] is List) {
+          return (decoded['movements'] as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        } else if (decoded is List) {
+          return (decoded as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchSuiteMovements error: $e');
+    }
+    return [];
+  }
+
   Future<bool> acceptHandover(String transferId, {String? toWalletId}) async {
     try {
       final payload = <String, dynamic>{};

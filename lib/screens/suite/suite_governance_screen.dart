@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
 import '../login_screen.dart';
 import '../../services/app_state.dart';
 import 'suite_transactions_screen.dart';
@@ -50,6 +49,174 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  String _timeAgo(dynamic rawDate) {
+    if (rawDate == null) return 'recently';
+    final date = DateTime.tryParse(rawDate.toString());
+    if (date == null) return 'recently';
+    final diff = DateTime.now().difference(date);
+    if (diff.inDays > 365) return '${(diff.inDays / 365).floor()}y ago';
+    if (diff.inDays > 30) return '${(diff.inDays / 30).floor()}mo ago';
+    if (diff.inDays > 0) return '${diff.inDays}d ago';
+    if (diff.inHours > 0) return '${diff.inHours}h ago';
+    if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+    return 'just now';
+  }
+  void _showVelocityBreakdown(BuildContext context, {required String direction, required double totalAmount, required String rangeLabel}) {
+    final isInflow = direction == 'in';
+    final title = isInflow ? 'Group Inflows' : 'Group Outflows';
+    final themeColor = isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    String periodParam = 'all_time';
+    final p = rangeLabel.toLowerCase();
+    if (p.contains('today')) periodParam = 'today';
+    if (p.contains('week')) periodParam = 'this_week';
+    if (p.contains('month')) periodParam = 'this_month';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(width: 44, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(color: themeColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                          child: Icon(isInflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: themeColor, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                            Text('Total: ৳ ${totalAmount.toStringAsFixed(2)} • $rangeLabel', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(onPressed: () => Navigator.of(ctx).pop(), icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              Expanded(
+                child: FutureBuilder<dynamic>(
+                  future: context.read<AppState>().fetchSuiteMovements(
+                    direction: direction,
+                    range: periodParam,
+                  ),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final items = (snapshot.data as List<Map<String, dynamic>>?) ?? [];
+
+                    if (items.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isInflow ? Icons.file_download_off_rounded : Icons.file_upload_off_rounded,
+                              size: 40,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No ${isInflow ? "inflows" : "outflows"} recorded for this period.',
+                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        final amt = double.tryParse(item['amount']?.toString() ?? '0') ?? 0.0;
+                        final note = (item['note'] ?? item['movementType'] ?? (isInflow ? 'Inflow' : 'Outflow')).toString();
+                        final user = item['userName'] ?? 'Staff';
+                        final time = _timeAgo(item['createdAt']);
+                        final voucher = item['voucherNumber']?.toString() ?? '';
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isInflow ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  isInflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                                  color: themeColor,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      note,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'By $user • $time${voucher.isNotEmpty ? ' • $voucher' : ''}',
+                                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                isInflow ? '+৳ ${amt.toStringAsFixed(2)}' : '-৳ ${amt.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: themeColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
 
   double _calculateConsolidatedCash(AppState app) {
     if (app.dashboardData['totalGroupCash'] != null) {
@@ -325,57 +492,87 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         Row(
           children: [
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    debugPrint('[Suite] Tapped Inflow card');
+                    _showVelocityBreakdown(
+                      context,
+                      direction: 'in',
+                      totalAmount: inflow,
+                      rangeLabel: _selectedPeriod,
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFF10B981)),
-                        SizedBox(width: 6),
-                        Text('Inflow', style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold)),
+                        const Row(
+                          children: [
+                            Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFF10B981)),
+                            SizedBox(width: 6),
+                            Text('Inflow', style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '৳ ${_formatAmount(inflow)}',
+                          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '৳ ${_formatAmount(inflow)}',
-                      style: const TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    debugPrint('[Suite] Tapped Outflow card');
+                    _showVelocityBreakdown(
+                      context,
+                      direction: 'out',
+                      totalAmount: outflow,
+                      rangeLabel: _selectedPeriod,
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.arrow_upward_rounded, size: 16, color: Color(0xFFEF4444)),
-                        SizedBox(width: 6),
-                        Text('Outflow', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold)),
+                        const Row(
+                          children: [
+                            Icon(Icons.arrow_upward_rounded, size: 16, color: Color(0xFFEF4444)),
+                            SizedBox(width: 6),
+                            Text('Outflow', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '৳ ${_formatAmount(outflow)}',
+                          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '৳ ${_formatAmount(outflow)}',
-                      style: const TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
