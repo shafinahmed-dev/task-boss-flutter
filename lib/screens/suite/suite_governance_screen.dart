@@ -1028,6 +1028,100 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
   }
 
 
+  Widget _buildMemberCard(String name, String handle, String designation, double balance, bool isManager) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isManager ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isManager ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
+          width: isManager ? 1.5 : 1.0,
+        ),
+        boxShadow: isManager
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                )
+              ]
+            : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: Color(0xFF0F172A),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isManager) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.shield_rounded, size: 10, color: Color(0xFFB45309)),
+                            SizedBox(width: 3),
+                            Text(
+                              'MANAGER',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFB45309),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${handle.isNotEmpty ? '@$handle • ' : ''}$designation',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isManager ? const Color(0xFF92400E) : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '৳ ${balance.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Color(0xFF16A34A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showConcernDetailsModal(BuildContext context, String concernId, String concernName) async {
     showDialog(
       context: context,
@@ -1043,7 +1137,20 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         final concern = data['concern'] ?? {};
-        final members = (data['members'] as List? ?? []);
+        final sortedMembers = List<Map<String, dynamic>>.from(
+          (data['members'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
+        );
+
+        // Sort: Managers at the top, then alphabetically by name
+        sortedMembers.sort((a, b) {
+          final aRole = (a['role'] ?? a['designation'] ?? '').toString().toUpperCase();
+          final bRole = (b['role'] ?? b['designation'] ?? '').toString().toUpperCase();
+          final aIsManager = aRole.contains('MANAGER');
+          final bIsManager = bRole.contains('MANAGER');
+          if (aIsManager && !bIsManager) return -1;
+          if (!aIsManager && bIsManager) return 1;
+          return (a['name']?.toString() ?? '').compareTo(b['name']?.toString() ?? '');
+        });
 
         if (mounted) {
           showModalBottomSheet(
@@ -1080,32 +1187,21 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                     const Text('Assigned Members', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                     const SizedBox(height: 12),
                     Expanded(
-                      child: members.isEmpty
+                      child: sortedMembers.isEmpty
                           ? const Center(child: Text('No assigned members.', style: TextStyle(color: Color(0xFF64748B))))
-                          : ListView.separated(
+                          : ListView.builder(
                               controller: controller,
-                              itemCount: members.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              itemCount: sortedMembers.length,
                               itemBuilder: (_, i) {
-                                final mem = members[i];
-                                return Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(mem['name'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                            Text('@${mem['handle'] ?? ''} • ${mem['designation'] ?? mem['role'] ?? ''}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                                          ],
-                                        ),
-                                      ),
-                                      Text('৳ ${_formatAmount(mem['balance'])}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-                                    ],
-                                  ),
-                                );
+                                final item = sortedMembers[i];
+                                final roleStr = (item['role'] ?? item['designation'] ?? '').toString().toUpperCase();
+                                final isManager = roleStr.contains('MANAGER');
+                                final name = item['name']?.toString() ?? 'Member';
+                                final handle = item['handle']?.toString() ?? '';
+                                final designation = item['designation']?.toString() ?? (isManager ? 'Manager' : 'Team Member');
+                                final balance = double.tryParse(item['balance']?.toString() ?? '0') ?? 0.0;
+
+                                return _buildMemberCard(name, handle, designation, balance, isManager);
                               },
                             ),
                     ),

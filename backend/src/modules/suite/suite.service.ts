@@ -731,7 +731,7 @@ export class SuiteService {
         id: u.id,
         name: u.name,
         handle: u.handle,
-        role: u.role,
+        role: u.role || 'EMPLOYEE',
         designation: u.designation,
         balance: memberBalance,
       });
