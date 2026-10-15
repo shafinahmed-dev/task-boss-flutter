@@ -124,6 +124,18 @@ export class SuiteController {
     if (!tenantId) throw new BadRequestException('No tenant associated');
     return this.suiteService.getSuiteTransactions(tenantId, companyId, range, search);
   }
+  @Get('suite/movements')
+  @HttpCode(HttpStatus.OK)
+  async getSuiteMovements(
+    @Query('direction') direction: string,
+    @Query('range') range: string,
+    @Req() req: any,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('No tenant associated');
+    return this.suiteService.getSuiteMovements(req.user, direction, range);
+  }
+
 
   @Get('suite/overview')
   @HttpCode(HttpStatus.OK)

@@ -666,6 +666,67 @@ export class SuiteService {
 
     return { success: true, transactions };
   }
+  async getSuiteMovements(reqUser: any, direction?: string, range?: string) {
+    const tenantId = reqUser.tenantId;
+
+    let dateFilter: any = {};
+    const now = new Date();
+    if (range === 'today') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      dateFilter = { gte: start };
+    } else if (range === 'this_week') {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      const start = new Date(now.setDate(diff));
+      start.setHours(0, 0, 0, 0);
+      dateFilter = { gte: start };
+    } else if (range === 'this_month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      dateFilter = { gte: start };
+    }
+
+    const where: any = {
+      custodian: { company: { tenantId } },
+      editedFromId: null,
+    };
+
+    if (direction) {
+      where.direction = direction.toUpperCase();
+    }
+
+    if (dateFilter.gte) {
+      where.createdAt = dateFilter;
+    }
+
+    const movements = await this.prisma.moneyMovement.findMany({
+      where,
+      include: {
+        collector: { select: { id: true, name: true, handle: true } },
+        wallet: { select: { id: true, name: true, type: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    const serialized = movements.map((m: any) => {
+      const meta = (m.metadata as any) || {};
+      return {
+        id: m.id,
+        amount: Number(m.amount || 0),
+        direction: m.direction.toLowerCase(),
+        movementType: m.movementType || meta.movementType || (m.direction.toUpperCase() === 'IN' ? 'Inflow' : 'Outflow'),
+        note: m.notes || m.note || meta.note || '',
+        voucherNumber: m.voucherNumber || meta.voucherNumber || '',
+        userName: m.collector?.name || meta.actorName || 'Staff',
+        userHandle: m.collector?.handle || '',
+        walletName: m.wallet?.name || meta.channel || '',
+        createdAt: m.createdAt.toISOString(),
+      };
+    });
+
+    return { success: true, movements: serialized };
+  }
+
 
   async getConcernBreakdown(tenantId: string, id: string) {
     const company = await this.prisma.company.findFirst({
