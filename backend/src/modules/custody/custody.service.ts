@@ -68,30 +68,47 @@ export class CustodyService {
     const originalToCustodian = await this.prisma.custodianAccount.findUnique({
       where: { id: dto.toCustodianId },
     });
-    if (!originalToCustodian || !originalToCustodian.linkedUserId) {
+    if (!originalToCustodian) {
       throw new BadRequestException('Unable to complete handover. Recipient account could not be resolved.');
     }
 
     const receiverUserId = originalToCustodian.linkedUserId;
 
     // 4. Resolve / Auto-heal recipient custodian under the operational company
-    let receiverCustodian = await this.prisma.custodianAccount.findFirst({
-      where: {
-        linkedUserId: receiverUserId,
-        companyId: operationalCompanyId,
-      },
-    });
-
-    if (!receiverCustodian) {
-      // If recipient doesn't have a custodian account in this concern yet, auto-create it
-      receiverCustodian = await this.prisma.custodianAccount.create({
-        data: {
+    let receiverCustodian: any;
+    if (receiverUserId) {
+      receiverCustodian = await this.prisma.custodianAccount.findFirst({
+        where: {
           linkedUserId: receiverUserId,
           companyId: operationalCompanyId,
-          name: originalToCustodian.name,
-          type: 'person',
         },
       });
+
+      if (!receiverCustodian) {
+        // If recipient doesn't have a custodian account in this concern yet, auto-create it
+        receiverCustodian = await this.prisma.custodianAccount.create({
+          data: {
+            linkedUserId: receiverUserId,
+            companyId: operationalCompanyId,
+            name: originalToCustodian.name,
+            type: originalToCustodian.type || 'person',
+          },
+        });
+      }
+    } else {
+      receiverCustodian = originalToCustodian;
+      if (originalToCustodian.companyId !== operationalCompanyId) {
+        const existing = await this.prisma.custodianAccount.findFirst({
+          where: {
+            companyId: operationalCompanyId,
+            name: originalToCustodian.name,
+            type: originalToCustodian.type,
+          },
+        });
+        if (existing) {
+          receiverCustodian = existing;
+        }
+      }
     }
 
     if (senderCustodian.id === receiverCustodian.id) {
@@ -100,8 +117,9 @@ export class CustodyService {
 
     // MANDATORY GUARD: Prevent self-handover
     const isSameUser =
-      (receiverCustodian.linkedUserId && receiverCustodian.linkedUserId === senderCustodian.linkedUserId) ||
+      (receiverCustodian.linkedUserId && senderCustodian.linkedUserId && receiverCustodian.linkedUserId === senderCustodian.linkedUserId) ||
       (senderCustodian.linkedUserId && receiverUserId && senderCustodian.linkedUserId === receiverUserId) ||
+      ((dto as any).recipientUserId && senderCustodian.linkedUserId === (dto as any).recipientUserId) ||
       senderCustodian.id === receiverCustodian.id;
 
     if (isSameUser) {

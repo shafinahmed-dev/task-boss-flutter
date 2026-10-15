@@ -252,25 +252,6 @@ model CustodyTransfer {
 }
 
 // ── Digital Receipts ─────────────────────────────────────────────────────
-model TransactionCategory {
-  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String          @db.Text
-  type        String          @default("BOTH") // 'INFLOW' | 'OUTFLOW' | 'BOTH'
-  companyId   String          @map("company_id") @db.Uuid
-  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  tenantId    String          @map("tenant_id") @db.Uuid
-  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdById String?         @map("created_by_id") @db.Uuid
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
-  movements   MoneyMovement[]
-
-  @@unique([companyId, name])
-  @@index([companyId])
-  @@map("transaction_categories")
-}
-
-
 
 model ReceiptNumberBlock {
   id              String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

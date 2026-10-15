@@ -59,62 +59,43 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
       _loadingCustodians = true;
       _error = null;
     });
+    
+    // Re-implemented with robust error handling to prevent Handover screen crashes
     try {
-      final url = Uri.parse(
-          '${app.apiBaseUrl}/custody/custodians?companyId=${app.user!.companyId}');
-      final res = await app.authRequest('GET', url);
+      final res = await app.authRequest('GET', Uri.parse('${app.apiBaseUrl}/custody/custodians?companyId=${app.user!.companyId}'));
+      List<dynamic> rawList = [];
       if (res.statusCode == 200) {
         final rawData = jsonDecode(res.body);
-        List<dynamic> allCustodians = [];
-        if (rawData is List) {
-          allCustodians = rawData;
-        } else if (rawData is Map && rawData['custodians'] is List) {
-          allCustodians = rawData['custodians'] as List;
-        } else if (rawData is Map && rawData['data'] is List) {
-          allCustodians = rawData['data'] as List;
-        }
-        final currentUserId = app.user?.id ?? app.user?.userId ?? '';
-        final currentUserName = (app.user?.name ?? '').trim().toLowerCase();
+        rawList = rawData is List ? rawData : (rawData['custodians'] ?? rawData['data'] ?? []);
+      }
+      
+      final currentUserId = app.user?.id ?? '';
+      final currentUserName = (app.user?.name ?? '').trim().toLowerCase();
 
-        final filteredRecipients = allCustodians.where((c) {
-          // Extract all possible ID representations
-          final cId = c['id']?.toString() ?? c['custodianId']?.toString() ?? '';
-          final cUserId = c['linkedUserId']?.toString() ?? c['userId']?.toString() ?? c['user']?['id']?.toString() ?? '';
-          final cName = (c['name'] ?? c['user']?['name'] ?? '').toString().trim().toLowerCase();
+      final filtered = rawList.where((c) {
+        final cId = c['id']?.toString() ?? '';
+        final cUserId = c['linkedUserId']?.toString() ?? c['userId']?.toString() ?? c['user']?['id']?.toString() ?? '';
+        final cName = (c['name'] ?? c['user']?['name'] ?? '').toString().trim().toLowerCase();
 
-          // 1. Check ID mismatch
-          if (currentUserId.isNotEmpty) {
-            if (cId == currentUserId || cUserId == currentUserId) {
-              return false; // Exclude self
-            }
-          }
+        if (currentUserId.isNotEmpty && (cId == currentUserId || cUserId == currentUserId)) return false;
+        if (currentUserName.isNotEmpty && cName == currentUserName) return false;
+        return true;
+      }).toList();
 
-          // 2. Check Name mismatch (fail-safe)
-          if (currentUserName.isNotEmpty && cName.isNotEmpty) {
-            if (cName == currentUserName) {
-              return false; // Exclude self
-            }
-          }
-
-          return true;
-        }).toList();
-
+      if (mounted) {
         setState(() {
-          _custodians = filteredRecipients;
-          _loadingCustodians = false;
-        });
-      } else {
-        setState(() {
-          _custodians = [];
+          _custodians = filtered;
           _loadingCustodians = false;
         });
       }
     } catch (e) {
-      setState(() {
-        _custodians = [];
-        _loadingCustodians = false;
-        _error = 'Could not load users. Please try again.';
-      });
+      debugPrint('_loadCustodiansSafely error: $e');
+      if (mounted) {
+        setState(() {
+          _error = 'Could not load users. Please check your network connection.';
+          _loadingCustodians = false;
+        });
+      }
     }
   }
 

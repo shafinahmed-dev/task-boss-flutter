@@ -62,9 +62,9 @@ describe('CustodyService', () => {
           companyId,
           linkedUser: {
             id: 'u-1',
-            name: 'Rafiqul Islam',
+            name: 'Test Custodian',
             role: 'collector',
-            designation: 'Site Engineer',
+            designation: 'Field Engineer',
             department: 'Engineering',
           },
         },
@@ -75,16 +75,16 @@ describe('CustodyService', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
         id: 'cust-1',
-        name: 'Rafiqul Islam',
-        designation: 'Site Engineer',
+        name: 'Test Custodian',
+        designation: 'Field Engineer',
         department: 'Engineering',
         type: 'person',
         companyId,
         linkedUser: {
           id: 'u-1',
-          name: 'Rafiqul Islam',
+          name: 'Test Custodian',
           role: 'collector',
-          designation: 'Site Engineer',
+          designation: 'Field Engineer',
           department: 'Engineering',
         },
       });
