@@ -668,34 +668,30 @@ export class SuiteService {
   }
   async getSuiteMovements(reqUser: any, direction?: string, range?: string) {
     const tenantId = reqUser.tenantId;
+    const where: any = {};
+    if (tenantId) where.tenantId = tenantId;
 
-    let dateFilter: any = {};
+    // Case-insensitive direction match
+    if (direction) {
+      const dir = direction.trim().toUpperCase();
+      where.direction = { in: [dir, dir.toLowerCase()] };
+    }
+
+    // Date filtering
     const now = new Date();
-    if (range === 'today') {
+    const r = (range || '').toLowerCase();
+    if (r.includes('today')) {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      dateFilter = { gte: start };
-    } else if (range === 'this_week') {
+      where.createdAt = { gte: start };
+    } else if (r.includes('week')) {
       const day = now.getDay();
       const diff = now.getDate() - day + (day === 0 ? -6 : 1);
       const start = new Date(now.setDate(diff));
       start.setHours(0, 0, 0, 0);
-      dateFilter = { gte: start };
-    } else if (range === 'this_month') {
+      where.createdAt = { gte: start };
+    } else if (r.includes('month')) {
       const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      dateFilter = { gte: start };
-    }
-
-    const where: any = {
-      custodian: { company: { tenantId } },
-      editedFromId: null,
-    };
-
-    if (direction) {
-      where.direction = direction.toUpperCase();
-    }
-
-    if (dateFilter.gte) {
-      where.createdAt = dateFilter;
+      where.createdAt = { gte: start };
     }
 
     const movements = await this.prisma.moneyMovement.findMany({
@@ -703,23 +699,28 @@ export class SuiteService {
       include: {
         collector: { select: { id: true, name: true, handle: true } },
         wallet: { select: { id: true, name: true, type: true } },
+        ledger: { select: { id: true, name: true } },
+        segment: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 100,
     });
 
     const serialized = movements.map((m: any) => {
       const meta = (m.metadata as any) || {};
+      const isDirectionIn = m.direction?.toUpperCase() === 'IN';
       return {
         id: m.id,
         amount: Number(m.amount || 0),
-        direction: m.direction.toLowerCase(),
-        movementType: m.movementType || meta.movementType || (m.direction.toUpperCase() === 'IN' ? 'Inflow' : 'Outflow'),
-        note: m.notes || m.note || meta.note || '',
+        direction: isDirectionIn ? 'in' : 'out',
+        movementType: isDirectionIn ? 'Inflow' : 'Outflow',
+        note: m.notes || m.note || meta.note || m.segment?.name || 'Movement',
         voucherNumber: m.voucherNumber || meta.voucherNumber || '',
         userName: m.collector?.name || meta.actorName || 'Staff',
-        userHandle: m.collector?.handle || '',
+        userRole: 'EMPLOYEE',
         walletName: m.wallet?.name || meta.channel || '',
+        ledgerName: m.ledger?.name || '',
+        segmentName: m.segment?.name || '',
         createdAt: m.createdAt.toISOString(),
       };
     });

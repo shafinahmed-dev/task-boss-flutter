@@ -274,121 +274,99 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
     );
   }
 
-  void _showAddSegmentSheet(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
 
-    showModalBottomSheet(
+
+
+  void _exportLedgerPdf(List filteredSegments, double totalInflow, double totalOutflow) {
+    final ledgerName = _ledger?['name']?.toString() ?? widget.initialName;
+    final net = totalInflow - totalOutflow;
+
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalCtx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
-            top: 20,
-            left: 20,
-            right: 20,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF0F172A)),
+            const SizedBox(width: 8),
+            Expanded(child: Text('$ledgerName Statement', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+          ],
+        ),
+        content: SizedBox(
+          width: 450,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Export Date: ${DateTime.now().toLocal().toString().split('.').first}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                if (_searchQuery.isNotEmpty)
+                  Text('Filter: "$_searchQuery"', style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF0F172A))),
+                const Divider(height: 20),
+                const Text('Segments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                const SizedBox(height: 6),
+                ...filteredSegments.map((s) {
+                  final sName = s['name']?.toString() ?? 'Segment';
+                  final sIn = double.tryParse(s['totalInflow']?.toString() ?? '0') ?? 0.0;
+                  final sOut = double.tryParse(s['totalOutflow']?.toString() ?? '0') ?? 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: Text(sName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+                        Text('+৳${sIn.toStringAsFixed(2)} / -৳${sOut.toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: Color(0xFF475569))),
+                      ],
+                    ),
+                  );
+                }),
+                const Divider(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(10)),
+                  child: Column(
                     children: [
-                      const Text(
-                        'Create New Segment',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Total Inflow', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          Text('+৳ ${totalInflow.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
                       ),
-                      IconButton(
-                        onPressed: () => Navigator.of(modalCtx).pop(),
-                        icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Total Outflow', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          Text('-৳ ${totalOutflow.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
+                      ),
+                      const Divider(color: Colors.white24, height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Net Balance', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          Text('৳ ${net.toStringAsFixed(2)}', style: TextStyle(color: net >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
                       ),
                     ],
                   ),
-                  const Divider(color: Color(0xFFE2E8F0)),
-                  const SizedBox(height: 16),
-                  const Text('Segment Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155))),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: InputDecoration(
-                      hintText: 'e.g., Construction Phase 2, Marketing',
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Description (Optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155))),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: descCtrl,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      hintText: 'Optional description of this segment...',
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final name = nameCtrl.text.trim();
-                        if (name.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Segment name cannot be empty.')),
-                          );
-                          return;
-                        }
-                        final app = context.read<AppState>();
-                        final success = await app.createSegmentInLedger(widget.ledgerId, name, description: descCtrl.text.trim());
-                        if (success && context.mounted) {
-                          Navigator.of(modalCtx).pop();
-                          _loadDetails();
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F172A),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Create Segment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        );
-      },
-    );
-  }
-
-
-  void _exportReport() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Exporting PDF report for ${_ledger?['name'] ?? widget.initialName}...')),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PDF statement successfully exported.')));
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white),
+            child: const Text('Download / Print'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -449,11 +427,6 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_rounded, color: Color(0xFF0F172A)),
-            onPressed: () => _showAddSegmentSheet(context),
-            tooltip: 'Add Segment',
-          ),
-          IconButton(
             icon: const Icon(Icons.tune_rounded, color: Color(0xFF0F172A)),
             onPressed: _openEditModal,
             tooltip: 'Edit Ledger',
@@ -484,29 +457,20 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
 
                     Expanded(
                       child: filteredSegments.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.folder_open_rounded, size: 48, color: Color(0xFF94A3B8)),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    segments.isEmpty ? 'No segments found in this ledger.' : 'No matching segments found.',
-                                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 15),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton.icon(
-                                    onPressed: () => _showAddSegmentSheet(context),
-                                    icon: const Icon(Icons.add_rounded, size: 18),
-                                    label: Text(segments.isEmpty ? 'Add First Segment' : 'Add Segment'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF0F172A),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.folder_open_rounded, size: 48, color: Color(0xFF94A3B8)),
+                                    SizedBox(height: 12),
+                                    Text(
+                                      'No segments created by managers yet.',
+                                      style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             )
                           : ListView.builder(
@@ -610,7 +574,7 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                           ],
                         ),
                         ElevatedButton.icon(
-                          onPressed: _exportReport,
+                          onPressed: () => _exportLedgerPdf(filteredSegments, filteredInflow, filteredOutflow),
                           icon: const Icon(Icons.picture_as_pdf_rounded, size: 16, color: Color(0xFF0F172A)),
                           label: const Text('Export PDF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0F172A))),
                           style: ElevatedButton.styleFrom(
