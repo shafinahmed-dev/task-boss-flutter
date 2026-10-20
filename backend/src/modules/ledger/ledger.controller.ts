@@ -2,9 +2,12 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
   Param,
   Query,
+  Req,
   HttpCode,
   HttpStatus,
   HttpException,
@@ -17,28 +20,73 @@ import type {
 } from './ledger.service.js';
 import { Roles } from '../auth/roles.decorator.js';
 
-@Controller('ledger')
+@Controller(['ledger', 'ledgers'])
 export class LedgerController {
   constructor(private readonly ledgerService: LedgerService) {}
 
-  /**
-   * POST /ledger/movements
-   * Record a new money movement. Idempotent via idempotencyKey.
-   */
+  @Get('suite')
+  @Roles('SUITE_ADMIN')
+  async getSuiteLedgers(
+    @Req() req: any,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.ledgerService.getSuiteLedgers(req.user, search, status);
+  }
+
+  @Post()
+  @Roles('SUITE_ADMIN')
+  @HttpCode(HttpStatus.CREATED)
+  async createLedger(@Req() req: any, @Body() dto: any) {
+    return this.ledgerService.createLedger(req.user, dto);
+  }
+
+  @Put(':id')
+  @Roles('SUITE_ADMIN')
+  async updateLedger(@Req() req: any, @Param('id') id: string, @Body() dto: any) {
+    return this.ledgerService.updateLedger(req.user, id, dto);
+  }
+
+  @Delete(':id')
+  @Roles('SUITE_ADMIN')
+  async deleteLedger(@Req() req: any, @Param('id') id: string) {
+    return this.ledgerService.deleteLedger(req.user, id);
+  }
+
+  @Get('manager')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  async getManagerLedgers(@Req() req: any) {
+    return this.ledgerService.getManagerLedgers(req.user);
+  }
+
+  @Post(':id/employees')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  @HttpCode(HttpStatus.CREATED)
+  async assignEmployeeToLedger(
+    @Req() req: any,
+    @Param('id') ledgerId: string,
+    @Body('employeeUserId') employeeUserId: string,
+  ) {
+    return this.ledgerService.assignEmployeeToLedger(req.user, ledgerId, employeeUserId);
+  }
+
+  @Post(':id/segments')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  @HttpCode(HttpStatus.CREATED)
+  async createSegmentInLedger(
+    @Req() req: any,
+    @Param('id') ledgerId: string,
+    @Body() dto: any,
+  ) {
+    return this.ledgerService.createSegmentInLedger(req.user, ledgerId, dto);
+  }
+
   @Post('movements')
   @HttpCode(HttpStatus.CREATED)
   async recordMovement(@Body() dto: RecordMovementDto) {
-    console.log('--- [DEBUG] INCOMING MOVEMENT PAYLOAD ---');
-    console.log(JSON.stringify(dto, null, 2));
     try {
-      const result = await this.ledgerService.recordMoneyMovement(dto);
-      console.log('--- [DEBUG] MOVEMENT SAVED SUCCESSFULLY ---', (result as any)?.id);
-      return result;
+      return await this.ledgerService.recordMoneyMovement(dto);
     } catch (error: any) {
-      console.error('--- [DEBUG] ERROR IN RECORD MOVEMENT ---');
-      console.error('Error message:', error?.message);
-      console.error('Prisma / DB error code:', error?.code);
-      console.error('Full stack:', error?.stack);
       throw new HttpException(
         error?.message || 'Database error processing movement',
         error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -46,11 +94,6 @@ export class LedgerController {
     }
   }
 
-  /**
-   * POST /ledger/movements/:id/edit
-   * Submit an append-only correction. Creates a new movement row
-   * with edited_from_id pointing to the original.
-   */
   @Post('movements/:id/edit')
   @HttpCode(HttpStatus.CREATED)
   async editMovement(
@@ -60,10 +103,6 @@ export class LedgerController {
     return this.ledgerService.editMoneyMovement(id, dto);
   }
 
-  /**
-   * GET /ledger/custodians/:id/balance?companyId=...
-   * Returns the dynamically computed balance for a custodian.
-   */
   @Get('custodians/:id/balance')
   async getCustodianBalance(
     @Param('id') id: string,
@@ -72,15 +111,6 @@ export class LedgerController {
     return this.ledgerService.getCustodianBalance(id, companyId);
   }
 
-  /**
-   * GET /ledger/custodians/:id/movements?page=1&limit=50&direction=in
-   * Paginated ledger history for a custodian.
-   */
-  /**
-   * POST /ledger/allocations/inter-company
-   * Record a cross-entity shared cost. Creates an OUT movement under source
-   * company and an offsetting inter-company liability/receivable entry.
-   */
   @Post('allocations/inter-company')
   @HttpCode(HttpStatus.CREATED)
   @Roles('accounts', 'approver', 'admin')
@@ -90,10 +120,6 @@ export class LedgerController {
     return this.ledgerService.allocateInterCompanyCost(dto);
   }
 
-  /**
-   * POST /ledger/allocations/:id/settle
-   * Mark an inter-company allocation as settled.
-   */
   @Post('allocations/:id/settle')
   @HttpCode(HttpStatus.OK)
   @Roles('accounts', 'approver', 'admin')
@@ -101,10 +127,6 @@ export class LedgerController {
     return this.ledgerService.settleInterCompanyAllocation(id);
   }
 
-  /**
-   * GET /ledger/custodians/:id/movements?page=1&limit=50&direction=in
-   * Paginated ledger history for a custodian.
-   */
   @Get('custodians/:id/movements')
   async getCustodianMovements(
     @Param('id') id: string,

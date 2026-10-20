@@ -68,6 +68,14 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
     final inflowAmt = _toDouble(rawInflow);
     final outflowAmt = _toDouble(rawOutflow);
 
+    final activeCompanyId = company['id']?.toString() ?? app.effectiveCompanyId;
+    final activeCompanyName = company['name']?.toString() ?? 'Consolidated Concern';
+
+    String selectedPeriodLabel = 'This Month';
+    if (_selectedFilter == 'today') selectedPeriodLabel = 'Today';
+    if (_selectedFilter == 'this_week') selectedPeriodLabel = 'This Week';
+    if (_selectedFilter == 'all_time') selectedPeriodLabel = 'All Time';
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -115,33 +123,49 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: darkSlate,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      company['name'] ?? 'Consolidated Concern',
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.bold),
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ManagerTransactionsScreen(
+                          companyId: activeCompanyId,
+                          companyName: activeCompanyName,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: darkSlate,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4)),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '৳ ${_formatAmount(companyTotalBalance, forceShow: true)}',
-                      style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          company['name'] ?? 'Consolidated Concern',
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '৳ ${_formatAmount(companyTotalBalance, forceShow: true)}',
+                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Consolidated cash held across active custodians',
+                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Consolidated cash held across active custodians',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -167,59 +191,89 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), shape: BoxShape.circle),
-                            child: const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 18),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          _showManagerVelocityBreakdown(
+                            context,
+                            companyId: activeCompanyId,
+                            direction: 'in',
+                            totalAmount: inflowAmt,
+                            rangeLabel: selectedPeriodLabel,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: borderColor),
                           ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              const Text('Inflow', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                              const SizedBox(height: 2),
-                              Text('৳ ${_formatAmount(inflowAmt)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), shape: BoxShape.circle),
+                                child: const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 18),
+                              ),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Inflow', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                                  const SizedBox(height: 2),
+                                  Text('৳ ${_formatAmount(inflowAmt)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.1), shape: BoxShape.circle),
-                            child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFFEF4444), size: 18),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          _showManagerVelocityBreakdown(
+                            context,
+                            companyId: activeCompanyId,
+                            direction: 'out',
+                            totalAmount: outflowAmt,
+                            rangeLabel: selectedPeriodLabel,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: borderColor),
                           ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              const Text('Outflow', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                              const SizedBox(height: 2),
-                              Text('৳ ${_formatAmount(outflowAmt)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.1), shape: BoxShape.circle),
+                                child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFFEF4444), size: 18),
+                              ),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Outflow', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                                  const SizedBox(height: 2),
+                                  Text('৳ ${_formatAmount(outflowAmt)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -520,7 +574,6 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
       ),
     );
   }
-}
 
   Widget _buildCompanyHeader(BuildContext context) {
     final app = context.watch<AppState>();
@@ -577,5 +630,111 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
       }).toList(),
     );
   }
+
+  void _showManagerVelocityBreakdown(
+    BuildContext context, {
+    required String companyId,
+    required String direction,
+    required double totalAmount,
+    required String rangeLabel,
+  }) {
+    final isOut = direction == 'out';
+    final title = isOut ? 'Outflow Breakdown ($rangeLabel)' : 'Inflow Breakdown ($rangeLabel)';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => FutureBuilder<List<Map<String, dynamic>>>(
+          future: context.read<AppState>().fetchManagerMovements(
+                companyId: companyId,
+                direction: direction,
+                range: _selectedFilter,
+              ),
+          builder: (context, snapshot) {
+            final movements = snapshot.data ?? [];
+            final isLoading = snapshot.connectionState == ConnectionState.waiting;
+
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: darkSlate), overflow: TextOverflow.ellipsis),
+                      ),
+                      IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Total: ৳ ${_formatAmount(totalAmount)}',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isOut ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
+                  ),
+                  const Divider(height: 24),
+                  Expanded(
+                    child: isLoading
+                        ? const Center(child: CircularProgressIndicator(color: darkSlate))
+                        : movements.isEmpty
+                            ? const Center(child: Text('No movements recorded for this period.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)))
+                            : ListView.separated(
+                                controller: scrollController,
+                                itemCount: movements.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final m = movements[index];
+                                  final amt = _toDouble(m['amount']);
+                                  final note = m['note'] ?? m['movementType'] ?? 'Transaction';
+                                  final userName = m['userName'] ?? 'Staff';
+                                  final timeStr = m['createdAt']?.toString().substring(0, 10) ?? '';
+
+                                  return Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: borderColor)),
+                                    child: Row(
+                                      children: [
+                                        Icon(isOut ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: isOut ? const Color(0xFFEF4444) : const Color(0xFF10B981), size: 16),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Text(note, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: darkSlate)),
+                                                  Text(isOut ? '-৳ ${_formatAmount(amt)}' : '+৳ ${_formatAmount(amt)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isOut ? const Color(0xFFEF4444) : const Color(0xFF10B981))),
+                                                ],
+                                              ),
+                                              Text('$timeStr • By: $userName', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
 
 

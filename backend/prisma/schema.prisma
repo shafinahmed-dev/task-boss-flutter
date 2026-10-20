@@ -12,7 +12,65 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ── Multi-Tenant Entities ──────────────────────────────────────────────────
+enum LedgerStatus {
+  ACTIVE
+  FROZEN
+  ARCHIVED
+}
+
+model Ledger {
+  id          String        @id @default(uuid()) @db.Uuid
+  tenantId    String        @map("tenant_id")
+  companyId   String?       @map("company_id") @db.Uuid
+  name        String        @db.Text
+  code        String        @db.Text
+  description String?       @db.Text
+  isPerpetual Boolean       @default(true) @map("is_perpetual")
+  startDate   DateTime?     @map("start_date")
+  endDate     DateTime?     @map("end_date")
+  status      LedgerStatus  @default(ACTIVE)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  company     Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  segments    Segment[]
+  movements   MoneyMovement[]
+  assignments LedgerMember[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@map("ledgers")
+}
+
+model LedgerMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  ledgerId  String   @map("ledger_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      String   @db.Text // 'MANAGER' or 'EMPLOYEE'
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ledger    Ledger   @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ledgerId, userId])
+  @@map("ledger_members")
+}
+
+model Segment {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ledgerId    String   @map("ledger_id") @db.Uuid
+  name        String   @db.Text
+  code        String?  @db.Text
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  ledger      Ledger   @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  movements   MoneyMovement[]
+
+  @@map("segments")
+}
+
 
 model Tenant {
   id          String    @id @default(uuid()) @db.Uuid
@@ -44,6 +102,7 @@ model Company {
   digitalReceipts    DigitalReceipt[]
   interCompanyAllocationsFrom InterCompanyAllocation[] @relation("AllocFrom")
   interCompanyAllocationsTo   InterCompanyAllocation[] @relation("AllocTo")
+  ledgers                     Ledger[]
 
   createdAt DateTime @default(now()) @map("created_at")
   @@map("companies")
@@ -68,6 +127,7 @@ model User {
   custodianAccounts CustodianAccount[]
   collectedMovements MoneyMovement[]     @relation("CollectorMovements")
   assignedBlocks    ReceiptNumberBlock[]
+  ledgerAssignments LedgerMember[]
 
   createdAt DateTime @default(now()) @map("created_at")
   @@map("users")
@@ -198,6 +258,8 @@ model MoneyMovement {
   clientId         String? @map("client_id") @db.Uuid
   projectId        String? @map("project_id") @db.Uuid
   categoryId       String? @map("category_id") @db.Uuid
+  ledgerId         String? @map("ledger_id") @db.Uuid
+  segmentId        String? @map("segment_id") @db.Uuid
   loanId           String? @map("loan_id") @db.Uuid
   walletId         String? @map("wallet_id") @db.Uuid
   fee              Decimal? @db.Decimal(14, 2)
@@ -218,6 +280,8 @@ model MoneyMovement {
   client           Client?         @relation(fields: [clientId], references: [id])
   project          Project?        @relation(fields: [projectId], references: [id])
   category         TransactionCategory? @relation(fields: [categoryId], references: [id])
+  ledger           Ledger?         @relation(fields: [ledgerId], references: [id], onDelete: SetNull)
+  segment          Segment?        @relation(fields: [segmentId], references: [id], onDelete: SetNull)
 
   digitalReceipt   DigitalReceipt?
   interCompanyAllocations InterCompanyAllocation[]

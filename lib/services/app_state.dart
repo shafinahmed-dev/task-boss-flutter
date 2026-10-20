@@ -82,16 +82,84 @@ class AppState extends ChangeNotifier {
         final decoded = jsonDecode(response.body);
         if (decoded is Map && decoded['movements'] is List) {
           return (decoded['movements'] as List)
-              .map((e) => Map<String, dynamic>.from(e as Map))
+              .map((e) => Map<String, dynamic>.from(e))
               .toList();
         } else if (decoded is List) {
-          return (decoded as List)
-              .map((e) => Map<String, dynamic>.from(e as Map))
+          return decoded
+              .map((e) => Map<String, dynamic>.from(e))
               .toList();
         }
       }
     } catch (e) {
       debugPrint('fetchSuiteMovements error: $e');
+    }
+    return [];
+  }
+
+  List<Map<String, dynamic>> _managerTransactions = [];
+  List<Map<String, dynamic>> get managerTransactions => _managerTransactions;
+
+  Future<List<Map<String, dynamic>>> fetchManagerTransactions({
+    String? companyId,
+    String? search,
+    String? direction,
+  }) async {
+    try {
+      final cid = (companyId != null && companyId.isNotEmpty)
+          ? companyId
+          : effectiveCompanyId;
+
+      var urlStr = '$apiBaseUrl/manager/transactions?companyId=$cid';
+      if (search != null && search.isNotEmpty) urlStr += '&search=${Uri.encodeComponent(search)}';
+      if (direction != null && direction.isNotEmpty) urlStr += '&direction=$direction';
+
+      final response = await authRequest('GET', Uri.parse(urlStr));
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        List<dynamic> rawList = [];
+        if (decoded is Map && decoded['transactions'] is List) {
+          rawList = decoded['transactions'];
+        } else if (decoded is Map && decoded['data'] is List) {
+          rawList = decoded['data'];
+        } else if (decoded is List) {
+          rawList = decoded;
+        }
+        _managerTransactions = rawList
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        notifyListeners();
+        return _managerTransactions;
+      }
+    } catch (e) {
+      debugPrint('fetchManagerTransactions error: $e');
+    }
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> fetchManagerMovements({
+    required String companyId,
+    required String direction,
+    required String range,
+  }) async {
+    try {
+      final response = await authRequest(
+        'GET',
+        Uri.parse('$apiBaseUrl/manager/movements?companyId=$companyId&direction=$direction&range=$range'),
+      );
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['movements'] is List) {
+          return (decoded['movements'] as List)
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        } else if (decoded is List) {
+          return decoded
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchManagerMovements error: $e');
     }
     return [];
   }
@@ -350,6 +418,112 @@ class AppState extends ChangeNotifier {
       return null;
     }
   }
+
+  Future<List<Map<String, dynamic>>> fetchSuiteLedgers({String? search, String? status}) async {
+    try {
+      var uri = '$apiBaseUrl/ledgers/suite';
+      final params = <String>[];
+      if (search != null && search.isNotEmpty) params.add('search=${Uri.encodeComponent(search)}');
+      if (status != null && status.isNotEmpty) params.add('status=$status');
+      if (params.isNotEmpty) uri += '?${params.join('&')}';
+
+      final res = await authRequest('GET', Uri.parse(uri));
+      if (res.statusCode == 200 && res.body.isNotEmpty) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['ledgers'] is List) {
+          return (decoded['ledgers'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        } else if (decoded is List) {
+          return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchSuiteLedgers error: $e');
+    }
+    return [];
+  }
+
+  Future<bool> createLedger(Map<String, dynamic> data) async {
+    try {
+      final res = await authRequest(
+        'POST',
+        Uri.parse('$apiBaseUrl/ledgers'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data),
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        notifyListeners();
+        return true;
+      }
+      _errorMessage = jsonDecode(res.body)?['message']?.toString() ?? 'Failed to create ledger';
+      notifyListeners();
+    } catch (e) {
+      debugPrint('createLedger error: $e');
+    }
+    return false;
+  }
+
+  Future<bool> updateLedger(String ledgerId, Map<String, dynamic> data) async {
+    try {
+      final res = await authRequest(
+        'PUT',
+        Uri.parse('$apiBaseUrl/ledgers/$ledgerId'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data),
+      );
+      if (res.statusCode == 200) {
+        notifyListeners();
+        return true;
+      }
+      _errorMessage = jsonDecode(res.body)?['message']?.toString() ?? 'Failed to update ledger';
+      notifyListeners();
+    } catch (e) {
+      debugPrint('updateLedger error: $e');
+    }
+    return false;
+  }
+
+  Future<List<Map<String, dynamic>>> fetchManagerLedgers() async {
+    try {
+      final res = await authRequest('GET', Uri.parse('$apiBaseUrl/ledgers/manager'));
+      if (res.statusCode == 200 && res.body.isNotEmpty) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['ledgers'] is List) {
+          return (decoded['ledgers'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchManagerLedgers error: $e');
+    }
+    return [];
+  }
+
+  List<Map<String, dynamic>> _myLedgers = [];
+  List<Map<String, dynamic>> get myLedgers => _myLedgers;
+
+  Future<void> fetchMyLedgers() async {
+    _myLedgers = await fetchManagerLedgers();
+    notifyListeners();
+  }
+
+
+  Future<bool> createSegmentInLedger(String ledgerId, Map<String, dynamic> data) async {
+    try {
+      final res = await authRequest(
+        'POST',
+        Uri.parse('$apiBaseUrl/ledgers/$ledgerId/segments'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data),
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('createSegmentInLedger error: $e');
+    }
+    return false;
+  }
+
 
 
 
@@ -1043,43 +1217,6 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       print('Update employee exception: $e');
       return false;
-    }
-  }
-
-  List<Map<String, dynamic>> _managerTransactions = [];
-  List<Map<String, dynamic>> get managerTransactionsList => _managerTransactions;
-  List<Map<String, dynamic>> get managerTransactions => _managerTransactions;
-
-  Future<void> fetchManagerTransactions({String? companyId}) async {
-    try {
-      final cid = (companyId != null && companyId.isNotEmpty)
-          ? companyId
-          : effectiveCompanyId;
-
-      final query = cid.isNotEmpty ? '?companyId=$cid' : '';
-      final url = Uri.parse('$apiBaseUrl/manager/transactions$query');
-      final response = await authRequest('GET', url);
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = jsonDecode(response.body);
-        List<dynamic> rawList = [];
-
-        if (data is List) {
-          rawList = data;
-        } else if (data is Map && data['transactions'] is List) {
-          rawList = data['transactions'];
-        } else if (data is Map && data['data'] is List) {
-          rawList = data['data'];
-        }
-
-        _managerTransactions = rawList
-            .map((item) => Map<String, dynamic>.from(item as Map))
-            .toList();
-
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('fetchManagerTransactions error: $e');
     }
   }
 }

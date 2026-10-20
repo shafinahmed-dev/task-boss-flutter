@@ -492,4 +492,139 @@ export class ManagerService {
         };
     });
   }
+
+  async getConcernTransactions(
+    reqUser: any,
+    companyId: string,
+    search?: string,
+    direction?: string,
+  ) {
+    const tenantId = reqUser.tenantId;
+
+    // Resolve members belonging to this company
+    const companyMembers = await this.prisma.userCompany.findMany({
+      where: { companyId },
+      select: { userId: true },
+    });
+    const memberUserIds = companyMembers.map((m) => m.userId);
+
+    const where: any = {
+      tenantId,
+      userId: { in: memberUserIds },
+    };
+
+    if (direction === 'in' || direction === 'out') {
+      where.direction = direction;
+    }
+
+    if (search && search.trim().length > 0) {
+      const q = search.trim();
+      where.OR = [
+        { note: { contains: q, mode: 'insensitive' } },
+        { voucherNumber: { contains: q, mode: 'insensitive' } },
+        { movementType: { contains: q, mode: 'insensitive' } },
+        { user: { name: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+
+    const movements = await this.prisma.moneyMovement.findMany({
+      where,
+      include: {
+        collector: { select: { id: true, name: true, handle: true, role: true } },
+        wallet: { select: { id: true, name: true, type: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    const serialized = movements.map((m: any) => {
+      const meta = (m.metadata as any) || {};
+      return {
+        id: m.id,
+        amount: Number(m.amount || 0),
+        direction: m.direction,
+        movementType: m.movementType || meta.movementType || (m.direction === 'in' ? 'Inflow' : 'Outflow'),
+        note: m.notes || meta.note || '',
+        voucherNumber: m.voucherNumber || meta.voucherNumber || '',
+        userName: m.collector?.name || meta.actorName || 'Staff',
+        userRole: m.collector?.role || 'EMPLOYEE',
+        walletName: m.wallet?.name || meta.channel || '',
+        createdAt: m.createdAt.toISOString(),
+      };
+    });
+
+    return { success: true, transactions: serialized };
+  }
+
+  async getConcernMovements(
+    reqUser: any,
+    companyId: string,
+    direction?: string,
+    range?: string,
+  ) {
+    const tenantId = reqUser.tenantId;
+
+    let dateFilter: any = {};
+    const now = new Date();
+    if (range === 'today') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      dateFilter = { gte: start };
+    } else if (range === 'this_week') {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      const start = new Date(now.setDate(diff));
+      start.setHours(0, 0, 0, 0);
+      dateFilter = { gte: start };
+    } else if (range === 'this_month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      dateFilter = { gte: start };
+    }
+
+    const companyMembers = await this.prisma.userCompany.findMany({
+      where: { companyId },
+      select: { userId: true },
+    });
+    const memberUserIds = companyMembers.map((m) => m.userId);
+
+    const where: any = {
+      tenantId,
+      userId: { in: memberUserIds },
+    };
+
+    if (direction === 'in' || direction === 'out') {
+      where.direction = direction;
+    }
+
+    if (dateFilter.gte) {
+      where.createdAt = dateFilter;
+    }
+
+    const movements = await this.prisma.moneyMovement.findMany({
+      where,
+      include: {
+        collector: { select: { id: true, name: true, handle: true, role: true } },
+        wallet: { select: { id: true, name: true, type: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    const serialized = movements.map((m: any) => {
+      const meta = (m.metadata as any) || {};
+      return {
+        id: m.id,
+        amount: Number(m.amount || 0),
+        direction: m.direction,
+        movementType: m.movementType || meta.movementType || (m.direction === 'in' ? 'Inflow' : 'Outflow'),
+        note: m.notes || meta.note || '',
+        voucherNumber: m.voucherNumber || meta.voucherNumber || '',
+        userName: m.collector?.name || meta.actorName || 'Staff',
+        userRole: m.collector?.role || 'EMPLOYEE',
+        walletName: m.wallet?.name || meta.channel || '',
+        createdAt: m.createdAt.toISOString(),
+      };
+    });
+
+    return { success: true, movements: serialized };
+  }
 }

@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../../services/app_state.dart';
 
 class ManagerTransactionsScreen extends StatefulWidget {
-  const ManagerTransactionsScreen({super.key});
+  final String? companyId;
+  final String? companyName;
+  const ManagerTransactionsScreen({super.key, this.companyId, this.companyName});
 
   @override
   State<ManagerTransactionsScreen> createState() => _ManagerTransactionsScreenState();
@@ -18,7 +20,8 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final app = context.read<AppState>();
-      app.fetchManagerTransactions(companyId: app.effectiveCompanyId);
+      final cid = widget.companyId ?? app.effectiveCompanyId;
+      app.fetchManagerTransactions(companyId: cid, search: _searchQuery);
     });
   }
 
@@ -26,6 +29,13 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
   void dispose() {
     _searchCtl.dispose();
     super.dispose();
+  }
+
+  Future<void> _onSearchChanged(String query) async {
+    setState(() => _searchQuery = query);
+    final app = context.read<AppState>();
+    final cid = widget.companyId ?? app.effectiveCompanyId;
+    await app.fetchManagerTransactions(companyId: cid, search: query);
   }
 
   double _toDouble(dynamic val) {
@@ -97,13 +107,14 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
-          'All Transactions',
-          style: TextStyle(
+        title: Text(
+          widget.companyName != null ? '${widget.companyName} — Transactions' : 'All Transactions',
+          style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 18,
+            fontSize: 16,
           ),
+          overflow: TextOverflow.ellipsis,
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: const Color(0xFF0F172A),
@@ -119,7 +130,8 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
                 : RefreshIndicator(
                     onRefresh: () async {
                       final app = context.read<AppState>();
-                      await app.fetchManagerTransactions(companyId: app.effectiveCompanyId);
+                      final cid = widget.companyId ?? app.effectiveCompanyId;
+                      await app.fetchManagerTransactions(companyId: cid, search: _searchQuery);
                     },
                     child: ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -140,7 +152,7 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
       color: Colors.white,
       child: TextField(
         controller: _searchCtl,
-        onChanged: (val) => setState(() => _searchQuery = val),
+        onChanged: (val) => _onSearchChanged(val),
         decoration: InputDecoration(
           hintText: 'Search by segment, note, or actor...',
           hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
@@ -150,7 +162,7 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
                   icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
                   onPressed: () {
                     _searchCtl.clear();
-                    setState(() => _searchQuery = '');
+                    _onSearchChanged('');
                   },
                 )
               : null,

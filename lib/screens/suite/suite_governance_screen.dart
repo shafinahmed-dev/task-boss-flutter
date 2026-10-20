@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../login_screen.dart';
 import '../../services/app_state.dart';
 import 'suite_transactions_screen.dart';
+import 'suite_ledgers_screen.dart';
 
 
 class SuiteGovernanceScreen extends StatefulWidget {
@@ -130,7 +131,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              isInflow ? Icons.file_download_off_rounded : Icons.file_upload_off_rounded,
+                              isInflow ? Icons.file_download_off_rounded : Icons.file_upload_outlined,
                               size: 40,
                               color: Colors.grey.shade400,
                             ),
@@ -255,15 +256,21 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         children: [
           _buildTopHeaderAndTabs(context, totalCash),
           Expanded(
-            child: _isLoading && app.concerns.isEmpty && app.managers.isEmpty
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF1E2638)))
-                : RefreshIndicator(
-                    onRefresh: _loadData,
-                    color: const Color(0xFF1E2638),
-                    child: _selectedTabIndex == 0
-                        ? _buildDashboardTab(context, app, totalCash)
-                        : _buildManageTab(context, app),
-                  ),
+            child: _selectedTabIndex == 0
+                ? (_isLoading && app.concerns.isEmpty && app.managers.isEmpty
+                    ? const Center(child: CircularProgressIndicator(color: Color(0xFF1E2638)))
+                    : RefreshIndicator(
+                        onRefresh: _loadData,
+                        color: const Color(0xFF1E2638),
+                        child: _buildDashboardTab(context, app, totalCash),
+                      ))
+                : (_selectedTabIndex == 1
+                    ? const SuiteLedgersScreen()
+                    : RefreshIndicator(
+                        onRefresh: _loadData,
+                        color: const Color(0xFF1E2638),
+                        child: _buildManageTab(context, app),
+                      )),
           ),
         ],
       ),
@@ -361,7 +368,8 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
             Row(
               children: [
                 _buildTopTabItem('Dashboard', 0),
-                _buildTopTabItem('Manage', 1),
+                _buildTopTabItem('Ledgers', 1),
+                _buildTopTabItem('Manage', 2),
               ],
             ),
           ],

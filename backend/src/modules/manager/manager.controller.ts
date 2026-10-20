@@ -14,9 +14,25 @@ export class ManagerController {
   }
 
   @Get('transactions')
-  async getTransactions(@Req() req: any, @Query('companyId') companyId?: string) {
+  async getConcernTransactions(
+    @Query('companyId') companyId: string,
+    @Query('search') search: string,
+    @Query('direction') direction: string,
+    @Req() req: any,
+  ) {
     if (req.user?.role === 'EMPLOYEE') throw new ForbiddenException();
-    return this.managerService.getAllTransactions(companyId, req.user);
+    return this.managerService.getConcernTransactions(req.user, companyId, search, direction);
+  }
+
+  @Get('movements')
+  async getConcernMovements(
+    @Query('companyId') companyId: string,
+    @Query('direction') direction: string,
+    @Query('range') range: string,
+    @Req() req: any,
+  ) {
+    if (req.user?.role === 'EMPLOYEE') throw new ForbiddenException();
+    return this.managerService.getConcernMovements(req.user, companyId, direction, range);
   }
 
   @Get('employees')

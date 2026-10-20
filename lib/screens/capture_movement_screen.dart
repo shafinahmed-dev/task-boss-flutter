@@ -48,19 +48,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final app = context.read<AppState>();
-      // If company ID not yet initialized, load overview to establish it
-      if (app.selectedManagerCompanyId == null || app.selectedManagerCompanyId!.isEmpty) {
-        await app.fetchManagerOverview();
-      }
-      final cid = _getEffectiveCompanyId(app);
-      if (cid.isNotEmpty) {
-        await app.fetchCategories(companyId: cid);
-      }
-    });
-    _loadDraft();
-  }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {\n      final app = context.read<AppState>();\n      await app.fetchMyLedgers();\n      if (app.myLedgers.isNotEmpty) {\n        setState(() => _selectedLedgerId = app.myLedgers.first['id'].toString());\n      }\n      if (app.selectedManagerCompanyId == null || app.selectedManagerCompanyId!.isEmpty) {\n        await app.fetchManagerOverview();\n      }\n      final cid = _getEffectiveCompanyId(app);\n      if (cid.isNotEmpty) {\n        await app.fetchCategories(companyId: cid);\n      }\n    });\n    _loadDraft();\n  }
+
+  String? _selectedLedgerId;
 
   String _getEffectiveCompanyId(AppState app) {
     return app.effectiveCompanyId;
@@ -346,6 +336,8 @@ class _CaptureState extends State<CaptureMovementScreen> {
         'custodianId': app.user!.custodianId,
         'entryTag': _getEntryTag(_flowType, _selectedCategory?['name']),
         'categoryId': _selectedCategory?['id'],
+        'ledgerId': _selectedLedgerId,
+        'segmentId': _selectedCategory?['id'],
         'occurredAt': DateTime.now().toIso8601String(),
         'notes': noteText.isNotEmpty ? noteText : null,
         'note': noteText.isNotEmpty ? noteText : null,
@@ -457,7 +449,38 @@ class _CaptureState extends State<CaptureMovementScreen> {
             if (_error != null) _banner(_error!),
             _buildFlowPill(),
             const SizedBox(height: 14),
-            _buildCategoryCard(context.watch<AppState>()),
+            if (app.myLedgers.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.cardBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Fiscal Ledger', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.primaryText)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _selectedLedgerId,
+                      items: app.myLedgers.map((l) => DropdownMenuItem<String>(
+                        value: l['id'].toString(),
+                        child: Text('[${l['code']}] ${l['name']}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      )).toList(),
+                      onChanged: (v) => setState(() => _selectedLedgerId = v),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+            _buildCategoryCard(app),
             const SizedBox(height: 14),
             // Card 2: Wallet & Method
             Container(
