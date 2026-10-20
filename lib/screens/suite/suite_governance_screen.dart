@@ -233,8 +233,11 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     double total = 0.0;
     for (final c in app.concerns) {
       final b = c['totalBalance'];
-      if (b is num) total += b.toDouble();
-      else total += double.tryParse(b?.toString() ?? '0') ?? 0.0;
+      if (b is num) {
+        total += b.toDouble();
+      } else {
+        total += double.tryParse(b?.toString() ?? '0') ?? 0.0;
+      }
     }
     return total;
   }
@@ -274,6 +277,36 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF0F172A),
+          border: Border(top: BorderSide(color: Color(0xFF1E2638), width: 1)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedTabIndex,
+          onTap: (index) => setState(() => _selectedTabIndex = index),
+          backgroundColor: const Color(0xFF0F172A),
+          selectedItemColor: const Color(0xFF38BDF8),
+          unselectedItemColor: const Color(0xFF64748B),
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          type: BottomNavigationBarType.fixed,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_rounded),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.menu_book_rounded),
+              label: 'Ledgers',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.business_center_rounded),
+              label: 'Manage',
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -286,121 +319,81 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
       color: const Color(0xFF1E2638),
       child: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  InkWell(
-                    onTap: () => _showAccountBottomSheet(context),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              InkWell(
+                onTap: () => _showAccountBottomSheet(context),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            companyName,
-                            style: const TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF0F172A)),
-                        ],
-                      ),
-                    ),
                   ),
-
-                  Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Color(0xFF10B981)),
-                            const SizedBox(width: 6),
-                            Text(
-                              _isCashMasked ? '৳ ••••••' : '৳ ${_formatAmount(totalCash)}',
-                              style: const TextStyle(
-                                color: Color(0xFF0F172A),
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            InkWell(
-                              onTap: () => setState(() => _isCashMasked = !_isCashMasked),
-                              child: Icon(
-                                _isCashMasked ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                size: 16,
-                                color: const Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
+                      Text(
+                        companyName,
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-                        onPressed: _loadData,
-                        tooltip: 'Refresh Data',
-                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF0F172A)),
                     ],
+                  ),
+                ),
+              ),
+
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Color(0xFF10B981)),
+                        const SizedBox(width: 6),
+                        Text(
+                          _isCashMasked ? '৳ ••••••' : '৳ ${_formatAmount(totalCash)}',
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: () => setState(() => _isCashMasked = !_isCashMasked),
+                          child: Icon(
+                            _isCashMasked ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                            size: 16,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                    onPressed: _loadData,
+                    tooltip: 'Refresh Data',
                   ),
                 ],
               ),
-            ),
-            Row(
-              children: [
-                _buildTopTabItem('Dashboard', 0),
-                _buildTopTabItem('Ledgers', 1),
-                _buildTopTabItem('Manage', 2),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTopTabItem(String label, int index) {
-    final isSelected = _selectedTabIndex == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _selectedTabIndex = index),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: isSelected ? Colors.white : Colors.transparent,
-                width: 2.5,
-              ),
-            ),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            ),
+            ],
           ),
         ),
       ),
@@ -652,9 +645,13 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
               final concernName = comps.isNotEmpty ? (comps[0]['name'] ?? comps[0]['code'] ?? '') : '';
 
               Color rankColor = const Color(0xFF0F172A);
-              if (rank == 1) rankColor = const Color(0xFFF59E0B);
-              else if (rank == 2) rankColor = const Color(0xFF64748B);
-              else if (rank == 3) rankColor = const Color(0xFFB45309);
+              if (rank == 1) {
+                rankColor = const Color(0xFFF59E0B);
+              } else if (rank == 2) {
+                rankColor = const Color(0xFF64748B);
+              } else if (rank == 3) {
+                rankColor = const Color(0xFFB45309);
+              }
 
               return Container(
                 padding: const EdgeInsets.all(14),
