@@ -1,0 +1,44 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:task_boss/services/app_state.dart';
+
+class LedgerDetailsScreen extends StatefulWidget {
+  final String ledgerId;
+  final String initialName;
+
+  const LedgerDetailsScreen({
+    Key? key,
+    required this.ledgerId,
+    required this.initialName,
+  }) : super(key: key);
+
+  @override
+  State<LedgerDetailsScreen> createState() => _LedgerDetailsScreenState();
+}
+
+class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
+  Map<String, dynamic>? _ledger;
+  bool _isLoading = true;
+  String _searchQuery = '';
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDetails();
+  }
+
+  Future<void> _loadDetails() async {
+    setState(() => _isLoading = true);
+    final app = context.read<AppState>();
+    if (app.managers.isEmpty) {
+      await app.fetchManagers();
+    }
+    final data = await app.fetchLedgerDetails(widget.ledgerId);
+    if (mounted) {
+      setState(() {
+        _ledger = data;
+        _isLoading = false;
+      });
+    }
+  }

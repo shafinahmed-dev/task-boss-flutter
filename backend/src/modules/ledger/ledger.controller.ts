@@ -59,6 +59,12 @@ export class LedgerController {
     return this.ledgerService.getManagerLedgers(req.user);
   }
 
+  @Get(':id/details')
+  @Roles('SUITE_ADMIN', 'MANAGER')
+  async getLedgerDetails(@Param('id') id: string, @Req() req: any) {
+    return this.ledgerService.getLedgerDetails(req.user, id);
+  }
+
   @Post(':id/employees')
   @Roles('MANAGER', 'SUITE_ADMIN')
   @HttpCode(HttpStatus.CREATED)

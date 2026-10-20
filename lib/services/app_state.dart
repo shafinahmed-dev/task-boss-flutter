@@ -296,6 +296,22 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> fetchLedgerDetails(String ledgerId) async {
+    try {
+      final url = Uri.parse('$apiBaseUrl/ledgers/$ledgerId/details');
+      final resp = await authRequest('GET', url);
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body);
+        if (data != null && data['ledger'] != null) {
+          return Map<String, dynamic>.from(data['ledger']);
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchLedgerDetails error: $e');
+    }
+    return null;
+  }
+
   Future<bool> updateCategory({
     required String id,
     required String name,

@@ -643,6 +643,70 @@ export class LedgerService {
     return { success: true, ledgers };
   }
 
+  async getLedgerDetails(reqUser: any, ledgerId: string) {
+    const tenantId = reqUser?.tenantId;
+
+    const ledger = await this.prisma.ledger.findFirst({
+      where: { id: ledgerId, tenantId },
+      include: {
+        assignments: {
+          include: { user: { select: { id: true, name: true, handle: true } } },
+        },
+        segments: {
+          include: {
+            movements: {
+              select: { amount: true, direction: true, createdAt: true },
+            },
+          },
+        },
+        movements: {
+          select: { id: true, amount: true, direction: true, createdAt: true },
+        },
+      },
+    });
+
+    if (!ledger) throw new NotFoundException('Ledger not found.');
+
+    const segmentsData = ledger.segments.map((seg) => {
+      let inflow = 0;
+      let outflow = 0;
+      for (const m of seg.movements) {
+        const amt = Number(m.amount || 0);
+        if (m.direction === 'in') inflow += amt;
+        else if (m.direction === 'out') outflow += amt;
+      }
+      return {
+        id: seg.id,
+        name: seg.name,
+        description: seg.description || '',
+        transactionCount: seg.movements.length,
+        totalInflow: inflow,
+        totalOutflow: outflow,
+        netBalance: inflow - outflow,
+      };
+    });
+
+    const managers = ledger.assignments
+      .filter((a) => a.role === 'MANAGER')
+      .map((a) => ({ id: a.user.id, name: a.user.name, handle: a.user.handle }));
+
+    return {
+      success: true,
+      ledger: {
+        id: ledger.id,
+        name: ledger.name,
+        code: ledger.code,
+        description: ledger.description || '',
+        status: ledger.status,
+        isPerpetual: ledger.isPerpetual,
+        startDate: ledger.startDate?.toISOString() || null,
+        endDate: ledger.endDate?.toISOString() || null,
+        managers: managers,
+        segments: segmentsData,
+      },
+    };
+  }
+
   async assignEmployeeToLedger(reqUser: any, ledgerId: string, employeeUserId: string) {
     const isSuite = reqUser.role === 'SUITE_ADMIN';
     if (!isSuite) {
