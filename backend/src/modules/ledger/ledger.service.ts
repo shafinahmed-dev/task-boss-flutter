@@ -660,12 +660,20 @@ export class LedgerService {
           },
         },
         movements: {
-          select: { id: true, amount: true, direction: true, createdAt: true },
+          select: { id: true, amount: true, direction: true, segmentId: true, note: true },
         },
       },
     });
 
     if (!ledger) throw new NotFoundException('Ledger not found.');
+
+    let totalInflow = 0;
+    let totalOutflow = 0;
+    for (const m of ledger.movements) {
+      const amt = Number(m.amount || 0);
+      if (m.direction === 'in') totalInflow += amt;
+      else if (m.direction === 'out') totalOutflow += amt;
+    }
 
     const segmentsData = ledger.segments.map((seg) => {
       let inflow = 0;
@@ -686,6 +694,26 @@ export class LedgerService {
       };
     });
 
+    const unsegmented = ledger.movements.filter((m) => !m.segmentId);
+    if (unsegmented.length > 0) {
+      let uInflow = 0;
+      let uOutflow = 0;
+      for (const m of unsegmented) {
+        const amt = Number(m.amount || 0);
+        if (m.direction === 'in') uInflow += amt;
+        else if (m.direction === 'out') uOutflow += amt;
+      }
+      segmentsData.unshift({
+        id: 'unsegmented',
+        name: 'General Operational Entries',
+        description: 'Historical records without assigned segment',
+        transactionCount: unsegmented.length,
+        totalInflow: uInflow,
+        totalOutflow: uOutflow,
+        netBalance: uInflow - uOutflow,
+      });
+    }
+
     const managers = ledger.assignments
       .filter((a) => a.role === 'MANAGER')
       .map((a) => ({ id: a.user.id, name: a.user.name, handle: a.user.handle }));
@@ -701,7 +729,9 @@ export class LedgerService {
         isPerpetual: ledger.isPerpetual,
         startDate: ledger.startDate?.toISOString() || null,
         endDate: ledger.endDate?.toISOString() || null,
-        managers: managers,
+        totalInflow,
+        totalOutflow,
+        managers,
         segments: segmentsData,
       },
     };

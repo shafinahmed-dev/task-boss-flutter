@@ -96,6 +96,9 @@ class AppState extends ChangeNotifier {
     return [];
   }
 
+
+
+
   List<Map<String, dynamic>> _managerTransactions = [];
   List<Map<String, dynamic>> get managerTransactions => _managerTransactions;
 
@@ -539,13 +542,16 @@ class AppState extends ChangeNotifier {
   }
 
 
-  Future<bool> createSegmentInLedger(String ledgerId, Map<String, dynamic> data) async {
+  Future<bool> createSegmentInLedger(String ledgerId, String name, {String? description}) async {
     try {
       final res = await authRequest(
         'POST',
         Uri.parse('$apiBaseUrl/ledgers/$ledgerId/segments'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(data),
+        body: jsonEncode({
+          'name': name,
+          if (description != null && description.isNotEmpty) 'description': description,
+        }),
       );
       if (res.statusCode == 200 || res.statusCode == 201) {
         notifyListeners();
