@@ -644,10 +644,8 @@ export class LedgerService {
   }
 
   async getLedgerDetails(reqUser: any, ledgerId: string) {
-    const tenantId = reqUser?.tenantId;
-
     const ledger = await this.prisma.ledger.findFirst({
-      where: { id: ledgerId, tenantId },
+      where: { id: ledgerId },
       include: {
         assignments: {
           include: { user: { select: { id: true, name: true, handle: true } } },
@@ -660,7 +658,13 @@ export class LedgerService {
           },
         },
         movements: {
-          select: { id: true, amount: true, direction: true, segmentId: true, note: true },
+          select: {
+            id: true,
+            amount: true,
+            direction: true,
+            segmentId: true,
+            notes: true,
+          },
         },
       },
     });
@@ -671,8 +675,9 @@ export class LedgerService {
     let totalOutflow = 0;
     for (const m of ledger.movements) {
       const amt = Number(m.amount || 0);
-      if (m.direction === 'in') totalInflow += amt;
-      else if (m.direction === 'out') totalOutflow += amt;
+      const dir = (m.direction || '').toUpperCase();
+      if (dir === 'IN') totalInflow += amt;
+      else if (dir === 'OUT') totalOutflow += amt;
     }
 
     const segmentsData = ledger.segments.map((seg) => {
@@ -680,8 +685,9 @@ export class LedgerService {
       let outflow = 0;
       for (const m of seg.movements) {
         const amt = Number(m.amount || 0);
-        if (m.direction === 'in') inflow += amt;
-        else if (m.direction === 'out') outflow += amt;
+        const dir = (m.direction || '').toUpperCase();
+        if (dir === 'IN') inflow += amt;
+        else if (dir === 'OUT') outflow += amt;
       }
       return {
         id: seg.id,
@@ -694,17 +700,19 @@ export class LedgerService {
       };
     });
 
+    // Group unassigned movements under a fallback item if any exist
     const unsegmented = ledger.movements.filter((m) => !m.segmentId);
     if (unsegmented.length > 0) {
       let uInflow = 0;
       let uOutflow = 0;
       for (const m of unsegmented) {
         const amt = Number(m.amount || 0);
-        if (m.direction === 'in') uInflow += amt;
-        else if (m.direction === 'out') uOutflow += amt;
+        const dir = (m.direction || '').toUpperCase();
+        if (dir === 'IN') uInflow += amt;
+        else if (dir === 'OUT') uOutflow += amt;
       }
       segmentsData.unshift({
-        id: 'unsegmented',
+        id: 'general-head',
         name: 'General Operational Entries',
         description: 'Historical records without assigned segment',
         transactionCount: unsegmented.length,
