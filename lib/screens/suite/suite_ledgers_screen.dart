@@ -71,7 +71,7 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Create Fiscal Ledger',
+                          'Create Ledger',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                         ),
                         IconButton(
@@ -477,12 +477,12 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Fiscal Ledgers',
+                          'Ledgers',
                           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Executive project and budget containers',
+                          'Project and operational budget books',
                           style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                         ),
                       ],
@@ -519,7 +519,7 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: Color(0xFF1E2638)))
                 : _ledgers.isEmpty
-                    ? const Center(child: Text('No fiscal ledgers found.', style: TextStyle(color: Color(0xFF64748B))))
+                    ? const Center(child: Text('No ledgers found.', style: TextStyle(color: Color(0xFF64748B))))
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: _ledgers.length,

@@ -475,13 +475,14 @@ class _CaptureState extends State<CaptureMovementScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Fiscal Ledger', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.primaryText)),
+                    const Text('Ledger', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.primaryText)),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: _selectedLedgerId,
+                      key: ValueKey('ledger_$_selectedLedgerId'),
+                      initialValue: _selectedLedgerId,
                       items: app.myLedgers.map((l) => DropdownMenuItem<String>(
                         value: l['id'].toString(),
-                        child: Text('[${l['code']}] ${l['name']}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        child: Text(l['name']?.toString() ?? 'Ledger', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                       )).toList(),
                       onChanged: (v) => setState(() => _selectedLedgerId = v),
                       decoration: InputDecoration(

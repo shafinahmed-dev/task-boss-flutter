@@ -419,7 +419,7 @@ export class LedgerService {
     return amt;
   }
 
-  // ── Fiscal Ledgers Governance Methods ──────────────────────────────────────
+  // ── Ledgers Governance Methods ──────────────────────────────────────
 
   async getSuiteLedgers(reqUser: any, search?: string, status?: string) {
     const tenantId = reqUser?.tenantId;
@@ -624,9 +624,12 @@ export class LedgerService {
       where: {
         tenantId,
         status: { not: 'ARCHIVED' },
-        assignments: {
-          some: { userId, role: 'MANAGER' },
-        },
+        OR: [
+          // Assigned to this manager
+          { assignments: { some: { userId, role: 'MANAGER' } } },
+          // Fail-safe: If no managers have been assigned to the ledger yet, show to all managers
+          { assignments: { none: { role: 'MANAGER' } } },
+        ],
       },
       include: {
         segments: true,
