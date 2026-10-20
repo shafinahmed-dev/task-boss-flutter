@@ -48,7 +48,22 @@ class _CaptureState extends State<CaptureMovementScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {\n      final app = context.read<AppState>();\n      await app.fetchMyLedgers();\n      if (app.myLedgers.isNotEmpty) {\n        setState(() => _selectedLedgerId = app.myLedgers.first['id'].toString());\n      }\n      if (app.selectedManagerCompanyId == null || app.selectedManagerCompanyId!.isEmpty) {\n        await app.fetchManagerOverview();\n      }\n      final cid = _getEffectiveCompanyId(app);\n      if (cid.isNotEmpty) {\n        await app.fetchCategories(companyId: cid);\n      }\n    });\n    _loadDraft();\n  }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final app = context.read<AppState>();
+      await app.fetchMyLedgers();
+      if (app.myLedgers.isNotEmpty && mounted) {
+        setState(() => _selectedLedgerId = app.myLedgers.first['id'].toString());
+      }
+      if (app.selectedManagerCompanyId == null || app.selectedManagerCompanyId!.isEmpty) {
+        await app.fetchManagerOverview();
+      }
+      final cid = _getEffectiveCompanyId(app);
+      if (cid.isNotEmpty) {
+        await app.fetchCategories(companyId: cid);
+      }
+    });
+    _loadDraft();
+  }
 
   String? _selectedLedgerId;
 
