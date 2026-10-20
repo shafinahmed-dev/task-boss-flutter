@@ -481,6 +481,23 @@ class AppState extends ChangeNotifier {
     }
     return false;
   }
+  Future<bool> deleteLedger(String ledgerId) async {
+    try {
+      final res = await authRequest(
+        'DELETE',
+        Uri.parse('$apiBaseUrl/ledgers/$ledgerId'),
+      );
+      if (res.statusCode == 200 || res.statusCode == 204) {
+        notifyListeners();
+        return true;
+      }
+      _errorMessage = jsonDecode(res.body)?['message']?.toString() ?? 'Failed to delete ledger';
+      notifyListeners();
+    } catch (e) {
+      debugPrint('deleteLedger error: $e');
+    }
+    return false;
+  }
 
   Future<List<Map<String, dynamic>>> fetchManagerLedgers() async {
     try {

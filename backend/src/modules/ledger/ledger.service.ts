@@ -426,145 +426,177 @@ export class LedgerService {
     if (!tenantId) throw new BadRequestException('Tenant ID required');
 
     const where: any = { tenantId };
-    if (search && search.trim() !== '') {
+    if (status && status !== 'ALL' && status.trim() !== '') {
+      where.status = status.toUpperCase();
+    }
+
+    if (search && search.trim().length > 0) {
       const q = search.trim();
       where.OR = [
         { name: { contains: q, mode: 'insensitive' } },
         { code: { contains: q, mode: 'insensitive' } },
       ];
     }
-    if (status && status.trim() !== '') {
-      where.status = status.toUpperCase();
-    }
 
     const ledgers = await this.prisma.ledger.findMany({
       where,
       include: {
-        segments: true,
         assignments: {
-          include: {
-            user: { select: { id: true, name: true, email: true, role: true, handle: true } },
-          },
+          include: { user: { select: { id: true, name: true, handle: true } } },
         },
+        segments: { select: { id: true, name: true } },
+        movements: { select: { amount: true, direction: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    const results = [];
-    for (const l of ledgers) {
-      const movements = await this.prisma.moneyMovement.findMany({
-        where: { ledgerId: l.id },
-        select: { direction: true, amount: true },
-      });
-
-      let totalInflow = 0;
-      let totalOutflow = 0;
-      for (const m of movements) {
+    const serialized = ledgers.map((l) => {
+      let inflow = 0;
+      let outflow = 0;
+      for (const m of l.movements) {
         const amt = Number(m.amount || 0);
-        if (m.direction === 'in') totalInflow += amt;
-        else if (m.direction === 'out') totalOutflow += amt;
+        if (m.direction === 'in') inflow += amt;
+        else if (m.direction === 'out') outflow += amt;
       }
 
-      const managerCount = l.assignments.filter((a: any) => a.role === 'MANAGER').length;
-      const activeSegmentsCount = l.segments.length;
+      const managers = l.assignments
+        .filter((a) => a.role === 'MANAGER')
+        .map((a) => ({
+          id: a.user.id,
+          name: a.user.name,
+          handle: a.user.handle,
+        }));
 
-      results.push({
-        ...l,
-        totalInflow,
-        totalOutflow,
-        netVelocity: totalInflow - totalOutflow,
-        managerCount,
-        activeSegmentsCount,
-      });
-    }
+      return {
+        id: l.id,
+        name: l.name,
+        code: l.code,
+        description: l.description || '',
+        isPerpetual: l.isPerpetual,
+        startDate: l.startDate?.toISOString() || null,
+        endDate: l.endDate?.toISOString() || null,
+        status: l.status,
+        segmentsCount: l.segments.length,
+        managersCount: managers.length,
+        managers: managers,
+        inflow: inflow,
+        outflow: outflow,
+        netVelocity: inflow - outflow,
+      };
+    });
 
-    return { ledgers: results };
+    return { success: true, ledgers: serialized };
   }
 
   async createLedger(reqUser: any, dto: any) {
     const tenantId = reqUser?.tenantId;
     if (!tenantId) throw new BadRequestException('Tenant ID required');
 
-    const code = (dto.code || dto.name?.substring(0, 5) || 'LEDGER').toUpperCase().replace(/\s+/g, '_');
-    
-    const existing = await this.prisma.ledger.findUnique({
-      where: { tenantId_code: { tenantId, code } },
+    const name = dto.name?.trim();
+    if (!name) throw new BadRequestException('Ledger name is required.');
+
+    let code = dto.code ? dto.code.trim().toUpperCase() : '';
+    if (!code) {
+      code = name
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '_')
+        .slice(0, 16);
+      if (!code) code = `LEDGER_${Date.now().toString().slice(-4)}`;
+    }
+
+    const existing = await this.prisma.ledger.findFirst({
+      where: { tenantId, code },
     });
     if (existing) {
-      throw new ConflictException(`Ledger with code ${code} already exists`);
+      code = `${code}_${Date.now().toString().slice(-4)}`;
     }
+
+    const rawManagerIds = dto.managerUserIds || dto.managerIds;
+    const managerUserIds: string[] = Array.isArray(rawManagerIds)
+      ? rawManagerIds.filter(Boolean)
+      : [];
 
     const ledger = await this.prisma.ledger.create({
       data: {
         tenantId,
         companyId: dto.companyId || null,
-        name: dto.name,
+        name,
         code,
         description: dto.description || null,
         isPerpetual: dto.isPerpetual ?? true,
         startDate: dto.startDate ? new Date(dto.startDate) : null,
         endDate: dto.endDate ? new Date(dto.endDate) : null,
         status: dto.status || 'ACTIVE',
+        assignments: {
+          create: managerUserIds.map((userId) => ({
+            userId,
+            role: 'MANAGER',
+          })),
+        },
+      },
+      include: {
+        assignments: {
+          include: { user: { select: { id: true, name: true, handle: true } } },
+        },
       },
     });
 
-    if (dto.managerIds && Array.isArray(dto.managerIds)) {
-      for (const mId of dto.managerIds) {
-        await this.prisma.ledgerMember.create({
-          data: {
-            ledgerId: ledger.id,
-            userId: mId,
-            role: 'MANAGER',
-          },
-        }).catch(() => {});
-      }
-    }
-
-    return ledger;
+    return { success: true, ledger };
   }
 
   async updateLedger(reqUser: any, ledgerId: string, dto: any) {
     const tenantId = reqUser?.tenantId;
-    const ledger = await this.prisma.ledger.findUnique({ where: { id: ledgerId } });
-    if (!ledger || ledger.tenantId !== tenantId) {
-      throw new NotFoundException('Ledger not found');
+    const ledger = await this.prisma.ledger.findFirst({
+      where: { id: ledgerId, tenantId },
+    });
+    if (!ledger) {
+      throw new NotFoundException('Ledger not found.');
+    }
+
+    const updateData: any = {};
+    if (dto.name) updateData.name = dto.name.trim();
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.status) updateData.status = dto.status;
+    if (dto.isPerpetual !== undefined) updateData.isPerpetual = dto.isPerpetual;
+    if (dto.startDate !== undefined) updateData.startDate = dto.startDate ? new Date(dto.startDate) : null;
+    if (dto.endDate !== undefined) updateData.endDate = dto.endDate ? new Date(dto.endDate) : null;
+
+    const rawManagerIds = dto.managerUserIds || dto.managerIds;
+    if (Array.isArray(rawManagerIds)) {
+      await this.prisma.ledgerMember.deleteMany({
+        where: { ledgerId, role: 'MANAGER' },
+      });
+      if (rawManagerIds.length > 0) {
+        await this.prisma.ledgerMember.createMany({
+          data: rawManagerIds.map((userId: string) => ({
+            ledgerId,
+            userId,
+            role: 'MANAGER',
+          })),
+        });
+      }
     }
 
     const updated = await this.prisma.ledger.update({
       where: { id: ledgerId },
-      data: {
-        name: dto.name ?? ledger.name,
-        description: dto.description !== undefined ? dto.description : ledger.description,
-        isPerpetual: dto.isPerpetual ?? ledger.isPerpetual,
-        startDate: dto.startDate !== undefined ? (dto.startDate ? new Date(dto.startDate) : null) : ledger.startDate,
-        endDate: dto.endDate !== undefined ? (dto.endDate ? new Date(dto.endDate) : null) : ledger.endDate,
-        status: dto.status ?? ledger.status,
+      data: updateData,
+      include: {
+        assignments: {
+          include: { user: { select: { id: true, name: true, handle: true } } },
+        },
       },
     });
 
-    if (dto.managerIds && Array.isArray(dto.managerIds)) {
-      await this.prisma.ledgerMember.deleteMany({
-        where: { ledgerId, role: 'MANAGER' },
-      });
-      for (const mId of dto.managerIds) {
-        await this.prisma.ledgerMember.create({
-          data: {
-            ledgerId,
-            userId: mId,
-            role: 'MANAGER',
-          },
-        }).catch(() => {});
-      }
-    }
-
-    return updated;
+    return { success: true, ledger: updated };
   }
 
   async deleteLedger(reqUser: any, ledgerId: string) {
     const tenantId = reqUser?.tenantId;
-    const ledger = await this.prisma.ledger.findUnique({ where: { id: ledgerId } });
-    if (!ledger || ledger.tenantId !== tenantId) {
-      throw new NotFoundException('Ledger not found');
+    const ledger = await this.prisma.ledger.findFirst({
+      where: { id: ledgerId, tenantId },
+    });
+    if (!ledger) {
+      throw new NotFoundException('Ledger not found.');
     }
 
     const movementCount = await this.prisma.moneyMovement.count({
@@ -572,45 +604,40 @@ export class LedgerService {
     });
 
     if (movementCount > 0) {
-      return this.prisma.ledger.update({
+      const archived = await this.prisma.ledger.update({
         where: { id: ledgerId },
         data: { status: 'ARCHIVED' },
       });
+      return { success: true, ledger: archived };
     }
 
+    await this.prisma.ledgerMember.deleteMany({ where: { ledgerId } });
     await this.prisma.ledger.delete({ where: { id: ledgerId } });
     return { success: true, message: 'Ledger deleted successfully' };
   }
 
   async getManagerLedgers(reqUser: any) {
-    const userId = reqUser?.id;
     const tenantId = reqUser?.tenantId;
-    if (!userId) throw new BadRequestException('User ID required');
-
-    const isSuite = reqUser.role === 'SUITE_ADMIN';
-    const where: any = {};
-    if (!isSuite) {
-      where.assignments = {
-        some: { userId, role: 'MANAGER' },
-      };
-    } else if (tenantId) {
-      where.tenantId = tenantId;
-    }
+    const userId = reqUser?.id;
 
     const ledgers = await this.prisma.ledger.findMany({
-      where,
+      where: {
+        tenantId,
+        status: { not: 'ARCHIVED' },
+        assignments: {
+          some: { userId, role: 'MANAGER' },
+        },
+      },
       include: {
         segments: true,
         assignments: {
-          include: {
-            user: { select: { id: true, name: true, email: true, role: true, handle: true } },
-          },
+          include: { user: { select: { id: true, name: true, handle: true } } },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return { ledgers };
+    return { success: true, ledgers };
   }
 
   async assignEmployeeToLedger(reqUser: any, ledgerId: string, employeeUserId: string) {
