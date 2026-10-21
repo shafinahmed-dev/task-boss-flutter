@@ -76,11 +76,25 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
         final cId = c['id']?.toString() ?? '';
         final cUserId = c['linkedUserId']?.toString() ?? c['userId']?.toString() ?? c['user']?['id']?.toString() ?? '';
         final cName = (c['name'] ?? c['user']?['name'] ?? '').toString().trim().toLowerCase();
+        final cType = (c['type'] ?? '').toString().toLowerCase();
 
+        if (cType == 'company' || cName.contains('root')) return false;
         if (currentUserId.isNotEmpty && (cId == currentUserId || cUserId == currentUserId)) return false;
         if (currentUserName.isNotEmpty && cName == currentUserName) return false;
         return true;
       }).toList();
+
+      filtered.sort((a, b) {
+        final aRole = (a['role'] ?? a['user']?['role'] ?? a['linkedUser']?['role'] ?? '').toString().toUpperCase();
+        final bRole = (b['role'] ?? b['user']?['role'] ?? b['linkedUser']?['role'] ?? '').toString().toUpperCase();
+        final aIsManager = a['isManager'] == true || aRole == 'MANAGER' || aRole == 'SUITE_ADMIN';
+        final bIsManager = b['isManager'] == true || bRole == 'MANAGER' || bRole == 'SUITE_ADMIN';
+        if (aIsManager && !bIsManager) return -1;
+        if (!aIsManager && bIsManager) return 1;
+        final aName = (a['name'] ?? a['user']?['name'] ?? '').toString();
+        final bName = (b['name'] ?? b['user']?['name'] ?? '').toString();
+        return aName.compareTo(bName);
+      });
 
       if (mounted) {
         setState(() {
@@ -403,14 +417,54 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
                     'Unknown';
                 final cRole = c['role']?.toString() ??
                     c['user']?['role']?.toString() ??
+                    c['linkedUser']?['role']?.toString() ??
                     '';
+                final isManager = c['isManager'] == true ||
+                    cRole.toUpperCase() == 'MANAGER' ||
+                    cRole.toUpperCase() == 'SUITE_ADMIN';
+
                 return DropdownMenuItem<String>(
                   value: cId,
-                  child: Text(
-                    cRole.isNotEmpty ? '$cName ($cRole)' : cName,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 13),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          cName,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                      ),
+                      if (isManager) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color: const Color(0xFFF59E0B), width: 1),
+                          ),
+                          child: const Text(
+                            'Manager',
+                            style: TextStyle(
+                              color: Color(0xFFB45309),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ] else if (cRole.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          '($cRole)',
+                          style: const TextStyle(
+                              color: AppTheme.secondaryText, fontSize: 11),
+                        ),
+                      ],
+                    ],
                   ),
                 );
               }).toList(),

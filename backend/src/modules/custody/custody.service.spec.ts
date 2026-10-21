@@ -80,6 +80,8 @@ describe('CustodyService', () => {
         department: 'Engineering',
         type: 'person',
         companyId,
+        role: 'collector',
+        isManager: false,
         linkedUser: {
           id: 'u-1',
           name: 'Test Custodian',

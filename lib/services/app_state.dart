@@ -520,11 +520,20 @@ class AppState extends ChangeNotifier {
 
   Future<List<Map<String, dynamic>>> fetchManagerLedgers() async {
     try {
-      final res = await authRequest('GET', Uri.parse('$apiBaseUrl/ledgers/manager'));
+      var res = await authRequest('GET', Uri.parse('$apiBaseUrl/ledgers/my'));
+      if (res.statusCode != 200) {
+        res = await authRequest('GET', Uri.parse('$apiBaseUrl/ledgers/manager'));
+      }
       if (res.statusCode == 200 && res.body.isNotEmpty) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map && decoded['ledgers'] is List) {
-          return (decoded['ledgers'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          final list = (decoded['ledgers'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          list.sort((a, b) {
+            if (a['code'] == 'GEN-OPS') return -1;
+            if (b['code'] == 'GEN-OPS') return 1;
+            return 0;
+          });
+          return list;
         }
       }
     } catch (e) {

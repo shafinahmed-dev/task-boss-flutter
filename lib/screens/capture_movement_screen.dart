@@ -31,7 +31,6 @@ class _CaptureState extends State<CaptureMovementScreen> {
   String _flowType = 'INFLOW'; // INFLOW | OUTFLOW
   Map<String, dynamic>? _selectedCategory;
   final TextEditingController _categorySearchCtrl = TextEditingController();
-  String _catSearchQuery = '';
 
   final _amtCtl = TextEditingController();
   final _chgCtl = TextEditingController();
@@ -52,7 +51,11 @@ class _CaptureState extends State<CaptureMovementScreen> {
       final app = context.read<AppState>();
       await app.fetchMyLedgers();
       if (app.myLedgers.isNotEmpty && mounted) {
-        setState(() => _selectedLedgerId = app.myLedgers.first['id'].toString());
+        final genOps = app.myLedgers.firstWhere(
+          (l) => l['code'] == 'GEN-OPS',
+          orElse: () => app.myLedgers.first,
+        );
+        setState(() => _selectedLedgerId = genOps['id'].toString());
       }
       if (app.selectedManagerCompanyId == null || app.selectedManagerCompanyId!.isEmpty) {
         await app.fetchManagerOverview();
@@ -286,11 +289,6 @@ class _CaptureState extends State<CaptureMovementScreen> {
     return 'outflow';
   }
 
-  List<dynamic> _getCategories(AppState app) {
-    return app.concernCategories.where((c) => c['type'] == 'BOTH' || c['type'] == _flowType).toList();
-  }
-
-
   Future<void> _submit() async {
     setState(() => _error = null);
     final app = context.read<AppState>();
@@ -338,6 +336,15 @@ class _CaptureState extends State<CaptureMovementScreen> {
     setState(() => _saving = true);
     try {
       final receiptNo = 'TRX-${const Uuid().v4().substring(0, 8).toUpperCase()}';
+      String? effectiveLedgerId = _selectedLedgerId;
+      if ((effectiveLedgerId == null || effectiveLedgerId.isEmpty) && app.myLedgers.isNotEmpty) {
+        final genOps = app.myLedgers.firstWhere(
+          (l) => l['code'] == 'GEN-OPS',
+          orElse: () => app.myLedgers.first,
+        );
+        effectiveLedgerId = genOps['id']?.toString();
+      }
+
       final payload = {
         'idempotencyKey': const Uuid().v4(),
         'direction': _flowType == 'INFLOW' ? 'in' : 'out',
@@ -351,7 +358,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
         'custodianId': app.user!.custodianId,
         'entryTag': _getEntryTag(_flowType, _selectedCategory?['name']),
         'categoryId': _selectedCategory?['id'],
-        'ledgerId': _selectedLedgerId,
+        'ledgerId': effectiveLedgerId,
         'segmentId': _selectedCategory?['id'],
         'occurredAt': DateTime.now().toIso8601String(),
         'notes': noteText.isNotEmpty ? noteText : null,
@@ -464,38 +471,47 @@ class _CaptureState extends State<CaptureMovementScreen> {
             if (_error != null) _banner(_error!),
             _buildFlowPill(),
             const SizedBox(height: 14),
-            if (app.myLedgers.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.cardBorder),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Ledger', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.primaryText)),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('ledger_$_selectedLedgerId'),
-                      initialValue: _selectedLedgerId,
-                      items: app.myLedgers.map((l) => DropdownMenuItem<String>(
-                        value: l['id'].toString(),
-                        child: Text(l['name']?.toString() ?? 'Ledger', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                      )).toList(),
-                      onChanged: (v) => setState(() => _selectedLedgerId = v),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: const Color(0xFFF1F5F9),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                      ),
-                    ),
-                  ],
-                ),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.cardBorder),
               ),
-              const SizedBox(height: 14),
-            ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Ledger', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.primaryText)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('ledger_${_selectedLedgerId ?? (app.myLedgers.isNotEmpty ? app.myLedgers.first['id'].toString() : 'none')}'),
+                    initialValue: _selectedLedgerId ?? (app.myLedgers.isNotEmpty ? app.myLedgers.first['id'].toString() : null),
+                    hint: const Text('Select Ledger', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Color(0xFF94A3B8))),
+                    items: app.myLedgers.map((l) {
+                      final isGenOps = l['code'] == 'GEN-OPS';
+                      final lName = l['name']?.toString() ?? 'Ledger';
+                      return DropdownMenuItem<String>(
+                        value: l['id'].toString(),
+                        child: Text(
+                          isGenOps ? '$lName (Default)' : lName,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (v) => setState(() {
+                      _selectedLedgerId = v;
+                      _selectedCategory = null;
+                    }),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFFF1F5F9),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
             _buildCategoryCard(app),
             const SizedBox(height: 14),
             // Card 2: Wallet & Method
@@ -944,15 +960,42 @@ class _CaptureState extends State<CaptureMovementScreen> {
     );
   }
   Widget _buildCategoryCard(AppState app) {
-  final query = _categorySearchCtrl.text.trim().toLowerCase();
-  final categories = app.concernCategories.where((c) {
-    final matchesFlow = c['type'] == _flowType || c['type'] == 'BOTH';
-    final matchesSearch = query.isEmpty ||
-        (c['name']?.toString().toLowerCase().contains(query) ?? false);
-    return matchesFlow && matchesSearch;
-  }).toList();
+    final query = _categorySearchCtrl.text.trim().toLowerCase();
 
-  final isManager = app.currentUser?.role != 'EMPLOYEE';
+    Map<String, dynamic>? selectedLedger;
+    if (_selectedLedgerId != null && app.myLedgers.isNotEmpty) {
+      try {
+        selectedLedger = app.myLedgers.firstWhere(
+          (l) => l['id'].toString() == _selectedLedgerId,
+        );
+      } catch (_) {}
+    }
+    if (selectedLedger == null && app.myLedgers.isNotEmpty) {
+      selectedLedger = app.myLedgers.firstWhere(
+        (l) => l['code'] == 'GEN-OPS',
+        orElse: () => app.myLedgers.first,
+      );
+    }
+
+    List<dynamic> categories = [];
+    if (selectedLedger != null &&
+        selectedLedger['segments'] is List &&
+        (selectedLedger['segments'] as List).isNotEmpty) {
+      categories = (selectedLedger['segments'] as List).where((s) {
+        final matchesSearch = query.isEmpty ||
+            (s['name']?.toString().toLowerCase().contains(query) ?? false);
+        return matchesSearch;
+      }).toList();
+    } else {
+      categories = app.concernCategories.where((c) {
+        final matchesFlow = c['type'] == _flowType || c['type'] == 'BOTH';
+        final matchesSearch = query.isEmpty ||
+            (c['name']?.toString().toLowerCase().contains(query) ?? false);
+        return matchesFlow && matchesSearch;
+      }).toList();
+    }
+
+    final isManager = app.currentUser?.role != 'EMPLOYEE';
 
   return Container(
     margin: const EdgeInsets.symmetric(vertical: 12),

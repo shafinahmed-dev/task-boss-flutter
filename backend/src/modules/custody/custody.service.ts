@@ -391,7 +391,15 @@ export class CustodyService {
       await this.ensureColleaguesExist(targetCompanyId);
 
       const list = await this.prisma.custodianAccount.findMany({
-        where: { companyId: targetCompanyId },
+        where: {
+          companyId: targetCompanyId,
+          type: { not: 'company' },
+          name: { not: { contains: 'Root', mode: 'insensitive' } },
+          linkedUserId: { not: null },
+          linkedUser: {
+            role: { not: 'SYSTEM' },
+          },
+        },
         include: {
           linkedUser: {
             select: { id: true, name: true, role: true, designation: true, department: true },
@@ -399,15 +407,30 @@ export class CustodyService {
         },
       });
 
-      return list.map((c) => ({
-        id: c.id,
-        name: c.linkedUser?.name || c.name,
-        designation: c.linkedUser?.designation || undefined,
-        department: c.linkedUser?.department || undefined,
-        type: c.type,
-        companyId: c.companyId,
-        linkedUser: c.linkedUser,
-      }));
+      const mapped = list.map((c) => {
+        const role = c.linkedUser?.role || '';
+        const isManager =
+          role.toUpperCase() === 'MANAGER' || role.toUpperCase() === 'SUITE_ADMIN';
+        return {
+          id: c.id,
+          name: c.linkedUser?.name || c.name,
+          designation: c.linkedUser?.designation || undefined,
+          department: c.linkedUser?.department || undefined,
+          type: c.type,
+          companyId: c.companyId,
+          role: role || undefined,
+          isManager,
+          linkedUser: c.linkedUser,
+        };
+      });
+
+      mapped.sort((a, b) => {
+        if (a.isManager && !b.isManager) return -1;
+        if (!a.isManager && b.isManager) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
+      return mapped;
     } catch (err) {
       console.error('[CUSTODY SERVICE] getCustodians error:', err);
       return [];

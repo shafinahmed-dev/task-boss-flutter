@@ -53,14 +53,17 @@ export class LedgerController {
     return this.ledgerService.deleteLedger(req.user, id);
   }
 
+  @Get('my')
+  async getMyLedgers(@Req() req: any) {
+    return this.ledgerService.getMyLedgers(req.user);
+  }
+
   @Get('manager')
-  @Roles('MANAGER', 'SUITE_ADMIN')
   async getManagerLedgers(@Req() req: any) {
     return this.ledgerService.getManagerLedgers(req.user);
   }
 
   @Get(':id/details')
-  @Roles('SUITE_ADMIN', 'MANAGER')
   async getLedgerDetails(@Param('id') id: string, @Req() req: any) {
     return this.ledgerService.getLedgerDetails(req.user, id);
   }

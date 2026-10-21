@@ -44,6 +44,8 @@ export interface RecordMovementDto {
   clientId?: string;
   projectId?: string;
   categoryId?: string;
+  ledgerId?: string;
+  segmentId?: string;
   loanId?: string;
   occurredAt: string; // ISO-8601
   syncStatus?: string;
@@ -62,6 +64,8 @@ export interface EditMovementDto {
   clientId?: string;
   projectId?: string;
   categoryId?: string;
+  ledgerId?: string;
+  segmentId?: string;
   loanId?: string;
   occurredAt?: string;
 }
@@ -292,6 +296,37 @@ export class LedgerService {
         metadata.paymentMethod = dto.paymentMethod;
       }
 
+      let ledgerId = dto.ledgerId;
+      const segmentId = dto.segmentId || null;
+      if (segmentId && !ledgerId) {
+        const seg = await this.prisma.segment.findUnique({
+          where: { id: segmentId },
+          select: { ledgerId: true },
+        });
+        if (seg) ledgerId = seg.ledgerId;
+      }
+      if (!ledgerId) {
+        let tenantId: string | null = null;
+        if (custodian.companyId) {
+          const comp = await this.prisma.company.findUnique({
+            where: { id: custodian.companyId },
+            select: { tenantId: true },
+          });
+          tenantId = comp?.tenantId ?? null;
+        }
+        if (!tenantId && dto.collectorId) {
+          const user = await this.prisma.user.findUnique({
+            where: { id: dto.collectorId },
+            select: { tenantId: true },
+          });
+          tenantId = user?.tenantId ?? null;
+        }
+        if (tenantId) {
+          const defaultLedger = await this.ensureDefaultLedger(tenantId);
+          ledgerId = defaultLedger?.id;
+        }
+      }
+
       const movement = await this.prisma.moneyMovement.create({
         data: {
           fee: feeVal > 0 ? new Decimal(feeVal) : null,
@@ -312,6 +347,8 @@ export class LedgerService {
           clientId: dto.clientId ?? null,
           projectId: dto.projectId ?? null,
           categoryId: dto.categoryId ?? null,
+          ledgerId: ledgerId || null,
+          segmentId: segmentId || null,
           loanId: dto.loanId ?? null,
           editedFromId: null,
           occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : new Date(),
@@ -357,6 +394,9 @@ export class LedgerService {
         digitalReceiptId: original.digitalReceiptId,
         clientId: dto.clientId ?? original.clientId,
         projectId: dto.projectId ?? original.projectId,
+        categoryId: dto.categoryId ?? original.categoryId,
+        ledgerId: dto.ledgerId ?? original.ledgerId,
+        segmentId: dto.segmentId ?? original.segmentId,
         loanId: dto.loanId ?? original.loanId,
         editedFromId: movementId,
         occurredAt: new Date(
@@ -421,9 +461,60 @@ export class LedgerService {
 
   // ── Ledgers Governance Methods ──────────────────────────────────────
 
+  async ensureDefaultLedger(tenantId: string) {
+    let defaultLedger = await this.prisma.ledger.findFirst({
+      where: { tenantId, code: 'GEN-OPS' },
+      include: { segments: true },
+    });
+    if (!defaultLedger) {
+      defaultLedger = await this.prisma.ledger.create({
+        data: {
+          tenantId,
+          name: 'General Operations',
+          code: 'GEN-OPS',
+          description: 'Default system ledger for general operations',
+          isPerpetual: true,
+          status: 'ACTIVE',
+        },
+        include: { segments: true },
+      });
+    }
+    return defaultLedger;
+  }
+
+  async getMyLedgers(reqUser: any) {
+    const tenantId = reqUser?.tenantId || reqUser?.tenant_id;
+    if (!tenantId) throw new BadRequestException('Tenant ID required');
+
+    // Always find or ensure default General Operations ledger
+    const defaultLedger = await this.ensureDefaultLedger(tenantId);
+
+    // Find ledgers assigned to this user
+    const assignedLedgers = await this.prisma.ledger.findMany({
+      where: {
+        tenantId,
+        status: { not: 'ARCHIVED' },
+        code: { not: 'GEN-OPS' },
+        OR: [
+          { assignments: { some: { userId: reqUser.id } } },
+          ...(reqUser.role === 'SUITE_ADMIN' || reqUser.role === 'MANAGER'
+            ? [{ assignments: { none: { role: 'MANAGER' } } }]
+            : []),
+        ],
+      },
+      include: { segments: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const allLedgers = defaultLedger ? [defaultLedger, ...assignedLedgers] : assignedLedgers;
+    return { success: true, ledgers: allLedgers };
+  }
+
   async getSuiteLedgers(reqUser: any, search?: string, status?: string) {
     const tenantId = reqUser?.tenantId;
     if (!tenantId) throw new BadRequestException('Tenant ID required');
+
+    await this.ensureDefaultLedger(tenantId);
 
     const where: any = { tenantId };
     if (status && status !== 'ALL' && status.trim() !== '') {
@@ -483,6 +574,12 @@ export class LedgerService {
         outflow: outflow,
         netVelocity: inflow - outflow,
       };
+    });
+
+    serialized.sort((a, b) => {
+      if (a.code === 'GEN-OPS') return -1;
+      if (b.code === 'GEN-OPS') return 1;
+      return 0;
     });
 
     return { success: true, ledgers: serialized };
@@ -598,6 +695,9 @@ export class LedgerService {
     if (!ledger) {
       throw new NotFoundException('Ledger not found.');
     }
+    if (ledger.code === 'GEN-OPS') {
+      throw new BadRequestException('The default General Operations ledger cannot be deleted.');
+    }
 
     const movementCount = await this.prisma.moneyMovement.count({
       where: { ledgerId },
@@ -617,30 +717,7 @@ export class LedgerService {
   }
 
   async getManagerLedgers(reqUser: any) {
-    const tenantId = reqUser?.tenantId;
-    const userId = reqUser?.id;
-
-    const ledgers = await this.prisma.ledger.findMany({
-      where: {
-        tenantId,
-        status: { not: 'ARCHIVED' },
-        OR: [
-          // Assigned to this manager
-          { assignments: { some: { userId, role: 'MANAGER' } } },
-          // Fail-safe: If no managers have been assigned to the ledger yet, show to all managers
-          { assignments: { none: { role: 'MANAGER' } } },
-        ],
-      },
-      include: {
-        segments: true,
-        assignments: {
-          include: { user: { select: { id: true, name: true, handle: true } } },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return { success: true, ledgers };
+    return this.getMyLedgers(reqUser);
   }
 
   async getLedgerDetails(reqUser: any, ledgerId: string) {
@@ -653,18 +730,40 @@ export class LedgerService {
         segments: {
           include: {
             movements: {
-              select: { amount: true, direction: true, createdAt: true },
+              include: {
+                collector: {
+                  select: {
+                    id: true,
+                    name: true,
+                    companies: {
+                      select: {
+                        company: { select: { code: true } },
+                      },
+                      take: 1,
+                    },
+                  },
+                },
+              },
+              orderBy: { createdAt: 'desc' },
             },
           },
         },
         movements: {
-          select: {
-            id: true,
-            amount: true,
-            direction: true,
-            segmentId: true,
-            notes: true,
+          include: {
+            collector: {
+              select: {
+                id: true,
+                name: true,
+                companies: {
+                  select: {
+                    company: { select: { code: true } },
+                  },
+                  take: 1,
+                },
+              },
+            },
           },
+          orderBy: { createdAt: 'desc' },
         },
       },
     });
@@ -680,6 +779,23 @@ export class LedgerService {
       else if (dir === 'OUT') totalOutflow += amt;
     }
 
+    const mapMovement = (m: any) => {
+      const isDirIn = (m.direction || '').toUpperCase() === 'IN';
+      const meta = (m.metadata as any) || {};
+      const companyCode =
+        m.collector?.companies?.[0]?.company?.code || meta.companyCode || meta.senderCode || '';
+      return {
+        id: m.id,
+        amount: Number(m.amount || 0),
+        direction: isDirIn ? 'in' : 'out',
+        notes: m.notes || meta.note || meta.notes || '',
+        voucherNumber: m.receiptNo || meta.voucherNumber || '',
+        collectorName: m.collector?.name || meta.actorName || 'Staff',
+        companyCode: companyCode ? companyCode.toUpperCase() : '',
+        createdAt: m.createdAt ? m.createdAt.toISOString() : new Date().toISOString(),
+      };
+    };
+
     const segmentsData = ledger.segments.map((seg) => {
       let inflow = 0;
       let outflow = 0;
@@ -689,6 +805,9 @@ export class LedgerService {
         if (dir === 'IN') inflow += amt;
         else if (dir === 'OUT') outflow += amt;
       }
+
+      const txns = seg.movements.map(mapMovement);
+
       return {
         id: seg.id,
         name: seg.name,
@@ -697,6 +816,7 @@ export class LedgerService {
         totalInflow: inflow,
         totalOutflow: outflow,
         netBalance: inflow - outflow,
+        transactions: txns,
       };
     });
 
@@ -711,7 +831,7 @@ export class LedgerService {
         if (dir === 'IN') uInflow += amt;
         else if (dir === 'OUT') uOutflow += amt;
       }
-      segmentsData.unshift({
+      segmentsData.push({
         id: 'general-head',
         name: 'General Operational Entries',
         description: 'Historical records without assigned segment',
@@ -719,8 +839,17 @@ export class LedgerService {
         totalInflow: uInflow,
         totalOutflow: uOutflow,
         netBalance: uInflow - uOutflow,
+        transactions: unsegmented.map(mapMovement),
       });
     }
+
+    // Sort: active segments with transactions first, then alphabetically / by volume
+    segmentsData.sort((a, b) => {
+      if (b.transactionCount !== a.transactionCount) {
+        return b.transactionCount - a.transactionCount;
+      }
+      return (b.totalInflow + b.totalOutflow) - (a.totalInflow + a.totalOutflow);
+    });
 
     const managers = ledger.assignments
       .filter((a) => a.role === 'MANAGER')

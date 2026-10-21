@@ -43,6 +43,111 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
     }
   }
 
+  void _showSegmentTransactionsSheet(BuildContext context, Map<String, dynamic> seg) {
+    final name = seg['name']?.toString() ?? 'Segment';
+    final inf = double.tryParse(seg['totalInflow']?.toString() ?? '0') ?? 0.0;
+    final out = double.tryParse(seg['totalOutflow']?.toString() ?? '0') ?? 0.0;
+    final net = double.tryParse(seg['netBalance']?.toString() ?? '0') ?? (inf - out);
+    final txns = (seg['transactions'] as List?) ?? [];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.75,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        const SizedBox(height: 4),
+                        Text('In: +৳${inf.toStringAsFixed(2)}  •  Out: -৳${out.toStringAsFixed(2)}  •  Net: ৳${net.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                  IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.of(ctx).pop()),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            Expanded(
+              child: txns.isEmpty
+                ? const Center(child: Text('No transactions under this segment.', style: TextStyle(color: Color(0xFF64748B))))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: txns.length,
+                    itemBuilder: (_, i) {
+                      final t = txns[i];
+                      final isDirIn = (t['direction']?.toString() ?? '').toLowerCase() == 'in';
+                      final amt = double.tryParse(t['amount']?.toString() ?? '0') ?? 0.0;
+                      final notes = t['notes']?.toString() ?? '';
+                      final voucher = t['voucherNumber']?.toString() ?? '';
+                      final collector = t['collectorName']?.toString() ?? 'Staff';
+                      final code = t['companyCode']?.toString() ?? '';
+                      final dateStr = t['createdAt']?.toString() ?? '';
+
+                      String dtDisplay = dateStr;
+                      try {
+                        final dt = DateTime.parse(dateStr).toLocal();
+                        final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+                        final p = dt.hour >= 12 ? 'PM' : 'AM';
+                        dtDisplay = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} $h:${dt.minute.toString().padLeft(2, '0')} $p';
+                      } catch (_) {}
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                        child: Row(
+                          children: [
+                            Icon(isDirIn ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: isDirIn ? const Color(0xFF10B981) : const Color(0xFFEF4444), size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('$collector${code.isNotEmpty ? ' [$code]' : ''}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                                      Text('${isDirIn ? '+' : '-'}৳ ${amt.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: isDirIn ? const Color(0xFF10B981) : const Color(0xFFEF4444))),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(dtDisplay, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                  if (notes.isNotEmpty || voucher.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text([if (voucher.isNotEmpty) 'Voucher: $voucher', if (notes.isNotEmpty) notes].join(' • '), style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
   void _openEditModal() {
     if (_ledger == null) return;
     final ledger = _ledger!;
@@ -50,6 +155,7 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
     final descCtrl = TextEditingController(text: ledger['description']?.toString() ?? '');
     String status = ledger['status']?.toString() ?? 'ACTIVE';
     bool isPerpetual = ledger['isPerpetual'] ?? true;
+    final isDefault = ledger['code'] == 'GEN-OPS';
     
     final managersRaw = ledger['managers'] as List? ?? [];
     Set<String> selectedManagerIds = managersRaw.map((m) => m['id'].toString()).toSet();
@@ -193,41 +299,43 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                     const SizedBox(height: 24),
                     Row(
                       children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              final confirm = await showDialog<bool>(
-                                context: ctx,
-                                builder: (dialogCtx) => AlertDialog(
-                                  title: const Text('Delete Ledger'),
-                                  content: const Text('Are you sure you want to delete this ledger? If movements exist, it will be archived.'),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text('Cancel')),
-                                    TextButton(onPressed: () => Navigator.of(dialogCtx).pop(true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
-                                  ],
-                                ),
-                              );
+                        if (!isDefault) ...[
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: ctx,
+                                  builder: (dialogCtx) => AlertDialog(
+                                    title: const Text('Delete Ledger'),
+                                    content: const Text('Are you sure you want to delete this ledger? If movements exist, it will be archived.'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text('Cancel')),
+                                      TextButton(onPressed: () => Navigator.of(dialogCtx).pop(true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                                    ],
+                                  ),
+                                );
 
-                              if (confirm == true) {
-                                final success = await app.deleteLedger(ledger['id']);
-                                if (success && context.mounted) {
-                                  Navigator.of(ctx).pop();
-                                  Navigator.of(context).pop();
+                                if (confirm == true) {
+                                  final success = await app.deleteLedger(ledger['id']);
+                                  if (success && context.mounted) {
+                                    Navigator.of(ctx).pop();
+                                    Navigator.of(context).pop();
+                                  }
                                 }
-                              }
-                            },
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(color: Colors.red),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                side: const BorderSide(color: Colors.red),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
-                            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
-                        ),
-                        const SizedBox(width: 12),
+                          const SizedBox(width: 12),
+                        ],
                         Expanded(
-                          flex: 2,
+                          flex: isDefault ? 1 : 2,
                           child: ElevatedButton(
                             onPressed: () async {
                               final name = nameCtrl.text.trim();
@@ -382,6 +490,15 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
       return name.contains(_searchQuery.toLowerCase());
     }).toList();
 
+    filteredSegments.sort((a, b) {
+      final aCount = a['transactionCount'] is int ? a['transactionCount'] as int : int.tryParse(a['transactionCount']?.toString() ?? '0') ?? 0;
+      final bCount = b['transactionCount'] is int ? b['transactionCount'] as int : int.tryParse(b['transactionCount']?.toString() ?? '0') ?? 0;
+      if (bCount != aCount) return bCount.compareTo(aCount);
+      final aTotal = (double.tryParse(a['totalInflow']?.toString() ?? '0') ?? 0) + (double.tryParse(a['totalOutflow']?.toString() ?? '0') ?? 0);
+      final bTotal = (double.tryParse(b['totalInflow']?.toString() ?? '0') ?? 0) + (double.tryParse(b['totalOutflow']?.toString() ?? '0') ?? 0);
+      return bTotal.compareTo(aTotal);
+    });
+
     double filteredInflow = 0;
     double filteredOutflow = 0;
     for (var s in filteredSegments) {
@@ -486,7 +603,6 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 12),
-                                  padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(16),
@@ -499,41 +615,55 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                                       ),
                                     ],
                                   ),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: InkWell(
+                                      onTap: () => _showSegmentTransactionsSheet(
+                                        context,
+                                        Map<String, dynamic>.from(seg as Map),
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Row(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              segName,
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    segName,
+                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    '$txCount transactions • Net: ৳ ${net.toStringAsFixed(2)}',
+                                                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '$txCount transactions • Net: ৳ ${net.toStringAsFixed(2)}',
-                                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                            const SizedBox(width: 12),
+                                            Column(
+                                              crossAxisAlignment: CrossAxisAlignment.end,
+                                              children: [
+                                                Text(
+                                                  '+৳ ${inflow.toStringAsFixed(2)}',
+                                                  style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  '-৳ ${outflow.toStringAsFixed(2)}',
+                                                  style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 13),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            '+৳ ${inflow.toStringAsFixed(2)}',
-                                            style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            '-৳ ${outflow.toStringAsFixed(2)}',
-                                            style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 13),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 );
                               },
