@@ -119,10 +119,10 @@ export class SuiteController {
 
   @Get('suite/transactions')
   @HttpCode(HttpStatus.OK)
-  async getSuiteTransactions(@Req() req: any, @Query('companyId') companyId?: string, @Query('range') range?: string, @Query('search') search?: string) {
+  async getSuiteTransactions(@Req() req: any, @Query('search') search?: string, @Query('range') range?: string, @Query('direction') direction?: string) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) throw new BadRequestException('No tenant associated');
-    return this.suiteService.getSuiteTransactions(tenantId, companyId, range, search);
+    return this.suiteService.getSuiteTransactions(req.user, search, range, direction);
   }
   @Get('suite/movements')
   @HttpCode(HttpStatus.OK)

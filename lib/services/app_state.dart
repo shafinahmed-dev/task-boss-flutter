@@ -1079,15 +1079,15 @@ class AppState extends ChangeNotifier {
       debugPrint('Error fetching suite employees: $e');
     }
   }
-  Future<void> fetchSuiteTransactions({String? companyId, String? range, String? search}) async {
+  Future<void> fetchSuiteTransactions({String? range, String? search, String? direction}) async {
     if (token == null) return;
     _isSuiteLoading = true;
     notifyListeners();
     try {
       final queryParams = <String, String>{};
-      if (companyId != null && companyId.isNotEmpty) queryParams['companyId'] = companyId;
       if (range != null && range.isNotEmpty) queryParams['range'] = range;
       if (search != null && search.isNotEmpty) queryParams['search'] = search;
+      if (direction != null && direction.isNotEmpty) queryParams['direction'] = direction;
       final uri = Uri.parse('$apiBaseUrl/suite/transactions').replace(queryParameters: queryParams);
       final resp = await authRequest('GET', uri);
       if (resp.statusCode == 200 || resp.statusCode == 201) {

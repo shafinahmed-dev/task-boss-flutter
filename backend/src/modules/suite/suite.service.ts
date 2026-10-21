@@ -553,118 +553,109 @@ export class SuiteService {
 
 
   async getSuiteTransactions(
-    tenantId: string,
-    companyId?: string,
-    range?: string,
+    reqUser: any,
     search?: string,
+    range?: string,
+    direction?: string,
   ) {
-    const companies = await this.prisma.company.findMany({
-      where: { tenantId },
-      select: { id: true, name: true, code: true },
-    });
-    const companyMap = new Map(companies.map((c) => [c.id, c]));
-    const tenantCompanyIds = companies.map((c) => c.id);
+    const tenantId = reqUser?.tenantId;
+    const where: any = {};
 
-    let startDate;
-    const now = new Date();
-    if (range === 'today') startDate = new Date(now.setHours(0, 0, 0, 0));
-    else if (range === 'this_week') {
-      const d = new Date(now.setHours(0, 0, 0, 0));
-      d.setDate(d.getDate() - d.getDay());
-      startDate = d;
-    } else if (range === 'this_month') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (tenantId) {
+      where.ledger = { tenantId };
     }
 
-    const movementsWhere: any = {
-      wallet: { companyId: { in: tenantCompanyIds } },
-    };
-    if (startDate) movementsWhere.createdAt = { gte: startDate };
+    // Direction filter
+    if (direction && direction !== 'ALL') {
+      const d = direction.trim().toUpperCase();
+      where.direction = { in: [d, d.toLowerCase()] };
+    }
+
+    // Date filtering
+    const now = new Date();
+    const r = (range || '').toLowerCase();
+    if (r.includes('today')) {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      where.createdAt = { gte: start };
+    } else if (r.includes('week')) {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      const start = new Date(now.setDate(diff));
+      start.setHours(0, 0, 0, 0);
+      where.createdAt = { gte: start };
+    } else if (r.includes('month') && !r.includes('all')) {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      where.createdAt = { gte: start };
+    }
+
+    if (search && search.trim().length > 0) {
+      const q = search.trim();
+      where.OR = [
+        { notes: { contains: q, mode: 'insensitive' } },
+        { receiptNo: { contains: q, mode: 'insensitive' } },
+        { ledger: { name: { contains: q, mode: 'insensitive' } } },
+        { segment: { name: { contains: q, mode: 'insensitive' } } },
+        { collector: { name: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
 
     const movements = await this.prisma.moneyMovement.findMany({
-      where: movementsWhere,
-      orderBy: { createdAt: 'desc' },
+      where,
       include: {
-        category: {
-          select: { id: true, name: true, companyId: true },
-        },
         collector: {
-          select: {
-            id: true,
-            name: true,
-            role: true,
+          include: {
             companies: {
-              select: { companyId: true },
+              include: { company: { select: { id: true, code: true, name: true } } },
             },
           },
         },
-        wallet: {
-          select: { id: true, name: true, companyId: true },
-        },
+        wallet: { select: { id: true, name: true, type: true } },
+        ledger: { select: { id: true, name: true, code: true } },
+        segment: { select: { id: true, name: true } },
       },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
     });
 
-    let transactions = movements.map((tx) => {
-      const authorCompanyId = tx.collector?.companies?.[0]?.companyId;
-      const categoryCompanyId = tx.category?.companyId;
-      const walletCompanyId = tx.wallet?.companyId;
+    const serialized = movements.map((m) => {
+      const meta = (m.metadata as any) || {};
+      const isDirectionIn = (m.direction || '').toUpperCase() === 'IN';
+      const isHandover =
+        meta.isHandover === true ||
+        m.entryTag === 'HANDOVER' ||
+        !!meta.recipientName;
 
-      const resolvedCompanyId = authorCompanyId || categoryCompanyId || walletCompanyId;
-      const comp = resolvedCompanyId ? companyMap.get(resolvedCompanyId) : null;
+      // Resolve company code from collector's first company
+      const userCompany = (m.collector as any)?.companies?.[0]?.company;
+      const companyCode = userCompany?.code || meta.companyCode || 'TDC';
 
-      const companyCode = comp?.code
-        ? comp.code
-        : comp?.name
-        ? comp.name.split(' ').map((w: string) => w[0]).join('').toUpperCase()
-        : 'CONCERN';
-
-      const companyName = comp?.name || 'Workspace Concern';
-      const segmentName = tx.category?.name || 'General';
-
-      const isOut =
-        tx.direction === 'out' ||
-        tx.direction === 'OUT' ||
-        (tx as any).type === 'CASH_OUT' ||
-        (tx as any).type === 'EXPENSE' ||
-        (tx as any).movementType === 'Cash Out' ||
-        (tx as any).movementType === 'Expense';
+      const ledgerName =
+        (m.ledger as any)?.name || meta.ledgerName || 'General Operations';
+      const segmentName =
+        m.segment?.name || m.notes || meta.category || 'General';
 
       return {
-        id: tx.id,
-        companyId: resolvedCompanyId || '',
-        companyName: companyName,
-        companyCode: companyCode,
-        segmentName: segmentName,
-        amount: Number(tx.amount || 0),
-        fee: Number(tx.fee || 0),
-        direction: isOut ? 'out' : 'in',
-        type: isOut ? 'Cash Out' : 'Cash In',
-        note: tx.notes || (tx as any).note || (tx as any).movementType || '',
-        actorName: tx.collector?.name || 'System',
-        actorRole: tx.collector?.role || 'STAFF',
-        walletName: tx.wallet?.name || 'Cash in Hand',
-        createdAt: tx.createdAt.toISOString(),
+        id: m.id,
+        amount: Number(m.amount || 0),
+        direction: isDirectionIn ? 'in' : 'out',
+        movementType:
+          (m as any).movementType || (isDirectionIn ? 'Inflow' : 'Outflow'),
+        ledgerName,
+        segmentName,
+        notes: m.notes || '',
+        voucherNumber: m.receiptNo || meta.voucherNumber || '',
+        userName: m.collector?.name || meta.actorName || 'Staff',
+        companyCode: companyCode.toUpperCase(),
+        isHandover: isHandover,
+        senderName: meta.senderName || m.collector?.name || 'Sender',
+        senderCode: (meta.senderCode || companyCode).toUpperCase(),
+        recipientName: meta.recipientName || 'Recipient',
+        recipientCode: (meta.recipientCode || companyCode).toUpperCase(),
+        createdAt: m.createdAt.toISOString(),
       };
     });
 
-    if (companyId && companyId !== 'null' && companyId !== '') {
-      transactions = transactions.filter((t) => t.companyId === companyId);
-    }
-
-    if (search && search.trim() !== '') {
-      const q = search.trim().toLowerCase();
-      transactions = transactions.filter(
-        (f) =>
-          f.companyCode.toLowerCase().includes(q) ||
-          f.companyName.toLowerCase().includes(q) ||
-          f.segmentName.toLowerCase().includes(q) ||
-          f.actorName.toLowerCase().includes(q) ||
-          f.note.toLowerCase().includes(q) ||
-          String(f.amount).toLowerCase().includes(q)
-      );
-    }
-
-    return { success: true, transactions };
+    return { success: true, transactions: serialized };
   }
   async getSuiteMovements(reqUser: any, direction?: string, range?: string) {
     const where: any = {};
