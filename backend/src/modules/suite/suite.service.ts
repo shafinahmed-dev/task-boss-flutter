@@ -612,6 +612,7 @@ export class SuiteService {
         wallet: { select: { id: true, name: true, type: true } },
         ledger: { select: { id: true, name: true, code: true } },
         segment: { select: { id: true, name: true } },
+        category: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 200,
@@ -631,15 +632,19 @@ export class SuiteService {
 
       const ledgerName =
         (m.ledger as any)?.name || meta.ledgerName || 'General Operations';
-      
-      let rawSegmentName = m.segment?.name?.trim();
-      if (!rawSegmentName || rawSegmentName.length > 30 || rawSegmentName.toLowerCase().startsWith('on ')) {
-        rawSegmentName = isHandover ? 'Handover' : (meta.category || 'General');
-      }
+
+      let segmentName = '';
       if (isHandover) {
-        rawSegmentName = 'Handover';
+        segmentName = 'Cash Handover';
+      } else if (m.segment?.name && m.segment.name !== 'General' && m.segment.name !== 'Operational Expense') {
+        segmentName = m.segment.name;
+      } else if (m.category?.name) {
+        segmentName = m.category.name;
+      } else if (meta.category) {
+        segmentName = meta.category;
+      } else {
+        segmentName = m.segment?.name || 'Operational Expense';
       }
-      const segmentName = rawSegmentName;
 
       return {
         id: m.id,
