@@ -245,7 +245,7 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(right: 12),
             child: Center(
               child: Container(
                 padding:
@@ -255,10 +255,10 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '${filteredTransactions.length} txns',
+                  filteredTransactions.length == 1 ? '1 Transaction' : '${filteredTransactions.length} Transactions',
                   style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600),
                 ),
               ),
