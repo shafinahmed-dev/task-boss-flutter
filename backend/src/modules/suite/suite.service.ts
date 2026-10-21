@@ -631,8 +631,15 @@ export class SuiteService {
 
       const ledgerName =
         (m.ledger as any)?.name || meta.ledgerName || 'General Operations';
-      const segmentName =
-        m.segment?.name || m.notes || meta.category || 'General';
+      
+      let rawSegmentName = m.segment?.name?.trim();
+      if (!rawSegmentName || rawSegmentName.length > 30 || rawSegmentName.toLowerCase().startsWith('on ')) {
+        rawSegmentName = isHandover ? 'Handover' : (meta.category || 'General');
+      }
+      if (isHandover) {
+        rawSegmentName = 'Handover';
+      }
+      const segmentName = rawSegmentName;
 
       return {
         id: m.id,
