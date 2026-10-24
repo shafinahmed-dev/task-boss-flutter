@@ -453,13 +453,18 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
   Widget _buildLiveActivityTicker(BuildContext context, Map<String, dynamic>? latestTxn) {
     final hasTxn = latestTxn != null && latestTxn.isNotEmpty;
     final isInflow = hasTxn && (latestTxn['direction'] ?? '').toString().toUpperCase() == 'IN';
-    final amount = hasTxn ? (latestTxn['amount'] as num? ?? 0).toDouble() : 0.0;
-    final actor = hasTxn ? (latestTxn['userName'] ?? latestTxn['collectorName'] ?? 'Staff').toString().split(' ').first : 'System';
-    final segment = hasTxn ? (latestTxn['segmentName'] ?? latestTxn['notes'] ?? 'Movement').toString() : 'Ready';
+    final double amount = hasTxn ? (latestTxn['amount'] as num? ?? 0).toDouble() : 0.0;
+    final String actor = hasTxn
+        ? (latestTxn['userName'] ?? latestTxn['collectorName'] ?? 'Staff').toString().trim()
+        : 'System';
+    final String segment = hasTxn
+        ? (latestTxn['segmentName'] ?? latestTxn['notes'] ?? 'Movement').toString().trim()
+        : 'Synchronized';
 
-    final dotColor = !hasTxn
-        ? const Color(0xFF94A3B8)
+    final Color dotColor = !hasTxn
+        ? const Color(0xFF64748B)
         : (isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444));
+    final Color amountColor = isInflow ? const Color(0xFF34D399) : const Color(0xFFF87171);
 
     return Expanded(
       child: InkWell(
@@ -470,36 +475,28 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          margin: const EdgeInsets.only(right: 12),
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF0F172A), // Slate 900
-                Color(0xFF1E293B), // Slate 800
-              ],
-            ),
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Colors.white.withOpacity(0.09),
+              color: Colors.white.withOpacity(0.08),
               width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 8,
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              // Live Status Dot
+              // Glowing Live Pulse Dot
               Container(
                 width: 7,
                 height: 7,
@@ -508,35 +505,84 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: dotColor.withOpacity(0.55),
-                      blurRadius: 5,
+                      color: dotColor.withOpacity(0.6),
+                      blurRadius: 6,
                       spreadRadius: 1,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              // Ticker Text
+              const SizedBox(width: 9),
+
+              // Formatted Rich Text with Clean Spacing
               Expanded(
-                child: Text(
-                  hasTxn
-                      ? '$actor:${isInflow ? '+' : '-'}৳${amount.toStringAsFixed(0)} •$segment'
-                      : 'System synchronized • Ledger active',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFE2E8F0),
-                    letterSpacing: -0.2,
-                  ),
-                ),
+                child: hasTxn
+                    ? Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              actor,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFF1F5F9),
+                              ),
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 6),
+                            child: Text(
+                              '•',
+                              style: TextStyle(fontSize: 10, color: Color(0xFF475569)),
+                            ),
+                          ),
+                          Text(
+                            '${isInflow ? '+' : '-'}৳ ${amount.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: amountColor,
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 6),
+                            child: Text(
+                              '•',
+                              style: TextStyle(fontSize: 10, color: Color(0xFF475569)),
+                            ),
+                          ),
+                          Flexible(
+                            child: Text(
+                              segment,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : const Text(
+                        'All accounts synchronized • Ledger active',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 6),
               Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 10,
-                color: Colors.white.withOpacity(0.35),
+                Icons.chevron_right_rounded,
+                size: 16,
+                color: Colors.white.withOpacity(0.3),
               ),
             ],
           ),
@@ -545,47 +591,54 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     );
   }
 
-  Widget _buildPrivacyTogglePill(double totalCash) {
+  Widget _buildPrivacyTogglePill(double totalBalance) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      margin: const EdgeInsets.only(left: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.white.withOpacity(0.09),
+          color: Colors.white.withOpacity(0.08),
           width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.account_balance_wallet_rounded, size: 15, color: Color(0xFF10B981)),
-          const SizedBox(width: 6),
-          Text(
-            _isCashMasked ? '৳ ••••••' : formatBdt(totalCash),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 6),
-          InkWell(
-            onTap: () => setState(() => _isCashMasked = !_isCashMasked),
-            child: Icon(
-              _isCashMasked ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+      child: InkWell(
+        onTap: () => setState(() => _isCashMasked = !_isCashMasked),
+        borderRadius: BorderRadius.circular(12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.account_balance_wallet_outlined,
               size: 15,
+              color: Color(0xFF10B981),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _isCashMasked ? '৳ ••••••' : formatBdt(totalBalance),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFF1F5F9),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              _isCashMasked ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              size: 14,
               color: const Color(0xFF94A3B8),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -599,7 +652,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
           child: Row(
             children: [
               // Left: Live activity ticker
