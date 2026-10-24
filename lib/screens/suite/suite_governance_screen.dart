@@ -650,18 +650,18 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
           colors: [
-            Color(0xFF020617), // Deep Obsidian Slate
-            Color(0xFF0A1325), // Dark Midnight
-            Color(0xFF0B1E3A), // Executive Deep Navy Blue
+            Color(0xFF000000), // Solid Pitch Black (Dominates the left)
+            Color(0xFF040812), // Deep Black-Navy Transition
+            Color(0xFF0A1526), // Subtle, Muted Midnight Blue (Far right edge)
           ],
-          stops: [0.0, 0.5, 1.0],
+          stops: [0.0, 0.55, 1.0],
         ),
         border: Border(
           bottom: BorderSide(
-            color: Color(0x1AFFFFFF), // Subtle 10% white bottom divider
+            color: Color(0x14FFFFFF), // Faint 8% white separator
             width: 1.0,
           ),
         ),
