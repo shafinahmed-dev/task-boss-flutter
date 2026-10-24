@@ -648,7 +648,24 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     final latestTxn = appState.suiteTransactions.isNotEmpty ? appState.suiteTransactions.first : null;
 
     return Container(
-      color: const Color(0xFF1E2638),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF020617), // Deep Obsidian Slate
+            Color(0xFF0A1325), // Dark Midnight
+            Color(0xFF0B1E3A), // Executive Deep Navy Blue
+          ],
+          stops: [0.0, 0.5, 1.0],
+        ),
+        border: Border(
+          bottom: BorderSide(
+            color: Color(0x1AFFFFFF), // Subtle 10% white bottom divider
+            width: 1.0,
+          ),
+        ),
+      ),
       child: SafeArea(
         bottom: false,
         child: Padding(
