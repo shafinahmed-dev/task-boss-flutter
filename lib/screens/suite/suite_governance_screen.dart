@@ -257,6 +257,136 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     return numVal.toStringAsFixed(2);
   }
 
+  Widget _buildVelocityCard({
+    required BuildContext context,
+    required bool isInflow,
+    required double amount,
+    required VoidCallback onTap,
+  }) {
+    final accentColor = isInflow ? const Color(0xFF34D399) : const Color(0xFFF87171);
+    final shadowGlow = isInflow ? const Color(0xFF064E3B) : const Color(0xFF4C0519);
+    final gradientColors = isInflow
+        ? const [Color(0xFF04130C), Color(0xFF06281B), Color(0xFF064E3B)]
+        : const [Color(0xFF140306), Color(0xFF26070E), Color(0xFF4C0519)];
+
+    return Expanded(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: gradientColors,
+            stops: const [0.0, 0.55, 1.0],
+          ),
+          border: Border.all(
+            color: (isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.2),
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: shadowGlow.withOpacity(0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            children: [
+              // Top Glass Reflection
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.0),
+                        Colors.white.withOpacity(0.2),
+                        Colors.white.withOpacity(0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Background Arrow Watermark
+              Positioned(
+                right: -15,
+                bottom: -20,
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: 0.06,
+                    child: Icon(
+                      isInflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                      size: 95,
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Interactive Body
+              InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        isInflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                        color: accentColor,
+                        size: 20,
+                      ),
+                      const SizedBox(height: 10),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          formatBdt(amount),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Text(
+                          isInflow ? 'INFLOW' : 'OUTFLOW',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.1,
+                            color: accentColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
@@ -577,90 +707,34 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    debugPrint('[Suite] Tapped Inflow card');
-                    _showVelocityBreakdown(
-                      context,
-                      direction: 'in',
-                      totalAmount: inflow,
-                      rangeLabel: _selectedPeriod,
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFF10B981)),
-                            SizedBox(width: 6),
-                            Text('Inflow', style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '৳ ${_formatAmount(inflow)}',
-                          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+            _buildVelocityCard(
+              context: context,
+              isInflow: true,
+              amount: (inflow is num) ? inflow.toDouble() : (double.tryParse(inflow.toString()) ?? 0.0),
+              onTap: () {
+                debugPrint('[Suite] Tapped Inflow card');
+                _showVelocityBreakdown(
+                  context,
+                  direction: 'in',
+                  totalAmount: (inflow is num) ? inflow.toDouble() : (double.tryParse(inflow.toString()) ?? 0.0),
+                  rangeLabel: _selectedPeriod,
+                );
+              },
             ),
             const SizedBox(width: 12),
-            Expanded(
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    debugPrint('[Suite] Tapped Outflow card');
-                    _showVelocityBreakdown(
-                      context,
-                      direction: 'out',
-                      totalAmount: outflow,
-                      rangeLabel: _selectedPeriod,
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.arrow_upward_rounded, size: 16, color: Color(0xFFEF4444)),
-                            SizedBox(width: 6),
-                            Text('Outflow', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '৳ ${_formatAmount(outflow)}',
-                          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+            _buildVelocityCard(
+              context: context,
+              isInflow: false,
+              amount: (outflow is num) ? outflow.toDouble() : (double.tryParse(outflow.toString()) ?? 0.0),
+              onTap: () {
+                debugPrint('[Suite] Tapped Outflow card');
+                _showVelocityBreakdown(
+                  context,
+                  direction: 'out',
+                  totalAmount: (outflow is num) ? outflow.toDouble() : (double.tryParse(outflow.toString()) ?? 0.0),
+                  rangeLabel: _selectedPeriod,
+                );
+              },
             ),
           ],
         ),
