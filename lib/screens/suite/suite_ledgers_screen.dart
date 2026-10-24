@@ -4,6 +4,15 @@ import 'package:intl/intl.dart';
 import '../../services/app_state.dart';
 import 'ledger_details_screen.dart';
 
+String formatBdt(num value) {
+  final formatter = NumberFormat.currency(
+    locale: 'en_IN',
+    symbol: '৳ ',
+    decimalDigits: 2,
+  );
+  return formatter.format(value);
+}
+
 class SuiteLedgersScreen extends StatefulWidget {
   const SuiteLedgersScreen({super.key});
 
@@ -412,17 +421,7 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text('INFLOW', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: Color(0xFF94A3B8))),
-                              Text('+${formatBdt(inflow)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
-                              const SizedBox(height: 6),
-                              const Text('OUTFLOW', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: Color(0xFF94A3B8))),
-                              Text('-${formatBdt(outflow)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: outflow > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8))),
-                            ],
-                          ),
+                          _buildLedgerBalanceColumn(inflow, outflow),
                         ],
                       ),
                     ),
@@ -498,4 +497,72 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
       ),
     );
   }
+  Widget _buildLedgerBalanceColumn(double inflow, double outflow) {
+    final hasInflow = inflow > 0;
+    final hasOutflow = outflow > 0;
+
+    if (!hasInflow && !hasOutflow) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            formatBdt(0),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (hasInflow) ...[
+          const Text(
+            'INFLOW',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          Text(
+            '+${formatBdt(inflow)}',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF10B981),
+            ),
+          ),
+        ],
+        if (hasInflow && hasOutflow) const SizedBox(height: 6),
+        if (hasOutflow) ...[
+          const Text(
+            'OUTFLOW',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          Text(
+            '-${formatBdt(outflow)}',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFFEF4444),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
 }

@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import 'package:task_boss/services/app_state.dart';
+
+String formatBdt(num value) {
+  final formatter = NumberFormat.currency(
+    locale: 'en_IN',
+    symbol: '৳ ',
+    decimalDigits: 2,
+  );
+  return formatter.format(value);
+}
 
 class LedgerDetailsScreen extends StatefulWidget {
   final String ledgerId;
@@ -478,8 +488,51 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSegmentAmountColumn(double inflow, double outflow) {
+    final hasInflow = inflow > 0;
+    final hasOutflow = outflow > 0;
+
+    if (!hasInflow && !hasOutflow) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            formatBdt(0),
+            style: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (hasInflow)
+          Text(
+            '+${formatBdt(inflow)}',
+            style: const TextStyle(
+              color: Color(0xFF10B981),
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        if (hasInflow && hasOutflow) const SizedBox(height: 2),
+        if (hasOutflow)
+          Text(
+            '-${formatBdt(outflow)}',
+            style: const TextStyle(
+              color: Color(0xFFEF4444),
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+      ],
+    );
+  }
     final ledgerName = _ledger?['name']?.toString() ?? widget.initialName;
     final status = _ledger?['status']?.toString() ?? 'ACTIVE';
     final segments = (_ledger?['segments'] as List?) ?? [];
