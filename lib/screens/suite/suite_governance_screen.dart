@@ -17,6 +17,7 @@ class SuiteGovernanceScreen extends StatefulWidget {
 }
 
 class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
+  int _selectedTabIndex = 0;
   String formatBdt(num value) {
     final formatter = NumberFormat.currency(
       locale: 'en_IN',
@@ -434,26 +435,26 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF1E1B4B), // Midnight Corporate Indigo/Purple
-                  Color(0xFF0F172A), // Midnight Navy
-                  Color(0xFF090D16), // Deep Slate
+                  Color(0xFF000000), // True Solid Black
+                  Color(0xFF070B14), // Deep Black Transition
+                  Color(0xFF0D1B2A), // Elegant Midnight Blue
                 ],
-                stops: [0.0, 0.55, 1.0],
+                stops: [0.0, 0.5, 1.0],
               ),
               border: Border.all(
-                color: Colors.white.withOpacity(0.09),
+                color: Colors.white.withOpacity(0.08),
                 width: 1.0,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF1E1B4B).withOpacity(0.35),
-                  blurRadius: 24,
+                  color: Colors.black.withOpacity(0.45),
+                  blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
+                  color: const Color(0xFF0D1B2A).withOpacity(0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
