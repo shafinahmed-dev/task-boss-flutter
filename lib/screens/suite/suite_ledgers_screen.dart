@@ -306,17 +306,16 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                           final isDefault = l['code'] == 'GEN-OPS';
                           final inflow = double.tryParse(l['inflow']?.toString() ?? l['totalInflow']?.toString() ?? '0') ?? 0.0;
                           final outflow = double.tryParse(l['outflow']?.toString() ?? l['totalOutflow']?.toString() ?? '0') ?? 0.0;
-                          final status = l['status']?.toString() ?? 'ACTIVE';
                           final managersList = l['managers'] as List? ?? [];
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
-                              color: isDefault ? const Color(0xFFFFFDF5) : const Color(0xFFF8FAFC),
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: isDefault ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
-                                width: isDefault ? 1.5 : 1.0,
+                                color: isDefault ? const Color(0xFFFBBF24) : const Color(0xFF34D399),
+                                width: isDefault ? 1.4 : 1.2,
                               ),
                             ),
                             child: Material(
@@ -335,48 +334,16 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                                 },
                                 borderRadius: BorderRadius.circular(16),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                   child: Row(
                                     children: [
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    l['name']?.toString() ?? 'Unnamed Ledger',
-                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
-                                                  ),
-                                                ),
-                                                if (isDefault) ...[
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFFFEF3C7),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                      border: Border.all(color: const Color(0xFFF59E0B), width: 1.0),
-                                                    ),
-                                                    child: const Text(
-                                                      'SYSTEM DEFAULT',
-                                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 6),
-                                                ],
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                  decoration: BoxDecoration(
-                                                    color: status == 'ACTIVE' ? const Color(0xFFECFDF5) : const Color(0xFFFEF3C7),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: Text(
-                                                    status,
-                                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: status == 'ACTIVE' ? const Color(0xFF059669) : const Color(0xFFB45309)),
-                                                  ),
-                                                ),
-                                              ],
+                                            Text(
+                                              l['name']?.toString() ?? 'Unnamed Ledger',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
                                             ),
                                             const SizedBox(height: 6),
                                             Text(
