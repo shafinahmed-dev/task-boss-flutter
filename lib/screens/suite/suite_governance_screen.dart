@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../login_screen.dart';
 import '../../services/app_state.dart';
 import 'suite_transactions_screen.dart';
@@ -16,7 +17,14 @@ class SuiteGovernanceScreen extends StatefulWidget {
 }
 
 class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
-  int _selectedTabIndex = 0;
+  String formatBdt(num value) {
+    final formatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '৳ ',
+      decimalDigits: 2,
+    );
+    return formatter.format(value);
+  }
   bool _isCashMasked = true;
   bool _isLoading = false;
   String _selectedPeriod = 'month';
@@ -286,7 +294,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
           currentIndex: _selectedTabIndex,
           onTap: (index) => setState(() => _selectedTabIndex = index),
           backgroundColor: const Color(0xFF0F172A),
-          selectedItemColor: const Color(0xFF38BDF8),
+          selectedItemColor: Colors.white,
           unselectedItemColor: const Color(0xFF64748B),
           selectedFontSize: 12,
           unselectedFontSize: 12,
@@ -417,50 +425,126 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
               MaterialPageRoute(builder: (_) => const SuiteTransactionsScreen()),
             );
           },
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           child: Container(
-            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
             decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'TOTAL GROUP BALANCE',
-                      style: TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
-                  ],
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1E1B4B), // Midnight Corporate Indigo/Purple
+                  Color(0xFF0F172A), // Midnight Navy
+                  Color(0xFF090D16), // Deep Slate
+                ],
+                stops: [0.0, 0.55, 1.0],
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.09),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1E1B4B).withOpacity(0.35),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '৳ ${_formatAmount(totalGroupCash)}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Consolidated cash across all active concerns',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
                 ),
               ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                children: [
+                  // 1. Top Edge Frosted Glass Highlight Reflection
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 1,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withOpacity(0.0),
+                            Colors.white.withOpacity(0.25),
+                            Colors.white.withOpacity(0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 2. Large Watermark on Far Right (5% Opacity)
+                  Positioned(
+                    right: -25,
+                    bottom: -30,
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.05,
+                        child: const Icon(
+                          Icons.corporate_fare_rounded,
+                          size: 155,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 3. Card Interactive Content
+                  Padding(
+                    padding: const EdgeInsets.all(22.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'TOTAL GROUP BALANCE',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.1,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 13,
+                              color: Colors.white.withOpacity(0.45),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          formatBdt(totalGroupCash),
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Consolidated cash across all active concerns',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
