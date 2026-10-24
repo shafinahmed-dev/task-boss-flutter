@@ -296,16 +296,9 @@ export class LedgerService {
         metadata.paymentMethod = dto.paymentMethod;
       }
 
-      let ledgerId = dto.ledgerId;
-      const segmentId = dto.segmentId || null;
-      if (segmentId && !ledgerId) {
-        const seg = await this.prisma.segment.findUnique({
-          where: { id: segmentId },
-          select: { ledgerId: true },
-        });
-        if (seg) ledgerId = seg.ledgerId;
-      }
-      if (!ledgerId) {
+      // 1. Resolve Ledger ID (default to GEN-OPS if not provided)
+      let effectiveLedgerId = dto.ledgerId || undefined;
+      if (!effectiveLedgerId) {
         let tenantId: string | null = null;
         if (custodian.companyId) {
           const comp = await this.prisma.company.findUnique({
@@ -323,7 +316,61 @@ export class LedgerService {
         }
         if (tenantId) {
           const defaultLedger = await this.ensureDefaultLedger(tenantId);
-          ledgerId = defaultLedger?.id;
+          effectiveLedgerId = defaultLedger?.id;
+        }
+      }
+
+      // 2. Safely Resolve Segment ID
+      let effectiveSegmentId: string | null = null;
+      const rawSegment =
+        dto.segmentId ||
+        (dto as any).segment ||
+        (dto as any).category ||
+        null;
+
+      if (rawSegment && effectiveLedgerId) {
+        // Check if rawSegment is already a valid UUID existing in the Segment table
+        const existingSegment = await this.prisma.segment.findFirst({
+          where: {
+            id: rawSegment,
+            ledgerId: effectiveLedgerId,
+          },
+        });
+
+        if (existingSegment) {
+          effectiveSegmentId = existingSegment.id;
+        } else {
+          // rawSegment might be a name (e.g. "Client Payment") or a legacy Category ID
+          let segmentName = rawSegment as string;
+
+          // If it looks like a UUID, try resolving from the TransactionCategory table
+          const legacyCategory =
+            await this.prisma.transactionCategory.findUnique({
+              where: { id: rawSegment },
+            }).catch(() => null);   // gracefully handle non-UUID strings
+
+          if (legacyCategory) {
+            segmentName = legacyCategory.name;
+          }
+
+          // Find or create the Segment under this ledger with that name
+          let resolvedSeg = await this.prisma.segment.findFirst({
+            where: {
+              ledgerId: effectiveLedgerId,
+              name: { equals: segmentName.trim(), mode: 'insensitive' },
+            },
+          });
+
+          if (!resolvedSeg) {
+            resolvedSeg = await this.prisma.segment.create({
+              data: {
+                ledgerId: effectiveLedgerId,
+                name: segmentName.trim(),
+              },
+            });
+          }
+
+          effectiveSegmentId = resolvedSeg.id;
         }
       }
 
@@ -347,8 +394,8 @@ export class LedgerService {
           clientId: dto.clientId ?? null,
           projectId: dto.projectId ?? null,
           categoryId: dto.categoryId ?? null,
-          ledgerId: ledgerId || null,
-          segmentId: segmentId || null,
+          ledgerId: effectiveLedgerId || null,
+          segmentId: effectiveSegmentId,
           loanId: dto.loanId ?? null,
           editedFromId: null,
           occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : new Date(),
@@ -379,6 +426,55 @@ export class LedgerService {
     // Generate a fresh idempotency key for the correction row
     const correctionIdempotencyKey = crypto.randomUUID();
 
+    // Resolve ledger — prefer dto, fall back to original
+    const correctionLedgerId = dto.ledgerId ?? original.ledgerId;
+
+    // Safely resolve segment just like recordMoneyMovement
+    let correctionSegmentId: string | null = original.segmentId;
+    const rawSeg =
+      dto.segmentId ||
+      (dto as any).segment ||
+      (dto as any).category ||
+      null;
+
+    if (rawSeg && correctionLedgerId) {
+      const existingSeg = await this.prisma.segment.findFirst({
+        where: { id: rawSeg, ledgerId: correctionLedgerId },
+      });
+
+      if (existingSeg) {
+        correctionSegmentId = existingSeg.id;
+      } else {
+        let segName = rawSeg as string;
+
+        const legacyCat = await this.prisma.transactionCategory
+          .findUnique({ where: { id: rawSeg } })
+          .catch(() => null);
+
+        if (legacyCat) {
+          segName = legacyCat.name;
+        }
+
+        let resolved = await this.prisma.segment.findFirst({
+          where: {
+            ledgerId: correctionLedgerId,
+            name: { equals: segName.trim(), mode: 'insensitive' },
+          },
+        });
+
+        if (!resolved) {
+          resolved = await this.prisma.segment.create({
+            data: {
+              ledgerId: correctionLedgerId,
+              name: segName.trim(),
+            },
+          });
+        }
+
+        correctionSegmentId = resolved.id;
+      }
+    }
+
     const correction = await this.prisma.moneyMovement.create({
       data: {
         idempotencyKey: correctionIdempotencyKey,
@@ -395,8 +491,8 @@ export class LedgerService {
         clientId: dto.clientId ?? original.clientId,
         projectId: dto.projectId ?? original.projectId,
         categoryId: dto.categoryId ?? original.categoryId,
-        ledgerId: dto.ledgerId ?? original.ledgerId,
-        segmentId: dto.segmentId ?? original.segmentId,
+        ledgerId: correctionLedgerId,
+        segmentId: correctionSegmentId,
         loanId: dto.loanId ?? original.loanId,
         editedFromId: movementId,
         occurredAt: new Date(
