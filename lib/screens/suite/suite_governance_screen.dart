@@ -48,6 +48,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         app.fetchSuiteEmployees(),
         app.fetchSuiteDashboard(period: _selectedPeriod),
         app.fetchSuiteSummary(),
+        app.fetchSuiteTransactions(),
       ]);
     } catch (e) {
       if (mounted) {
@@ -449,89 +450,163 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     );
   }
 
+  Widget _buildLiveActivityTicker(BuildContext context, Map<String, dynamic>? latestTxn) {
+    final hasTxn = latestTxn != null && latestTxn.isNotEmpty;
+    final isInflow = hasTxn && (latestTxn['direction'] ?? '').toString().toUpperCase() == 'IN';
+    final amount = hasTxn ? (latestTxn['amount'] as num? ?? 0).toDouble() : 0.0;
+    final actor = hasTxn ? (latestTxn['userName'] ?? latestTxn['collectorName'] ?? 'Staff').toString().split(' ').first : 'System';
+    final segment = hasTxn ? (latestTxn['segmentName'] ?? latestTxn['notes'] ?? 'Movement').toString() : 'Ready';
+
+    final dotColor = !hasTxn
+        ? const Color(0xFF94A3B8)
+        : (isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444));
+
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const SuiteTransactionsScreen(),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: const EdgeInsets.only(right: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF0F172A), // Slate 900
+                Color(0xFF1E293B), // Slate 800
+              ],
+            ),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.09),
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Live Status Dot
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: dotColor.withOpacity(0.55),
+                      blurRadius: 5,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Ticker Text
+              Expanded(
+                child: Text(
+                  hasTxn
+                      ? '$actor:${isInflow ? '+' : '-'}৳${amount.toStringAsFixed(0)} •$segment'
+                      : 'System synchronized • Ledger active',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFE2E8F0),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 10,
+                color: Colors.white.withOpacity(0.35),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrivacyTogglePill(double totalCash) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.09),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.account_balance_wallet_rounded, size: 15, color: Color(0xFF10B981)),
+          const SizedBox(width: 6),
+          Text(
+            _isCashMasked ? '৳ ••••••' : formatBdt(totalCash),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: () => setState(() => _isCashMasked = !_isCashMasked),
+            child: Icon(
+              _isCashMasked ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              size: 15,
+              color: const Color(0xFF94A3B8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTopHeaderAndTabs(BuildContext context, double totalCash) {
     final appState = context.watch<AppState>();
-    final user = appState.currentUser ?? appState.user;
-    final companyName = user?.name ?? 'TASK Group Suite';
+    final latestTxn = appState.suiteTransactions.isNotEmpty ? appState.suiteTransactions.first : null;
 
     return Container(
       color: const Color(0xFF1E2638),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              InkWell(
-                onTap: () => _showAccountBottomSheet(context),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        companyName,
-                        style: const TextStyle(
-                          color: Color(0xFF0F172A),
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF0F172A)),
-                    ],
-                  ),
-                ),
-              ),
+              // Left: Live activity ticker
+              _buildLiveActivityTicker(context, latestTxn),
 
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Color(0xFF10B981)),
-                        const SizedBox(width: 6),
-                        Text(
-                          _isCashMasked ? '৳ ••••••' : '৳ ${_formatAmount(totalCash)}',
-                          style: const TextStyle(
-                            color: Color(0xFF0F172A),
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        InkWell(
-                          onTap: () => setState(() => _isCashMasked = !_isCashMasked),
-                          child: Icon(
-                            _isCashMasked ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                            size: 16,
-                            color: const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-                    onPressed: _loadData,
-                    tooltip: 'Refresh Data',
-                  ),
-                ],
-              ),
+              // Right: Eye balance toggle
+              _buildPrivacyTogglePill(totalCash),
             ],
           ),
         ),
