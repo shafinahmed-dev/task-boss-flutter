@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../../services/app_state.dart';
 import 'ledger_details_screen.dart';
 
@@ -299,80 +300,201 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                 : _ledgers.isEmpty
                     ? const Center(child: Text('No ledgers found.', style: TextStyle(color: Color(0xFF64748B))))
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         itemCount: _ledgers.length,
                         itemBuilder: (context, index) {
-                          final l = _ledgers[index];
-                          final isDefault = l['code'] == 'GEN-OPS';
-                          final inflow = double.tryParse(l['inflow']?.toString() ?? l['totalInflow']?.toString() ?? '0') ?? 0.0;
-                          final outflow = double.tryParse(l['outflow']?.toString() ?? l['totalOutflow']?.toString() ?? '0') ?? 0.0;
-                          final managersList = l['managers'] as List? ?? [];
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isDefault ? const Color(0xFFFBBF24) : const Color(0xFF34D399),
-                                width: isDefault ? 1.4 : 1.2,
-                              ),
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(16),
-                              child: InkWell(
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => LedgerDetailsScreen(
-                                        ledgerId: l['id'].toString(),
-                                        initialName: l['name']?.toString() ?? 'Ledger',
-                                      ),
-                                    ),
-                                  ).then((_) => _loadLedgers());
-                                },
-                                borderRadius: BorderRadius.circular(16),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              l['name']?.toString() ?? 'Unnamed Ledger',
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              l['description']?.toString().isNotEmpty == true ? l['description'] : 'Segments: ${l['segmentsCount'] ?? 0} • Managers: ${managersList.length}',
-                                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text('+৳ ${inflow.toStringAsFixed(0)}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13)),
-                                          Text('-৳ ${outflow.toStringAsFixed(0)}', style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 13)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
+                          return _buildEnterpriseLedgerCard(context, _ledgers[index]);
                         },
                       ),
           ),
         ],
+      ),
+    );
+  }
+  String formatBdt(num value) {
+    final formatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '৳ ',
+      decimalDigits: 2,
+    );
+    return formatter.format(value);
+  }
+
+  Widget _buildEnterpriseLedgerCard(BuildContext context, Map<String, dynamic> ledger) {
+    final isDefault = ledger['code'] == 'GEN-OPS';
+    final status = (ledger['status'] ?? 'ACTIVE').toString().toUpperCase();
+    final isFrozen = status == 'FROZEN';
+
+    final Color accentColor = isDefault
+        ? const Color(0xFFF59E0B)
+        : (isFrozen ? const Color(0xFF6B7280) : const Color(0xFF10B981));
+
+    final double inflow = double.tryParse(ledger['inflow']?.toString() ?? ledger['totalInflow']?.toString() ?? '0') ?? 0.0;
+    final double outflow = double.tryParse(ledger['outflow']?.toString() ?? ledger['totalOutflow']?.toString() ?? '0') ?? 0.0;
+    final managersList = ledger['managers'] as List? ?? [];
+
+    return Opacity(
+      opacity: isFrozen ? 0.75 : 1.0,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 4, color: accentColor),
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => LedgerDetailsScreen(
+                            ledgerId: ledger['id'].toString(),
+                            initialName: ledger['name']?.toString() ?? 'Ledger',
+                          ),
+                        ),
+                      ).then((_) => _loadLedgers());
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        ledger['name']?.toString() ?? 'Ledger',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _buildStatusBadge(isDefault, status),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  ledger['description']?.toString().isNotEmpty == true
+                                      ? ledger['description'].toString()
+                                      : 'Segments: ${ledger['segmentsCount'] ?? 0} • Managers: ${managersList.length}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text('INFLOW', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: Color(0xFF94A3B8))),
+                              Text('+${formatBdt(inflow)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+                              const SizedBox(height: 6),
+                              const Text('OUTFLOW', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: Color(0xFF94A3B8))),
+                              Text('-${formatBdt(outflow)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: outflow > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  Widget _buildStatusBadge(bool isDefault, String status) {
+    if (isDefault) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFFDE68A), width: 1),
+        ),
+        child: const Text(
+          'Default',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFFD97706),
+          ),
+        ),
+      );
+    }
+
+    if (status == 'FROZEN') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_rounded, size: 10, color: Color(0xFF4B5563)),
+            SizedBox(width: 3),
+            Text(
+              'Frozen',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF4B5563),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD1FAE5),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFA7F3D0), width: 1),
+      ),
+      child: const Text(
+        'Active',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF059669),
+        ),
       ),
     );
   }
