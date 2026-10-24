@@ -533,6 +533,8 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
       ],
     );
   }
+  @override
+  Widget build(BuildContext context) {
     final ledgerName = _ledger?['name']?.toString() ?? widget.initialName;
     final status = _ledger?['status']?.toString() ?? 'ACTIVE';
     final segments = (_ledger?['segments'] as List?) ?? [];
@@ -699,6 +701,7 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                                               ),
                                             ),
                                             const SizedBox(width: 12),
+                                             _buildSegmentAmountColumn(inflow, outflow),
                                             Column(
                                               crossAxisAlignment: CrossAxisAlignment.end,
                                               children: [
