@@ -493,43 +493,60 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
     final hasOutflow = outflow > 0;
 
     if (!hasInflow && !hasOutflow) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            formatBdt(0),
-            style: const TextStyle(
-              color: Color(0xFF94A3B8),
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
-          ),
-        ],
+      return Text(
+        formatBdt(0),
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF94A3B8),
+        ),
       );
     }
 
+    if (hasInflow && !hasOutflow) {
+      return Text(
+        '+${formatBdt(inflow)}',
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF10B981),
+        ),
+      );
+    }
+
+    if (hasOutflow && !hasInflow) {
+      return Text(
+        '-${formatBdt(outflow)}',
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFFEF4444),
+        ),
+      );
+    }
+
+    // Both exist
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        if (hasInflow)
-          Text(
-            '+${formatBdt(inflow)}',
-            style: const TextStyle(
-              color: Color(0xFF10B981),
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
+        Text(
+          '+${formatBdt(inflow)}',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF10B981),
           ),
-        if (hasInflow && hasOutflow) const SizedBox(height: 2),
-        if (hasOutflow)
-          Text(
-            '-${formatBdt(outflow)}',
-            style: const TextStyle(
-              color: Color(0xFFEF4444),
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '-${formatBdt(outflow)}',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFFEF4444),
           ),
+        ),
       ],
     );
   }
@@ -702,20 +719,8 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                                             ),
                                             const SizedBox(width: 12),
                                              _buildSegmentAmountColumn(inflow, outflow),
-                                            Column(
-                                              crossAxisAlignment: CrossAxisAlignment.end,
-                                              children: [
-                                                Text(
-                                                  '+৳ ${inflow.toStringAsFixed(2)}',
-                                                  style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  '-৳ ${outflow.toStringAsFixed(2)}',
-                                                  style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 13),
-                                                ),
-                                              ],
-                                            ),
+
+
                                           ],
                                         ),
                                       ),
