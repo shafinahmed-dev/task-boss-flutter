@@ -1456,7 +1456,6 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     final balance = (c['totalBalance'] as num? ?? c['balance'] as num? ?? 0).toDouble();
 
     return Container(
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1472,101 +1471,112 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
           ),
         ],
       ),
-      child: InkWell(
-        onTap: () => _showConcernDetailsModal(context, c['id'] ?? '', name),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Stack(
           children: [
-            // 1. Header Row: [CODE] Badge + Concern Name (Left) | 👥 X Members (Right)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    code.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
+            // 1. Bottom-Right Code Watermark (Mirrors Total Group Balance building watermark)
+            Positioned(
+              right: 14,
+              bottom: 6,
+              child: IgnorePointer(
+                child: Text(
+                  code.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.08),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+            ),
+
+            // 2. Interactive Card Content
+            InkWell(
+              onTap: () => _showConcernDetailsModal(context, c['id']?.toString() ?? '', name),
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(
-                      Icons.people_alt_outlined,
-                      size: 13,
-                      color: Color(0xFF64748B),
+                    // Header Row: Full Concern Name (Left) | 👥 X Members (Right)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.people_alt_outlined,
+                              size: 13,
+                              color: Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              memberCount == 1 ? '1 Member' : '$memberCount Members',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 3),
-                    Text(
-                      memberCount == 1 ? '1 Member' : '$memberCount Members',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF64748B),
-                      ),
+
+                    const SizedBox(height: 14),
+
+                    // Balance Section: Micro-label + Formatted BDT
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'TOTAL HOLDING',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            formatBdt(balance),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-
-            const SizedBox(height: 14),
-
-            // 2. Left-Aligned Balance Section: Micro-label + Formatted BDT
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'TOTAL HOLDING',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
-                    color: Color(0xFF94A3B8),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    formatBdt(balance),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
