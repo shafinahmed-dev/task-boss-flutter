@@ -534,7 +534,7 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
+              letterSpacing: 0.6,
               color: Color(0xFF64748B),
             ),
           ),
@@ -543,7 +543,8 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF10B981),
+              letterSpacing: -0.2,
+              color: Color(0xFF34D399), // Mint Emerald
             ),
           ),
         ],
@@ -554,7 +555,7 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
+              letterSpacing: 0.6,
               color: Color(0xFF64748B),
             ),
           ),
@@ -563,7 +564,8 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Color(0xFFEF4444),
+              letterSpacing: -0.2,
+              color: Color(0xFFFB7185), // Coral Rose
             ),
           ),
         ],
