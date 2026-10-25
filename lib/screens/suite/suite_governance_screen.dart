@@ -1267,6 +1267,10 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                     onPressed: () => _confirmDeleteConcern(context, c['id']),
                   ),
                 ],
+              ),
+            );
+          }),
+
   Widget _buildSlimManagerRow(BuildContext context, Map<String, dynamic> m) {
     final name = m['name']?.toString() ?? 'Manager';
     final balance = (m['balance'] as num? ?? 0).toDouble();
