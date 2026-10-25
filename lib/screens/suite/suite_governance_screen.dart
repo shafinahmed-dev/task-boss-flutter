@@ -1460,7 +1460,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         ],
       ),
       child: InkWell(
-        onTap: () => _showConcernDetailsModal(context, concern['id'] ?? '', name),
+        onTap: () => _openConcernBreakdown(concern),
         borderRadius: BorderRadius.circular(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
