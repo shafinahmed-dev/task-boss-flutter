@@ -809,7 +809,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Consolidated cash across all active concerns',
+                          'Tap to view total fund',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w400,
