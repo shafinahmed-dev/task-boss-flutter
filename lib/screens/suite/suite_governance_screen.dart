@@ -1270,124 +1270,95 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
               ),
             );
           }),
-
-  Widget _buildSlimManagerRow(BuildContext context, Map<String, dynamic> m) {
-    final name = m['name']?.toString() ?? 'Manager';
-    final balance = (m['balance'] as num? ?? 0).toDouble();
-    final concerns = (m['assignedConcerns'] as List<dynamic>?)?.map((e) => e.toString()).join(' • ') ?? 'No Concern';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    concerns.toUpperCase(),
-                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFFA7F3D0)),
-            ),
-            child: Text(
-              formatBdt(balance),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
-            ),
-          ),
-          const SizedBox(width: 10),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
-            onPressed: () => _showEditManagerModal(context, m),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildSlimEmployeeRow(BuildContext context, Map<String, dynamic> e) {
-    final name = e['name']?.toString() ?? 'Employee';
-    final balance = (e['balance'] as num? ?? 0).toDouble();
-    final concern = e['concernCode']?.toString() ?? e['concern']?.toString() ?? 'TDC';
+  Widget _buildManageTab(BuildContext context, AppState app) {
+    final concerns = app.concerns;
+    final managers = app.managers;
+    final employees = app.suiteEmployees;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    concern.toUpperCase(),
-                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
-                  ),
-                ),
-              ],
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Company Concerns (${concerns.length})',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFFA7F3D0)),
+            ElevatedButton.icon(
+              onPressed: () => _showAddConcernModal(context),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add Concern'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
             ),
-            child: Text(
-              formatBdt(balance),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
-            ),
-          ),
-          const SizedBox(width: 10),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
-            onPressed: () => _showEditEmployeeModal(context, e),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (concerns.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text('No concerns found.', style: TextStyle(color: Color(0xFF64748B))),
+          )
+        else
+          ...concerns.map((c) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      (c['code'] ?? '').toString().toUpperCase(),
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          c['name'] ?? '',
+                          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '${c['totalMembers'] ?? 0} Members • ৳ ${_formatAmount(c['totalBalance'])}',
+                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+                    onPressed: () => _showEditConcernModal(context, c),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
+                    onPressed: () => _confirmDeleteConcern(context, c['id']),
+                  ),
+                ],
               ),
             );
           }),
