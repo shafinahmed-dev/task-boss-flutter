@@ -1069,6 +1069,120 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
   }
 
 
+  Widget _buildSectionCard({
+    required String title,
+    required int count,
+    Widget? action,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$title ($count)',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                if (action != null) action,
+              ],
+            ),
+          ),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+          if (children.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'No records found.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: children.length,
+              separatorBuilder: (_, __) => const Divider(
+                height: 1,
+                thickness: 1,
+                color: Color(0xFFF1F5F9),
+                indent: 16,
+                endIndent: 16,
+              ),
+              itemBuilder: (_, index) => children[index],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSlimConcernRow(BuildContext context, Map<String, dynamic> c) {
+    final name = c['name']?.toString() ?? 'Concern';
+    final code = c['code']?.toString() ?? 'CORP';
+    final memberCount = (c['memberCount'] as num? ?? c['userCount'] as num? ?? 0).toInt();
+    final balance = (c['balance'] as num? ?? c['totalBalance'] as num? ?? 0).toDouble();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              code.toUpperCase(),
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+            ),
+          ),
+          Text(
+            '$memberCount Members • ${formatBdt(balance)}',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+            onPressed: () => _showEditConcernModal(context, c),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
   Widget _buildManageTab(BuildContext context, AppState app) {
     final concerns = app.concerns;
     final managers = app.managers;
@@ -1153,6 +1267,123 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                     onPressed: () => _confirmDeleteConcern(context, c['id']),
                   ),
                 ],
+  Widget _buildSlimManagerRow(BuildContext context, Map<String, dynamic> m) {
+    final name = m['name']?.toString() ?? 'Manager';
+    final balance = (m['balance'] as num? ?? 0).toDouble();
+    final concerns = (m['assignedConcerns'] as List<dynamic>?)?.map((e) => e.toString()).join(' • ') ?? 'No Concern';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    concerns.toUpperCase(),
+                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
+            ),
+            child: Text(
+              formatBdt(balance),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+            onPressed: () => _showEditManagerModal(context, m),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSlimEmployeeRow(BuildContext context, Map<String, dynamic> e) {
+    final name = e['name']?.toString() ?? 'Employee';
+    final balance = (e['balance'] as num? ?? 0).toDouble();
+    final concern = e['concernCode']?.toString() ?? e['concern']?.toString() ?? 'TDC';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    concern.toUpperCase(),
+                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
+            ),
+            child: Text(
+              formatBdt(balance),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+            onPressed: () => _showEditEmployeeModal(context, e),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
               ),
             );
           }),
