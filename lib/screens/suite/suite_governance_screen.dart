@@ -1189,321 +1189,99 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     final employees = app.suiteEmployees;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Company Concerns (${concerns.length})',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        _buildSectionCard(
+          title: 'Company Concerns',
+          count: concerns.length,
+          action: ElevatedButton.icon(
+            onPressed: () => _showAddConcernModal(context),
+            icon: const Icon(Icons.add, size: 16, color: Colors.white),
+            label: const Text('Add Concern', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F172A),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            ElevatedButton.icon(
-              onPressed: () => _showAddConcernModal(context),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add Concern'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F172A),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              ),
+          ),
+          children: concerns.map((c) => _buildSlimConcernRow(context, c)).toList(),
+        ),
+        _buildSectionCard(
+          title: 'Managers',
+          count: managers.length,
+          action: ElevatedButton.icon(
+            onPressed: () => _showAddManagerModal(context),
+            icon: const Icon(Icons.add, size: 16, color: Colors.white),
+            label: const Text('Add Manager', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F172A),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-          ],
+          ),
+          children: managers.map((m) => _buildSlimManagerRow(context, m)).toList(),
         ),
-        const SizedBox(height: 12),
-        if (concerns.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text('No concerns found.', style: TextStyle(color: Color(0xFF64748B))),
-          )
-        else
-          ...concerns.map((c) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 30,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      (c['code'] ?? '').toString().toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          c['name'] ?? '',
-                          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          '${c['totalMembers'] ?? 0} Members • ৳ ${_formatAmount(c['totalBalance'])}',
-                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
-                    onPressed: () => _showEditConcernModal(context, c),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
-                    onPressed: () => _confirmDeleteConcern(context, c['id']),
-                  ),
-                ],
-              ),
-            );
-          }),
-
-
-        
-
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Managers (${managers.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            ElevatedButton.icon(
-              onPressed: () => _showAddManagerModal(context),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add Manager'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
-            ),
-          ],
+        _buildSectionCard(
+          title: 'Employees',
+          count: employees.length,
+          action: null,
+          children: employees.map((e) => _buildSlimEmployeeRow(context, e)).toList(),
         ),
-        const SizedBox(height: 12),
-        if (managers.isEmpty)
-          const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('No managers found.', style: TextStyle(color: Color(0xFF64748B))))
-        else
-          ...managers.map((m) {
-            final mId = m['id'] ?? '';
-            final isVis = _revealedPasswordManagerIds.contains(mId);
-            final rawPwd = m['rawPassword'] ?? '••••••••';
-            final compList = (m['companies'] as List? ?? []);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(m['name'] ?? 'Manager', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 8),
-                                _buildConcernBadge(m),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text('@${m['handle'] ?? ''}', style: const TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0FDF4),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFBBF7D0)),
-                        ),
-                        child: Text(
-                          '৳ ${_formatAmount(m['balance'])}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF16A34A),
-                          ),
-                        ),
-                      ),
-                      IconButton(icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)), onPressed: () => _showEditManagerModal(context, m)),
-                      IconButton(icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)), onPressed: () => _confirmDeleteManager(context, mId)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
-                    child: Row(
-                      children: [
-                        const Text('Password: ', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                        Expanded(child: Text(isVis ? rawPwd : '••••••••', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace'))),
-                        InkWell(
-                          onTap: () => setState(() => isVis ? _revealedPasswordManagerIds.remove(mId) : _revealedPasswordManagerIds.add(mId)),
-                          child: Icon(isVis ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
-                        ),
-                        const SizedBox(width: 12),
-                        InkWell(
-                          onTap: () {
-                            Clipboard.setData(ClipboardData(text: rawPwd));
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password copied')));
-                          },
-                          child: const Icon(Icons.copy_rounded, size: 16, color: Color(0xFF64748B)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-
         const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Employees (${employees.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (employees.isEmpty)
-          const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('No employee accounts found.', style: TextStyle(color: Color(0xFF64748B))))
-        else
-          ...employees.map((e) {
-            final eId = e['id'] ?? '';
-            final isVis = _revealedPasswordEmployeeIds.contains(eId);
-            final rawPwd = e['rawPassword'] ?? '••••••••';
-            final comp = e['company'];
-            final compCode = comp != null ? (comp['code'] ?? comp['name'] ?? '') : '';
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(e['name'] ?? 'Staff', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 8),
-                                _buildConcernBadge(e),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '@${e['handle'] ?? ''} • ${e['designation'] ?? 'Staff'} • Managed by ${e['managerName'] ?? 'Manager'}',
-                              style: const TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 12,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3))),
-                        child: Text('৳ ${_formatAmount(e['balance'])}', style: const TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
-                    child: Row(
-                      children: [
-                        const Text('Password: ', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                        Expanded(child: Text(isVis ? rawPwd : '••••••••', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace'))),
-                        InkWell(
-                          onTap: () => setState(() => isVis ? _revealedPasswordEmployeeIds.remove(eId) : _revealedPasswordEmployeeIds.add(eId)),
-                          child: Icon(isVis ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
-                        ),
-                        const SizedBox(width: 12),
-                        InkWell(
-                          onTap: () {
-                            Clipboard.setData(ClipboardData(text: rawPwd));
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password copied')));
-                          },
-                          child: const Icon(Icons.copy_rounded, size: 16, color: Color(0xFF64748B)),
-                        ),
-                        const SizedBox(width: 12),
-                        TextButton(
-                          onPressed: () => _showChangePasswordModal(context, eId, e['name'] ?? 'Employee'),
-                          style: TextButton.styleFrom(foregroundColor: const Color(0xFF0F172A), padding: EdgeInsets.zero, minimumSize: const Size(50, 30), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                          child: const Text('Change', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-
-        const SizedBox(height: 24),
-        const Text('Suite Account Security', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
-                children: [
-                  CircleAvatar(radius: 20, backgroundColor: Color(0xFF0F172A), child: Icon(Icons.security_rounded, color: Colors.white, size: 20)),
-                  SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('TASK Group Suite', style: TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
-                      Text('@suite.taskgroup', style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Divider(color: Color(0xFFE2E8F0), height: 1),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _showChangeSuitePasswordModal(context),
-                      icon: const Icon(Icons.lock_reset_rounded, size: 16),
-                      label: const Text('Change Suite Password'),
-                      style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF0F172A), side: const BorderSide(color: Color(0xFF0F172A)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+              const Text('Suite Account Security', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        CircleAvatar(radius: 20, backgroundColor: Color(0xFF0F172A), child: Icon(Icons.security_rounded, color: Colors.white, size: 20)),
+                        SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('TASK Group Suite', style: TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text('@suite.taskgroup', style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _confirmLogout(context),
-                      icon: const Icon(Icons.logout_rounded, size: 16),
-                      label: const Text('Log Out'),
-                      style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444), side: const BorderSide(color: Color(0xFFEF4444)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                    const SizedBox(height: 16),
+                    const Divider(color: Color(0xFFE2E8F0), height: 1),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showChangeSuitePasswordModal(context),
+                            icon: const Icon(Icons.lock_reset_rounded, size: 16),
+                            label: const Text('Change Suite Password'),
+                            style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF0F172A), side: const BorderSide(color: Color(0xFF0F172A)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _confirmLogout(context),
+                            icon: const Icon(Icons.logout_rounded, size: 16),
+                            label: const Text('Log Out'),
+                            style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444), side: const BorderSide(color: Color(0xFFEF4444)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -1513,7 +1291,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     );
   }
 
-  void _showAccountBottomSheet(BuildContext context) {
+void _showAccountBottomSheet(BuildContext context) {
     final appState = context.read<AppState>();
     final user = appState.currentUser ?? appState.user;
     showModalBottomSheet(
