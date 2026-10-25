@@ -302,18 +302,21 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
               ),
             ),
 
-            // Dark Search Bar
+            // Deep Obsidian Glass Search Bar
             Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.08), width: 1.0),
+                color: const Color(0xFF000000), // Pure Black
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.09),
+                  width: 1.0,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
@@ -326,7 +329,7 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                   hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 13),
                   prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                  contentPadding: EdgeInsets.symmetric(vertical: 13, horizontal: 16),
                 ),
               ),
             ),
@@ -366,98 +369,134 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
 
     final Color accentColor = isDefault
         ? const Color(0xFFF59E0B) // Amber
-        : (isFrozen ? const Color(0xFF64748B) : const Color(0xFF10B981)); // Green
+        : (isFrozen ? const Color(0xFF64748B) : const Color(0xFF10B981)); // Emerald Green
 
-    final double inflow = (ledger['inflow'] as num? ?? ledger['totalInflow'] as num? ?? 0).toDouble();
-    final double outflow = (ledger['outflow'] as num? ?? ledger['totalOutflow'] as num? ?? 0).toDouble();
+    final double inflow = (ledger['inflow'] as num? ?? 0).toDouble();
+    final double outflow = (ledger['outflow'] as num? ?? 0).toDouble();
 
     return Opacity(
       opacity: isFrozen ? 0.72 : 1.0,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A), // Clean deep dark obsidian
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF000000), // Pitch Black
+              Color(0xFF050B14), // Obsidian Charcoal Transition
+              Color(0xFF0B192C), // Deep Midnight Blue
+            ],
+            stops: [0.0, 0.45, 1.0],
+          ),
           border: Border.all(
             color: Colors.white.withOpacity(0.08),
             width: 1.0,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.35),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: const Color(0xFF0B192C).withOpacity(0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Sharp 4px solid vertical bar
-                Container(width: 4, color: accentColor),
-
-                // Interactive Card Body
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => LedgerDetailsScreen(
-                            ledgerId: ledger['id'].toString(),
-                            initialName: ledger['name']?.toString() ?? 'Ledger',
-                          ),
-                        ),
-                      ).then((_) => _loadLedgers());
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Left: Title + Description (No pill badges)
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  ledger['name']?.toString() ?? 'Ledger',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFFF8FAFC),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  ledger['description']?.toString().isNotEmpty == true
-                                      ? ledger['description'].toString()
-                                      : 'Operational budget container',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF94A3B8),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Right: Clean zero-suppressed balance column
-                          _buildLedgerBalanceColumn(inflow, outflow),
-                        ],
-                      ),
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            children: [
+              // 1. Top Edge Frosted Glass Highlight Reflection
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.0),
+                        Colors.white.withOpacity(0.22),
+                        Colors.white.withOpacity(0.0),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+
+              // 2. Card Content with 4px Left Accent Bar
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(width: 4, color: accentColor),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => LedgerDetailsScreen(
+                                ledgerId: ledger['id'].toString(),
+                                initialName: ledger['name']?.toString() ?? 'Ledger',
+                              ),
+                            ),
+                          ).then((_) => _loadLedgers());
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Left: Title & Description
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      ledger['name']?.toString() ?? 'Ledger',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.2,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      ledger['description']?.toString().isNotEmpty == true
+                                          ? ledger['description'].toString()
+                                          : 'Operational budget container',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              // Right: Financial Balances
+                              _buildLedgerBalanceColumn(inflow, outflow),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
