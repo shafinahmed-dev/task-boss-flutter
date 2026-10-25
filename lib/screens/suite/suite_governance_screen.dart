@@ -920,7 +920,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
 
         const SizedBox(height: 24),
         const Text(
-          'Managers by Liquidity',
+          'Team Cash Standings',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
         ),
         const SizedBox(height: 4),
