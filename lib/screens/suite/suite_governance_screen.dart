@@ -1183,6 +1183,104 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
       ),
     );
   }
+  Widget _buildSlimManagerRow(BuildContext context, Map<String, dynamic> m) {
+    final name = m['name']?.toString() ?? 'Manager';
+    final handle = m['handle']?.toString() ?? '';
+    final balance = (m['balance'] as num? ?? 0).toDouble();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildConcernBadge(m),
+                  ],
+                ),
+                if (handle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '@$handle',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Text(
+            formatBdt(balance),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF16A34A)),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+            onPressed: () => _showEditManagerModal(context, m),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSlimEmployeeRow(BuildContext context, Map<String, dynamic> e) {
+    final name = e['name']?.toString() ?? 'Employee';
+    final handle = e['handle']?.toString() ?? '';
+    final designation = e['designation']?.toString() ?? 'Staff';
+    final balance = (e['balance'] as num? ?? 0).toDouble();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildConcernBadge(e),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '@$handle • $designation',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            formatBdt(balance),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF10B981)),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.lock_reset_rounded, size: 18, color: Color(0xFF64748B)),
+            onPressed: () => _showChangePasswordModal(context, e['id'] ?? '', name),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
+
+
   Widget _buildManageTab(BuildContext context, AppState app) {
     final concerns = app.concerns;
     final managers = app.managers;
