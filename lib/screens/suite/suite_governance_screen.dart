@@ -2,9 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import '../login_screen.dart';
 import '../../services/app_state.dart';
+import 'suite_transactions_screen.dart';
+import 'suite_ledgers_screen.dart';
+
 
 class SuiteGovernanceScreen extends StatefulWidget {
   const SuiteGovernanceScreen({super.key});
@@ -15,6 +18,14 @@ class SuiteGovernanceScreen extends StatefulWidget {
 
 class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
   int _selectedTabIndex = 0;
+  String formatBdt(num value) {
+    final formatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '৳ ',
+      decimalDigits: 2,
+    );
+    return formatter.format(value);
+  }
   bool _isCashMasked = true;
   bool _isLoading = false;
   String _selectedPeriod = 'month';
@@ -37,6 +48,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         app.fetchSuiteEmployees(),
         app.fetchSuiteDashboard(period: _selectedPeriod),
         app.fetchSuiteSummary(),
+        app.fetchSuiteTransactions(),
       ]);
     } catch (e) {
       if (mounted) {
@@ -48,6 +60,174 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  String _timeAgo(dynamic rawDate) {
+    if (rawDate == null) return 'recently';
+    final date = DateTime.tryParse(rawDate.toString());
+    if (date == null) return 'recently';
+    final diff = DateTime.now().difference(date);
+    if (diff.inDays > 365) return '${(diff.inDays / 365).floor()}y ago';
+    if (diff.inDays > 30) return '${(diff.inDays / 30).floor()}mo ago';
+    if (diff.inDays > 0) return '${diff.inDays}d ago';
+    if (diff.inHours > 0) return '${diff.inHours}h ago';
+    if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+    return 'just now';
+  }
+  void _showVelocityBreakdown(BuildContext context, {required String direction, required double totalAmount, required String rangeLabel}) {
+    final isInflow = direction == 'in';
+    final title = isInflow ? 'Group Inflows' : 'Group Outflows';
+    final themeColor = isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    String periodParam = 'all_time';
+    final p = rangeLabel.toLowerCase();
+    if (p.contains('today')) periodParam = 'today';
+    if (p.contains('week')) periodParam = 'this_week';
+    if (p.contains('month')) periodParam = 'this_month';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(width: 44, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(color: themeColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                          child: Icon(isInflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: themeColor, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                            Text('Total: ৳ ${totalAmount.toStringAsFixed(2)} • $rangeLabel', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(onPressed: () => Navigator.of(ctx).pop(), icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              Expanded(
+                child: FutureBuilder<dynamic>(
+                  future: context.read<AppState>().fetchSuiteMovements(
+                    direction: direction,
+                    range: periodParam,
+                  ),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final items = (snapshot.data as List<Map<String, dynamic>>?) ?? [];
+
+                    if (items.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isInflow ? Icons.file_download_off_rounded : Icons.file_upload_outlined,
+                              size: 40,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No ${isInflow ? "inflows" : "outflows"} recorded for this period.',
+                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        final amt = double.tryParse(item['amount']?.toString() ?? '0') ?? 0.0;
+                        final note = (item['note'] ?? item['movementType'] ?? (isInflow ? 'Inflow' : 'Outflow')).toString();
+                        final user = item['userName'] ?? 'Staff';
+                        final time = _timeAgo(item['createdAt']);
+                        final voucher = item['voucherNumber']?.toString() ?? '';
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isInflow ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  isInflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                                  color: themeColor,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      note,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'By $user • $time${voucher.isNotEmpty ? ' • $voucher' : ''}',
+                                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                isInflow ? '+৳ ${amt.toStringAsFixed(2)}' : '-৳ ${amt.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: themeColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
 
   double _calculateConsolidatedCash(AppState app) {
     if (app.dashboardData['totalGroupCash'] != null) {
@@ -63,8 +243,11 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     double total = 0.0;
     for (final c in app.concerns) {
       final b = c['totalBalance'];
-      if (b is num) total += b.toDouble();
-      else total += double.tryParse(b?.toString() ?? '0') ?? 0.0;
+      if (b is num) {
+        total += b.toDouble();
+      } else {
+        total += double.tryParse(b?.toString() ?? '0') ?? 0.0;
+      }
     }
     return total;
   }
@@ -73,6 +256,136 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     if (val == null) return '0.00';
     final numVal = (val is num) ? val.toDouble() : (double.tryParse(val.toString()) ?? 0.0);
     return numVal.toStringAsFixed(2);
+  }
+
+  Widget _buildVelocityCard({
+    required BuildContext context,
+    required bool isInflow,
+    required double amount,
+    required VoidCallback onTap,
+  }) {
+    final accentColor = isInflow ? const Color(0xFF34D399) : const Color(0xFFF87171);
+    final shadowGlow = isInflow ? const Color(0xFF064E3B) : const Color(0xFF4C0519);
+    final gradientColors = isInflow
+        ? const [Color(0xFF04130C), Color(0xFF06281B), Color(0xFF064E3B)]
+        : const [Color(0xFF140306), Color(0xFF26070E), Color(0xFF4C0519)];
+
+    return Expanded(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: gradientColors,
+            stops: const [0.0, 0.55, 1.0],
+          ),
+          border: Border.all(
+            color: (isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.2),
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: shadowGlow.withOpacity(0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            children: [
+              // Top Glass Reflection
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.0),
+                        Colors.white.withOpacity(0.2),
+                        Colors.white.withOpacity(0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Background Arrow Watermark
+              Positioned(
+                right: -15,
+                bottom: -20,
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: 0.06,
+                    child: Icon(
+                      isInflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                      size: 95,
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Interactive Body
+              InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        isInflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                        color: accentColor,
+                        size: 20,
+                      ),
+                      const SizedBox(height: 10),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          formatBdt(amount),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Text(
+                          isInflow ? 'INFLOW' : 'OUTFLOW',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.1,
+                            color: accentColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -86,114 +399,50 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         children: [
           _buildTopHeaderAndTabs(context, totalCash),
           Expanded(
-            child: _isLoading && app.concerns.isEmpty && app.managers.isEmpty
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF1E2638)))
-                : RefreshIndicator(
-                    onRefresh: _loadData,
-                    color: const Color(0xFF1E2638),
-                    child: _selectedTabIndex == 0
-                        ? _buildDashboardTab(context, app, totalCash)
-                        : _buildManageTab(context, app),
-                  ),
+            child: _selectedTabIndex == 0
+                ? (_isLoading && app.concerns.isEmpty && app.managers.isEmpty
+                    ? const Center(child: CircularProgressIndicator(color: Color(0xFF1E2638)))
+                    : RefreshIndicator(
+                        onRefresh: _loadData,
+                        color: const Color(0xFF1E2638),
+                        child: _buildDashboardTab(context, app, totalCash),
+                      ))
+                : (_selectedTabIndex == 1
+                    ? const SuiteLedgersScreen()
+                    : RefreshIndicator(
+                        onRefresh: _loadData,
+                        color: const Color(0xFF1E2638),
+                        child: _buildManageTab(context, app),
+                      )),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildTopHeaderAndTabs(BuildContext context, double totalCash) {
-    final appState = context.watch<AppState>();
-    final user = appState.currentUser ?? appState.user;
-    final companyName = user?.name ?? 'TASK Group Suite';
-
-    return Container(
-      color: const Color(0xFF1E2638),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  InkWell(
-                    onTap: () => _showAccountBottomSheet(context),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            companyName,
-                            style: const TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF0F172A)),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Color(0xFF10B981)),
-                            const SizedBox(width: 6),
-                            Text(
-                              _isCashMasked ? '৳ ••••••' : '৳ ${_formatAmount(totalCash)}',
-                              style: const TextStyle(
-                                color: Color(0xFF0F172A),
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            InkWell(
-                              onTap: () => setState(() => _isCashMasked = !_isCashMasked),
-                              child: Icon(
-                                _isCashMasked ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                size: 16,
-                                color: const Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-                        onPressed: _loadData,
-                        tooltip: 'Refresh Data',
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF0F172A),
+          border: Border(top: BorderSide(color: Color(0xFF1E2638), width: 1)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedTabIndex,
+          onTap: (index) => setState(() => _selectedTabIndex = index),
+          backgroundColor: const Color(0xFF0F172A),
+          selectedItemColor: Colors.white,
+          unselectedItemColor: const Color(0xFF64748B),
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          type: BottomNavigationBarType.fixed,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_rounded),
+              label: 'Dashboard',
             ),
-            Row(
-              children: [
-                _buildTopTabItem('Dashboard', 0),
-                _buildTopTabItem('Manage', 1),
-              ],
+            BottomNavigationBarItem(
+              icon: Icon(Icons.menu_book_rounded),
+              label: 'Ledgers',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.business_center_rounded),
+              label: 'Manage',
             ),
           ],
         ),
@@ -201,29 +450,234 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     );
   }
 
-  Widget _buildTopTabItem(String label, int index) {
-    final isSelected = _selectedTabIndex == index;
+  Widget _buildLiveActivityTicker(BuildContext context, Map<String, dynamic>? latestTxn) {
+    final hasTxn = latestTxn != null && latestTxn.isNotEmpty;
+    final isInflow = hasTxn && (latestTxn['direction'] ?? '').toString().toUpperCase() == 'IN';
+    final double amount = hasTxn ? (latestTxn['amount'] as num? ?? 0).toDouble() : 0.0;
+    final String actor = hasTxn
+        ? (latestTxn['userName'] ?? latestTxn['collectorName'] ?? 'Staff').toString().trim()
+        : 'System';
+    final String segment = hasTxn
+        ? (latestTxn['segmentName'] ?? latestTxn['notes'] ?? 'Movement').toString().trim()
+        : 'Synchronized';
+
+    final Color dotColor = !hasTxn
+        ? const Color(0xFF64748B)
+        : (isInflow ? const Color(0xFF10B981) : const Color(0xFFEF4444));
+    final Color amountColor = isInflow ? const Color(0xFF34D399) : const Color(0xFFF87171);
+
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _selectedTabIndex = index),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const SuiteTransactionsScreen(),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: isSelected ? Colors.white : Colors.transparent,
-                width: 2.5,
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.08),
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Glowing Live Pulse Dot
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: dotColor.withOpacity(0.6),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 9),
+
+              // Formatted Rich Text with Clean Spacing
+              Expanded(
+                child: hasTxn
+                    ? Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              actor,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFF1F5F9),
+                              ),
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 6),
+                            child: Text(
+                              '•',
+                              style: TextStyle(fontSize: 10, color: Color(0xFF475569)),
+                            ),
+                          ),
+                          Text(
+                            '${isInflow ? '+' : '-'}৳ ${amount.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: amountColor,
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 6),
+                            child: Text(
+                              '•',
+                              style: TextStyle(fontSize: 10, color: Color(0xFF475569)),
+                            ),
+                          ),
+                          Flexible(
+                            child: Text(
+                              segment,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : const Text(
+                        'All accounts synchronized • Ledger active',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 16,
+                color: Colors.white.withOpacity(0.3),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrivacyTogglePill(double totalBalance) {
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      margin: const EdgeInsets.only(left: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.08),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => setState(() => _isCashMasked = !_isCashMasked),
+        borderRadius: BorderRadius.circular(12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.account_balance_wallet_outlined,
+              size: 15,
+              color: Color(0xFF10B981),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _isCashMasked ? '৳ ••••••' : formatBdt(totalBalance),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFF1F5F9),
               ),
             ),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            const SizedBox(width: 6),
+            Icon(
+              _isCashMasked ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              size: 14,
+              color: const Color(0xFF94A3B8),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopHeaderAndTabs(BuildContext context, double totalCash) {
+    final appState = context.watch<AppState>();
+    final latestTxn = appState.suiteTransactions.isNotEmpty ? appState.suiteTransactions.first : null;
+
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Color(0xFF000000), // Solid Pitch Black (Dominates the left)
+            Color(0xFF040812), // Deep Black-Navy Transition
+            Color(0xFF0A1526), // Subtle, Muted Midnight Blue (Far right edge)
+          ],
+          stops: [0.0, 0.55, 1.0],
+        ),
+        border: Border(
+          bottom: BorderSide(
+            color: Color(0x14FFFFFF), // Faint 8% white separator
+            width: 1.0,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+          child: Row(
+            children: [
+              // Left: Live activity ticker
+              _buildLiveActivityTicker(context, latestTxn),
+
+              // Right: Eye balance toggle
+              _buildPrivacyTogglePill(totalCash),
+            ],
           ),
         ),
       ),
@@ -240,35 +694,134 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'TOTAL GROUP BALANCE',
-                style: TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
+        InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SuiteTransactionsScreen()),
+            );
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF000000), // True Solid Black
+                  Color(0xFF070B14), // Deep Black Transition
+                  Color(0xFF0D1B2A), // Elegant Midnight Blue
+                ],
+                stops: [0.0, 0.5, 1.0],
               ),
-              const SizedBox(height: 8),
-              Text(
-                '৳ ${_formatAmount(totalGroupCash)}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.08),
+                width: 1.0,
               ),
-              const SizedBox(height: 4),
-            ],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.45),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: const Color(0xFF0D1B2A).withOpacity(0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                children: [
+                  // 1. Top Edge Frosted Glass Highlight Reflection
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 1,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withOpacity(0.0),
+                            Colors.white.withOpacity(0.25),
+                            Colors.white.withOpacity(0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 2. Large Watermark on Far Right (5% Opacity)
+                  Positioned(
+                    right: -25,
+                    bottom: -30,
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.05,
+                        child: const Icon(
+                          Icons.corporate_fare_rounded,
+                          size: 155,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 3. Card Interactive Content
+                  Padding(
+                    padding: const EdgeInsets.all(22.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'TOTAL GROUP BALANCE',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.1,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 13,
+                              color: Colors.white.withOpacity(0.45),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          formatBdt(totalGroupCash),
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Consolidated cash across all active concerns',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 24),
@@ -276,7 +829,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Money Flow',
+              'Financial Velocity',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
             ),
           ],
@@ -299,60 +852,34 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFF10B981)),
-                        SizedBox(width: 6),
-                        Text('Inflow', style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '৳ ${_formatAmount(inflow)}',
-                      style: const TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
+            _buildVelocityCard(
+              context: context,
+              isInflow: true,
+              amount: (inflow is num) ? inflow.toDouble() : (double.tryParse(inflow.toString()) ?? 0.0),
+              onTap: () {
+                debugPrint('[Suite] Tapped Inflow card');
+                _showVelocityBreakdown(
+                  context,
+                  direction: 'in',
+                  totalAmount: (inflow is num) ? inflow.toDouble() : (double.tryParse(inflow.toString()) ?? 0.0),
+                  rangeLabel: _selectedPeriod,
+                );
+              },
             ),
             const SizedBox(width: 12),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.arrow_upward_rounded, size: 16, color: Color(0xFFEF4444)),
-                        SizedBox(width: 6),
-                        Text('Outflow', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '৳ ${_formatAmount(outflow)}',
-                      style: const TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
+            _buildVelocityCard(
+              context: context,
+              isInflow: false,
+              amount: (outflow is num) ? outflow.toDouble() : (double.tryParse(outflow.toString()) ?? 0.0),
+              onTap: () {
+                debugPrint('[Suite] Tapped Outflow card');
+                _showVelocityBreakdown(
+                  context,
+                  direction: 'out',
+                  totalAmount: (outflow is num) ? outflow.toDouble() : (double.tryParse(outflow.toString()) ?? 0.0),
+                  rangeLabel: _selectedPeriod,
+                );
+              },
             ),
           ],
         ),
@@ -385,75 +912,20 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.5,
+              childAspectRatio: 2.1,
             ),
             itemCount: concernsList.length,
-            itemBuilder: (ctx, i) {
-              final c = concernsList[i];
-              final name = c['name'] ?? 'Concern';
-              final code = (c['code'] ?? '').toString().toUpperCase();
-              final membersCount = c['totalMembers'] ?? 0;
-              final balance = c['totalBalance'] ?? 0.0;
-
-              return InkWell(
-                onTap: () => _showConcernDetailsModal(context, c['id'], name),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 28,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              code.isNotEmpty ? code : 'TDC',
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        '$membersCount Members • ৳ ${_formatAmount(balance)}',
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+            itemBuilder: (context, index) => _buildDashboardConcernCard(context, concernsList[index]),
           ),
 
         const SizedBox(height: 24),
         const Text(
-          'Top Cash Holders',
+          'Managers by Liquidity',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
         ),
         const SizedBox(height: 4),
         const Text(
-          'Highest cash balance first',
+          'Sorted descending by personal cash-in-hand',
           style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
         ),
         const SizedBox(height: 12),
@@ -472,15 +944,18 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
               final m = leaderboard[i];
               final rank = m['rank'] ?? (i + 1);
               final name = m['name'] ?? 'Manager';
-              final handle = m['handle'] ?? '';
-              final designation = m['designation'] ?? 'Manager';
               final personalBalance = m['personalBalance'] ?? 0.0;
-              final sharePercentage = m['sharePercentage'] ?? 0.0;
+              final comps = (m['companies'] as List? ?? []);
+              final concernName = comps.isNotEmpty ? (comps[0]['name'] ?? comps[0]['code'] ?? '') : '';
 
               Color rankColor = const Color(0xFF0F172A);
-              if (rank == 1) rankColor = const Color(0xFFF59E0B);
-              else if (rank == 2) rankColor = const Color(0xFF64748B);
-              else if (rank == 3) rankColor = const Color(0xFFB45309);
+              if (rank == 1) {
+                rankColor = const Color(0xFFF59E0B);
+              } else if (rank == 2) {
+                rankColor = const Color(0xFF64748B);
+              } else if (rank == 3) {
+                rankColor = const Color(0xFFB45309);
+              }
 
               return Container(
                 padding: const EdgeInsets.all(14),
@@ -509,28 +984,18 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Text(name, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                                child: Text(designation, style: const TextStyle(color: Color(0xFF475569), fontSize: 10, fontWeight: FontWeight.w600)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text('@$handle', style: const TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 6),
-                          Text('${sharePercentage.toStringAsFixed(1)}% of total cash', style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                          Text(name, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
+                          if (concernName.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(concernName, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                          ],
                         ],
                       ),
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('৳ ${_formatAmount(personalBalance)}', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
+                        Text('৳ ${_formatAmount(personalBalance)}', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ],
@@ -567,6 +1032,42 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
       ),
     );
   }
+
+  Widget _buildConcernBadge(dynamic data) {
+    String badgeText = '';
+
+    if (data is Map) {
+      if (data['concernBadge'] != null && data['concernBadge'].toString().isNotEmpty) {
+        badgeText = data['concernBadge'].toString();
+      } else if (data['companyCodes'] is List && (data['companyCodes'] as List).isNotEmpty) {
+        badgeText = (data['companyCodes'] as List).join(' • ');
+      } else if (data['companyCode'] != null) {
+        badgeText = data['companyCode'].toString();
+      }
+    }
+
+    // Strip any accidental brackets
+    badgeText = badgeText.replaceAll('[', '').replaceAll(']', '').trim();
+    if (badgeText.isEmpty) badgeText = 'TDC';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        badgeText,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildManageTab(BuildContext context, AppState app) {
     final concerns = app.concerns;
@@ -656,11 +1157,13 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
             );
           }),
 
+        
+
         const SizedBox(height: 24),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Managing Accounts (${managers.length})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            Text('Managers (${managers.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             ElevatedButton.icon(
               onPressed: () => _showAddManagerModal(context),
               icon: const Icon(Icons.add, size: 16),
@@ -693,13 +1196,9 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                           children: [
                             Row(
                               children: [
-                                Text(m['name'] ?? '', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
+                                Text(m['name'] ?? 'Manager', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
                                 const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(4)),
-                                  child: const Text('MANAGER', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                                ),
+                                _buildConcernBadge(m),
                               ],
                             ),
                             const SizedBox(height: 2),
@@ -707,23 +1206,26 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                           ],
                         ),
                       ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Text(
+                          '৳ ${_formatAmount(m['balance'])}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF16A34A),
+                          ),
+                        ),
+                      ),
                       IconButton(icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)), onPressed: () => _showEditManagerModal(context, m)),
                       IconButton(icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)), onPressed: () => _confirmDeleteManager(context, mId)),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  if (compList.isNotEmpty)
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: compList.map<Widget>((comp) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                          child: Text(comp['code'] ?? comp['name'] ?? '', style: const TextStyle(color: Color(0xFF475569), fontSize: 11, fontWeight: FontWeight.w600)),
-                        );
-                      }).toList(),
-                    ),
                   const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -756,103 +1258,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Managing Accounts (${managers.length})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            ElevatedButton.icon(
-              onPressed: () => _showAddManagerModal(context),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add Manager'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (managers.isEmpty)
-          const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('No managers found.', style: TextStyle(color: Color(0xFF64748B))))
-        else
-          ...managers.map((m) {
-            final mId = m['id'] ?? '';
-            final isVis = _revealedPasswordManagerIds.contains(mId);
-            final rawPwd = m['rawPassword'] ?? '••••••••';
-            final compList = (m['companies'] as List? ?? []);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(m['name'] ?? '', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(4)),
-                                  child: const Text('MANAGER', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text('@${m['handle'] ?? ''}', style: const TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                      IconButton(icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)), onPressed: () => _showEditManagerModal(context, m)),
-                      IconButton(icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)), onPressed: () => _confirmDeleteManager(context, mId)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (compList.isNotEmpty)
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: compList.map<Widget>((comp) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                          child: Text(comp['code'] ?? comp['name'] ?? '', style: const TextStyle(color: Color(0xFF475569), fontSize: 11, fontWeight: FontWeight.w600)),
-                        );
-                      }).toList(),
-                    ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
-                    child: Row(
-                      children: [
-                        const Text('Password: ', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                        Expanded(child: Text(isVis ? rawPwd : '••••••••', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace'))),
-                        InkWell(
-                          onTap: () => setState(() => isVis ? _revealedPasswordManagerIds.remove(mId) : _revealedPasswordManagerIds.add(mId)),
-                          child: Icon(isVis ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
-                        ),
-                        const SizedBox(width: 12),
-                        InkWell(
-                          onTap: () {
-                            Clipboard.setData(ClipboardData(text: rawPwd));
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password copied')));
-                          },
-                          child: const Icon(Icons.copy_rounded, size: 16, color: Color(0xFF64748B)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Employee Accounts (${employees.length} Staff)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            Text('Employees (${employees.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
           ],
         ),
         const SizedBox(height: 12),
@@ -880,19 +1286,20 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                           children: [
                             Row(
                               children: [
-                                Text(e['name'] ?? '', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
-                                if (compCode.isNotEmpty) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(4)),
-                                    child: Text('[$compCode]', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
+                                Text(e['name'] ?? 'Staff', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 8),
+                                _buildConcernBadge(e),
                               ],
                             ),
                             const SizedBox(height: 2),
-                            Text('@${e['handle'] ?? ''} • ${e['designation'] ?? 'Staff'}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                            Text(
+                              '@${e['handle'] ?? ''} • ${e['designation'] ?? 'Staff'} • Managed by ${e['managerName'] ?? 'Manager'}',
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
                       ),
@@ -1040,6 +1447,154 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
     );
   }
 
+  Widget _buildDashboardConcernCard(BuildContext context, Map<String, dynamic> c) {
+    final code = c['code']?.toString() ?? 'CORP';
+    final name = c['name']?.toString() ?? 'Unnamed';
+    final totalBalance = c['totalBalance'] ?? 0.0;
+    final membersCount = c['totalMembers'] ?? 0;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => _showConcernDetailsModal(context, c['id'] ?? '', name),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    code,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '৳ ${_formatAmount(totalBalance)}',
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '$membersCount Members',
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildMemberCard(String name, String handle, String designation, double balance, bool isManager) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isManager ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isManager ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
+          width: isManager ? 1.5 : 1.0,
+        ),
+        boxShadow: isManager
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                )
+              ]
+            : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Color(0xFF0F172A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${handle.isNotEmpty ? '@$handle • ' : ''}$designation',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isManager ? const Color(0xFF92400E) : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '৳ ${balance.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Color(0xFF16A34A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showConcernDetailsModal(BuildContext context, String concernId, String concernName) async {
     showDialog(
       context: context,
@@ -1055,7 +1610,20 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         final concern = data['concern'] ?? {};
-        final members = (data['members'] as List? ?? []);
+        final sortedMembers = List<Map<String, dynamic>>.from(
+          (data['members'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
+        );
+
+        // Sort: Managers at the top, then alphabetically by name
+        sortedMembers.sort((a, b) {
+          final aRole = (a['role'] ?? a['designation'] ?? '').toString().toUpperCase();
+          final bRole = (b['role'] ?? b['designation'] ?? '').toString().toUpperCase();
+          final aIsManager = aRole.contains('MANAGER');
+          final bIsManager = bRole.contains('MANAGER');
+          if (aIsManager && !bIsManager) return -1;
+          if (!aIsManager && bIsManager) return 1;
+          return (a['name']?.toString() ?? '').compareTo(b['name']?.toString() ?? '');
+        });
 
         if (mounted) {
           showModalBottomSheet(
@@ -1092,32 +1660,21 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                     const Text('Assigned Members', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                     const SizedBox(height: 12),
                     Expanded(
-                      child: members.isEmpty
+                      child: sortedMembers.isEmpty
                           ? const Center(child: Text('No assigned members.', style: TextStyle(color: Color(0xFF64748B))))
-                          : ListView.separated(
+                          : ListView.builder(
                               controller: controller,
-                              itemCount: members.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              itemCount: sortedMembers.length,
                               itemBuilder: (_, i) {
-                                final mem = members[i];
-                                return Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(mem['name'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                            Text('@${mem['handle'] ?? ''} • ${mem['designation'] ?? mem['role'] ?? ''}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                                          ],
-                                        ),
-                                      ),
-                                      Text('৳ ${_formatAmount(mem['balance'])}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-                                    ],
-                                  ),
-                                );
+                                final item = sortedMembers[i];
+                                final roleStr = (item['role'] ?? item['designation'] ?? '').toString().toUpperCase();
+                                final isManager = roleStr.contains('MANAGER');
+                                final name = item['name']?.toString() ?? 'Member';
+                                final handle = item['handle']?.toString() ?? '';
+                                final designation = item['designation']?.toString() ?? (isManager ? 'Manager' : 'Team Member');
+                                final balance = double.tryParse(item['balance']?.toString() ?? '0') ?? 0.0;
+
+                                return _buildMemberCard(name, handle, designation, balance, isManager);
                               },
                             ),
                     ),
