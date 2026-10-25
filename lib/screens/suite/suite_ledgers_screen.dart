@@ -284,52 +284,63 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                       ),
                     ],
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () => _showCreateLedgerSheet(context),
-                    icon: const Icon(Icons.add, size: 18, color: Colors.white),
-                    label: const Text(
-                      'Add Ledger',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                  Container(
+                    height: 40,
+                    width: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F172A),
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    child: IconButton(
+                      onPressed: () => _showCreateLedgerSheet(context),
+                      icon: const Icon(Icons.add, size: 20, color: Colors.white),
+                      padding: EdgeInsets.zero,
                     ),
                   ),
                 ],
               ),
             ),
 
-            // Deep Obsidian Glass Search Bar
+            // Off-White Search Bar
             Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 14),
               decoration: BoxDecoration(
-                color: const Color(0xFF000000), // Pure Black
-                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xFFF1F5F9), // Clean soft off-white / slate 100
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.09),
+                  color: const Color(0xFFE2E8F0), // Subtle light border
                   width: 1.0,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
               ),
               child: TextField(
                 controller: _searchCtrl,
                 onChanged: (val) { setState(() => _searchQuery = val.trim().toLowerCase()); _loadLedgers(); },
-                style: const TextStyle(color: Colors.white, fontSize: 13),
+                style: const TextStyle(
+                  color: Color(0xFF0F172A), // Crisp dark text
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
                 decoration: const InputDecoration(
                   hintText: 'Search Ledger By Name',
-                  hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-                  prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                  hintStyle: TextStyle(
+                    color: Color(0xFF94A3B8), // Muted placeholder
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: Color(0xFF64748B),
+                    size: 20,
+                  ),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 13, horizontal: 16),
+                  contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                 ),
               ),
             ),
