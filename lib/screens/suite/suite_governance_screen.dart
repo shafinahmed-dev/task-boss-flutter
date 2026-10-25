@@ -1448,33 +1448,40 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
   }
 
   Widget _buildDashboardConcernCard(BuildContext context, Map<String, dynamic> c) {
-    final code = c['code']?.toString() ?? 'CORP';
-    final name = c['name']?.toString() ?? 'Unnamed';
-    final totalBalance = c['totalBalance'] ?? 0.0;
-    final membersCount = c['totalMembers'] ?? 0;
+    final name = c['name']?.toString() ?? 'Concern';
+    final code = (c['code'] != null && c['code'].toString().isNotEmpty)
+        ? c['code'].toString()
+        : name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(3).join();
+    final memberCount = (c['totalMembers'] as num? ?? c['memberCount'] as num? ?? c['userCount'] as num? ?? 0).toInt();
+    final balance = (c['totalBalance'] as num? ?? c['balance'] as num? ?? 0).toDouble();
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => _showConcernDetailsModal(context, c['id'] ?? '', name),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.0,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => _showConcernDetailsModal(context, c['id'] ?? '', name),
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            // 1. Header Row: [CODE] Badge + Concern Name (Left) | 👥 X Members (Right)
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
@@ -1483,11 +1490,12 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    code,
+                    code.toUpperCase(),
                     style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
                       color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ),
@@ -1495,37 +1503,70 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                 Expanded(
                   child: Text(
                     name,
-                    style: const TextStyle(
-                      color: Color(0xFF0F172A),
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.2,
+                    ),
                   ),
+                ),
+                const SizedBox(width: 6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.people_alt_outlined,
+                      size: 13,
+                      color: Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      memberCount == 1 ? '1 Member' : '$memberCount Members',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '৳ ${_formatAmount(totalBalance)}',
-              style: const TextStyle(
-                color: Color(0xFF0F172A),
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '$membersCount Members',
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
+
+            const SizedBox(height: 14),
+
+            // 2. Left-Aligned Balance Section: Micro-label + Formatted BDT
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'TOTAL HOLDING',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    formatBdt(balance),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
