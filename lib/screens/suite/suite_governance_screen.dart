@@ -829,7 +829,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Financial Velocity',
+              'Money Flow',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
             ),
           ],
