@@ -809,7 +809,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Tap to view total fund',
+                          'Tap to view all transactions',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w400,
