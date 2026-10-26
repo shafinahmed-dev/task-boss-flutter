@@ -1,6 +1,17 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../../services/app_state.dart';
+
+String formatBdt(num value) {
+  final formatter = NumberFormat.currency(
+    locale: 'en_IN',
+    symbol: '৳ ',
+    decimalDigits: 2,
+  );
+  return formatter.format(value);
+}
 
 class SuiteTransactionsScreen extends StatefulWidget {
   const SuiteTransactionsScreen({super.key});
@@ -497,72 +508,140 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
             ],
           ),
           Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildFloatingSummaryDeck(
+              inflow: liveInflow,
+              outflow: liveOutflow,
+              onExport: () => _exportPdf(filteredTransactions, liveInflow, liveOutflow),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingSummaryDeck({
+    required double inflow,
+    required double outflow,
+    required VoidCallback onExport,
+  }) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
-                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF0F172A).withValues(alpha: 0.88),
+                    const Color(0xFF020617).withValues(alpha: 0.92),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1.0,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Inflow',
-                          style: TextStyle(
-                              color: Color(0xFF94A3B8), fontSize: 10)),
+                      const Text(
+                        'INFLOW',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
                       Text(
-                        "+৳ ${liveInflow.toStringAsFixed(2)}",
+                        '+৳ ${formatBdt(inflow)}',
                         style: const TextStyle(
-                            color: Color(0xFF10B981),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: Color(0xFF10B981),
+                        ),
                       ),
                     ],
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () => _exportPdf(
-                        filteredTransactions, liveInflow, liveOutflow),
-                    icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
-                    label: const Text('Export PDF',
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF0F172A),
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onExport,
+                      borderRadius: BorderRadius.circular(22),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.16),
+                            width: 1.0,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.download_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const Text('Outflow',
-                          style: TextStyle(
-                              color: Color(0xFF94A3B8), fontSize: 10)),
+                      const Text(
+                        'OUTFLOW',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
                       Text(
-                        "-৳ ${liveOutflow.toStringAsFixed(2)}",
+                        '-৳ ${formatBdt(outflow)}',
                         style: const TextStyle(
-                            color: Color(0xFFEF4444),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: Color(0xFFF43F5E),
+                        ),
                       ),
                     ],
                   ),
@@ -570,7 +649,7 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
