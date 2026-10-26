@@ -1140,7 +1140,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
 
   Widget _buildSlimConcernRow(BuildContext context, Map<String, dynamic> c) {
     final name = c['name']?.toString() ?? 'Concern';
-    final code = c['code']?.toString() ?? 'CORP';
+    final code = (c['code'] != null && c['code'].toString().isNotEmpty) ? c['code'].toString() : 'CORP';
     final memberCount = (c['memberCount'] as num? ?? c['userCount'] as num? ?? 0).toInt();
     final balance = (c['balance'] as num? ?? c['totalBalance'] as num? ?? 0).toDouble();
 
@@ -1161,15 +1161,30 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  formatBdt(balance),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF059669),
+                  ),
+                ),
+              ],
             ),
           ),
           Text(
-            '$memberCount Members • ${formatBdt(balance)}',
+            '$memberCount Members',
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
           ),
           const SizedBox(width: 8),
@@ -1210,7 +1225,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                   const SizedBox(height: 2),
                   Text(
                     '@$handle',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                   ),
                 ],
               ],
@@ -1270,8 +1285,8 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(Icons.lock_reset_rounded, size: 18, color: Color(0xFF64748B)),
-            onPressed: () => _showChangePasswordModal(context, e['id'] ?? '', name),
+            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+            onPressed: () => _showEditEmployeeModal(context, e),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
@@ -1814,6 +1829,20 @@ void _showAccountBottomSheet(BuildContext context) {
                 child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
+            const SizedBox(height: 10),
+            Center(
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _confirmDeleteConcern(context, concern['id']?.toString() ?? '');
+                },
+                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                label: const Text(
+                  'Delete Concern',
+                  style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -2002,6 +2031,20 @@ void _showAccountBottomSheet(BuildContext context) {
                       child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _confirmDeleteManager(context, manager['id']?.toString() ?? '');
+                      },
+                      icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                      label: const Text(
+                        'Delete Manager',
+                        style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -2032,6 +2075,120 @@ void _showAccountBottomSheet(BuildContext context) {
       ),
     );
   }
+
+  void _showEditEmployeeModal(BuildContext context, Map<String, dynamic> employee) {
+    final nameController = TextEditingController(text: employee['name']);
+    final handle = employee['handle']?.toString() ?? '';
+    final prefix = handle.contains('.') ? handle.split('.')[0] : handle;
+    final handleController = TextEditingController(text: prefix);
+    final passwordController = TextEditingController();
+    final designationController = TextEditingController(text: employee['designation']);
+
+    // Find assigned concern id if any
+    final existingCompanyId = employee['companyId']?.toString() ?? (employee['companies'] is List && (employee['companies'] as List).isNotEmpty ? employee['companies'][0]['id']?.toString() : null);
+    String? selectedCompanyId = existingCompanyId;
+    bool obscurePassword = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateModal) {
+          final app = context.watch<AppState>();
+          return Padding(
+            padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Edit Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 16),
+                  TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder())),
+                  const SizedBox(height: 12),
+                  TextField(controller: handleController, decoration: const InputDecoration(labelText: 'Handle Prefix', border: OutlineInputBorder())),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'New Password (Optional)',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                        onPressed: () => setStateModal(() => obscurePassword = !obscurePassword),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(controller: designationController, decoration: const InputDecoration(labelText: 'Designation', border: OutlineInputBorder())),
+                  const SizedBox(height: 16),
+                  const Text('Assigned Concern:', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: app.concerns.map((c) {
+                      final cId = c['id']?.toString();
+                      final isSelected = selectedCompanyId == cId;
+                      return ChoiceChip(
+                        label: Text(c['code'] ?? c['name']),
+                        selected: isSelected,
+                        onSelected: (val) {
+                          setStateModal(() {
+                            selectedCompanyId = val ? cId : null;
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          await app.updateEmployee(
+                            id: employee['id'],
+                            name: nameController.text.trim(),
+                            designation: designationController.text.trim(),
+                            handlePrefix: handleController.text.trim(),
+                            newPassword: passwordController.text.trim().isNotEmpty ? passwordController.text.trim() : null,
+                            companyId: selectedCompanyId,
+                          );
+                          if (mounted) { Navigator.pop(ctx); _loadData(); }
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                      child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _confirmDeleteManager(context, employee['id']?.toString() ?? '');
+                      },
+                      icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                      label: const Text(
+                        'Delete Employee',
+                        style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
 
   void _showChangePasswordModal(BuildContext context, String userId, String userName) {
     final passwordController = TextEditingController();
