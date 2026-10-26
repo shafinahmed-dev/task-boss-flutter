@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:task_boss/services/app_state.dart';
 
 String formatBdt(num value) {
@@ -424,30 +426,20 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
       final ledgerName = _ledger?['name']?.toString() ?? widget.initialName;
       final net = totalInflow - totalOutflow;
 
-      final buffer = StringBuffer();
-      buffer.writeln('========================================');
-      buffer.writeln('TASK GROUP -- LEDGER STATEMENT: $ledgerName');
-      buffer.writeln('========================================');
-      if (_searchQuery.isNotEmpty) {
-        buffer.writeln('Filter: "$_searchQuery"');
-      }
-      buffer.writeln('Export Date: ${DateTime.now().toLocal()}');
-      buffer.writeln('----------------------------------------');
-      buffer.writeln('Total Inflow : +BDT ${totalInflow.toStringAsFixed(2)}');
-      buffer.writeln('Total Outflow: -BDT ${totalOutflow.toStringAsFixed(2)}');
-      buffer.writeln('Net Balance  : BDT ${net.toStringAsFixed(2)}');
-      buffer.writeln('========================================\n');
-      buffer.writeln('SEGMENTS BREAKDOWN:');
-      buffer.writeln('----------------------------------------');
+      final pdf = pw.Document();
 
+      final tableData = <List<String>>[];
       for (var s in filteredSegments) {
         final sName = s['name']?.toString() ?? 'Segment';
         final sIn = double.tryParse(s['totalInflow']?.toString() ?? '0') ?? 0.0;
         final sOut = double.tryParse(s['totalOutflow']?.toString() ?? '0') ?? 0.0;
         
-        buffer.writeln('Segment: $sName');
-        buffer.writeln('  Inflow : +BDT ${sIn.toStringAsFixed(2)}');
-        buffer.writeln('  Outflow: -BDT ${sOut.toStringAsFixed(2)}');
+        tableData.add([
+          sName,
+          'Segment Total',
+          '+BDT ${sIn.toStringAsFixed(2)}',
+          '-BDT ${sOut.toStringAsFixed(2)}',
+        ]);
 
         final txns = (s['transactions'] as List?) ?? [];
         for (var t in txns) {
@@ -455,23 +447,96 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
           final amt = double.tryParse(t['amount']?.toString() ?? '0') ?? 0.0;
           final collector = t['userName'] ?? t['collectorName'] ?? '';
           final tDate = t['createdAt']?.toString() ?? t['date']?.toString() ?? '';
-          buffer.writeln('    - [$tDate] ${collector.isNotEmpty ? "$collector: " : ""}${isIn ? "+" : "-"}BDT ${amt.toStringAsFixed(2)}');
+          tableData.add([
+            tDate.isNotEmpty ? tDate : '-',
+            '   -> ${collector.isNotEmpty ? "$collector: " : ""}Transaction',
+            isIn ? '+BDT ${amt.toStringAsFixed(2)}' : '',
+            !isIn ? '-BDT ${amt.toStringAsFixed(2)}' : '',
+          ]);
         }
-        buffer.writeln('----------------------------------------');
       }
 
-      final bytes = utf8.encode(buffer.toString());
-      downloadPdfWeb(Uint8List.fromList(bytes), '${ledgerName.replaceAll(RegExp(r'\s+'), '_')}_Statement_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(28),
+          build: (pw.Context ctx) => [
+            // Header
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('TASK GROUP', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF0F172A))),
+                    pw.SizedBox(height: 2),
+                    pw.Text('Ledger Statement: $ledgerName', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    if (_searchQuery.isNotEmpty)
+                      pw.Text('Filter: "$_searchQuery"', style: const pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
+                    pw.Text('Date: ${DateTime.now().toLocal().toString().split('.').first}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 12),
+            pw.Divider(thickness: 1, color: PdfColors.grey300),
+            pw.SizedBox(height: 12),
+
+            // Summary Metric Box
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: const pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                children: [
+                  pw.Text('Total Inflow: +BDT ${totalInflow.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.green700, fontSize: 10)),
+                  pw.Text('Total Outflow: -BDT ${totalOutflow.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.red700, fontSize: 10)),
+                  pw.Text('Net Balance: BDT ${net.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF0F172A), fontSize: 10)),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 18),
+
+            // Itemized Table
+            pw.Table.fromTextArray(
+              headers: ['Date', 'Segment / Item', 'Inflow', 'Outflow'],
+              data: tableData,
+              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9),
+              headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF0F172A)),
+              cellStyle: const pw.TextStyle(fontSize: 8),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellAlignments: {
+                0: pw.Alignment.centerLeft,
+                1: pw.Alignment.centerLeft,
+                2: pw.Alignment.centerRight,
+                3: pw.Alignment.centerRight,
+              },
+            ),
+          ],
+        ),
+      );
+
+      final Uint8List pdfBytes = await pdf.save();
+      downloadPdfWeb(pdfBytes, '${ledgerName.replaceAll(RegExp(r'\s+'), '_')}_Statement_${DateTime.now().millisecondsSinceEpoch}.pdf');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Statement downloaded successfully')),
+          const SnackBar(content: Text('Statement PDF downloaded successfully')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e')),
+          SnackBar(content: Text('PDF Export failed: $e')),
         );
       }
     }
