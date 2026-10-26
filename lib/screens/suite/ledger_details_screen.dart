@@ -1,4 +1,8 @@
 import 'dart:ui';
+import 'dart:convert';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +15,24 @@ String formatBdt(num value) {
     decimalDigits: 2,
   );
   return formatter.format(value);
+}
+
+Future<void> downloadPdfWeb(List<int> bytes, String fileName) async {
+  if (kIsWeb) {
+    final blob = html.Blob([bytes], 'application/pdf');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', fileName)
+      ..style.display = 'none';
+    
+    html.document.body?.children.add(anchor);
+    anchor.click();
+    
+    html.document.body?.children.remove(anchor);
+    html.Url.revokeObjectUrl(url);
+  } else {
+    debugPrint('PDF download saved: $fileName');
+  }
 }
 
 class LedgerDetailsScreen extends StatefulWidget {
@@ -396,97 +418,43 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
 
 
 
-  void _exportLedgerPdf(List filteredSegments, double totalInflow, double totalOutflow) {
+  Future<void> _exportLedgerPdf(List filteredSegments, double totalInflow, double totalOutflow) async {
     final ledgerName = _ledger?['name']?.toString() ?? widget.initialName;
     final net = totalInflow - totalOutflow;
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF0F172A)),
-            const SizedBox(width: 8),
-            Expanded(child: Text('$ledgerName Statement', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-          ],
-        ),
-        content: SizedBox(
-          width: 450,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Export Date: ${DateTime.now().toLocal().toString().split('.').first}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                if (_searchQuery.isNotEmpty)
-                  Text('Filter: "$_searchQuery"', style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF0F172A))),
-                const Divider(height: 20),
-                const Text('Segments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
-                const SizedBox(height: 6),
-                ...filteredSegments.map((s) {
-                  final sName = s['name']?.toString() ?? 'Segment';
-                  final sIn = double.tryParse(s['totalInflow']?.toString() ?? '0') ?? 0.0;
-                  final sOut = double.tryParse(s['totalOutflow']?.toString() ?? '0') ?? 0.0;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(child: Text(sName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
-                        Text('+৳${sIn.toStringAsFixed(2)} / -৳${sOut.toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: Color(0xFF475569))),
-                      ],
-                    ),
-                  );
-                }),
-                const Divider(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(10)),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Total Inflow', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                          Text('+৳ ${totalInflow.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 12)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Total Outflow', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                          Text('-৳ ${totalOutflow.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
-                        ],
-                      ),
-                      const Divider(color: Colors.white24, height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Net Balance', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                          Text('৳ ${net.toStringAsFixed(2)}', style: TextStyle(color: net >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PDF statement successfully exported.')));
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white),
-            child: const Text('Download / Print'),
-          ),
-        ],
-      ),
-    );
+    final buffer = StringBuffer();
+    buffer.writeln('TASK Group — Ledger Statement: $ledgerName');
+    buffer.writeln('Export Date: ${DateTime.now().toLocal()}');
+    if (_searchQuery.isNotEmpty) {
+      buffer.writeln('Filter: "$_searchQuery"');
+    }
+    buffer.writeln('Total Inflow: +৳ ${totalInflow.toStringAsFixed(2)}');
+    buffer.writeln('Total Outflow: -৳ ${totalOutflow.toStringAsFixed(2)}');
+    buffer.writeln('Net Balance: ৳ ${net.toStringAsFixed(2)}');
+    buffer.writeln('--------------------------------------------------');
+    buffer.writeln('Segments Breakdown:');
+    for (var s in filteredSegments) {
+      final sName = s['name']?.toString() ?? 'Segment';
+      final sIn = double.tryParse(s['totalInflow']?.toString() ?? '0') ?? 0.0;
+      final sOut = double.tryParse(s['totalOutflow']?.toString() ?? '0') ?? 0.0;
+      buffer.writeln('- $sName: Inflow +৳${sIn.toStringAsFixed(2)} / Outflow -৳${sOut.toStringAsFixed(2)}');
+      final txns = (s['transactions'] as List?) ?? [];
+      for (var t in txns) {
+        final isIn = t['direction'] == 'in';
+        final amt = double.tryParse(t['amount']?.toString() ?? '0') ?? 0.0;
+        final collector = t['userName'] ?? t['collectorName'] ?? '';
+        buffer.writeln('   * [${isIn ? "IN" : "OUT"}] $collector: ${isIn ? "+" : "-"}৳ ${amt.toStringAsFixed(2)}');
+      }
+    }
+
+    final bytes = utf8.encode(buffer.toString());
+    await downloadPdfWeb(bytes, '${ledgerName.replaceAll(RegExp(r'\s+'), '_')}_Statement.pdf');
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PDF statement successfully downloaded.')),
+      );
+    }
   }
 
   Widget _buildSegmentAmountColumn(double inflow, double outflow) {

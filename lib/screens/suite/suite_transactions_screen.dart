@@ -1,4 +1,8 @@
 import 'dart:ui';
+import 'dart:convert';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +15,24 @@ String formatBdt(num value) {
     decimalDigits: 2,
   );
   return formatter.format(value);
+}
+
+Future<void> downloadPdfWeb(List<int> bytes, String fileName) async {
+  if (kIsWeb) {
+    final blob = html.Blob([bytes], 'application/pdf');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', fileName)
+      ..style.display = 'none';
+    
+    html.document.body?.children.add(anchor);
+    anchor.click();
+    
+    html.document.body?.children.remove(anchor);
+    html.Url.revokeObjectUrl(url);
+  } else {
+    debugPrint('PDF download saved: $fileName');
+  }
 }
 
 class SuiteTransactionsScreen extends StatefulWidget {
@@ -67,27 +89,8 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
     }
   }
 
-  Widget _pdfRow(String label, String value, {Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 12, color: Color(0xFF64748B))),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: valueColor ?? const Color(0xFF0F172A))),
-        ],
-      ),
-    );
-  }
-
-  void _exportPdf(
-      List<Map<String, dynamic>> items, double inflow, double outflow) {
+  Future<void> _exportPdf(
+      List<Map<String, dynamic>> items, double inflow, double outflow) async {
     final labels = {
       'all_time': 'All Time',
       'today': 'Today',
@@ -95,102 +98,35 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
       'this_month': 'This Month',
     };
     final net = inflow - outflow;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: const Row(children: [
-          Icon(Icons.picture_as_pdf_rounded,
-              color: Color(0xFF0F172A), size: 22),
-          SizedBox(width: 8),
-          Text('Export PDF Statement',
-              style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold)),
-        ]),
-        content: SizedBox(
-          width: 340,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _pdfRow('Period', labels[_selectedPeriod] ?? 'All Time'),
-              _pdfRow('Total Transactions', "${items.length}"),
-              const Divider(height: 20),
-              _pdfRow('Total Inflow',
-                  "+৳ ${inflow.toStringAsFixed(2)}",
-                  valueColor: const Color(0xFF10B981)),
-              _pdfRow('Total Outflow',
-                  "-৳ ${outflow.toStringAsFixed(2)}",
-                  valueColor: const Color(0xFFEF4444)),
-              _pdfRow(
-                  'Net Balance',
-                  '${net >= 0 ? '+' : ''}৳ ${net.toStringAsFixed(2)}',
-                  valueColor: net >= 0
-                      ? const Color(0xFF10B981)
-                      : const Color(0xFFEF4444)),
-              if (items.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Text('Sample Entries:',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF64748B))),
-                const SizedBox(height: 6),
-                ...items.take(3).map((t) {
-                  final isIn = t['direction'] == 'in';
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(children: [
-                      Icon(
-                          isIn
-                              ? Icons.arrow_downward_rounded
-                              : Icons.arrow_upward_rounded,
-                          size: 12,
-                          color: isIn
-                              ? const Color(0xFF10B981)
-                              : const Color(0xFFEF4444)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                          child: Text(
-                              "${t['ledgerName']} • ${t['segmentName']}",
-                              style: const TextStyle(fontSize: 10),
-                              overflow: TextOverflow.ellipsis)),
-                      Text(
-                          "৳ ${(t['amount'] as num).toStringAsFixed(2)}",
-                          style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold)),
-                    ]),
-                  );
-                }),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Close')),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content:
-                      Text('PDF statement successfully exported.')));
-            },
-            icon: const Icon(Icons.download_rounded, size: 16),
-            label: const Text('Download / Print'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F172A),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-        ],
-      ),
-    );
+    final periodStr = labels[_selectedPeriod] ?? 'All Time';
+
+    final buffer = StringBuffer();
+    buffer.writeln('TASK Group — Transaction Statement');
+    buffer.writeln('Period: $periodStr');
+    buffer.writeln('Export Date: ${DateTime.now().toLocal()}');
+    buffer.writeln('Total Transactions: ${items.length}');
+    buffer.writeln('Total Inflow: +৳ ${inflow.toStringAsFixed(2)}');
+    buffer.writeln('Total Outflow: -৳ ${outflow.toStringAsFixed(2)}');
+    buffer.writeln('Net Balance: ${net >= 0 ? '+' : ''}৳ ${net.toStringAsFixed(2)}');
+    buffer.writeln('--------------------------------------------------');
+    buffer.writeln('Itemized Entries:');
+    for (var t in items) {
+      final isIn = t['direction'] == 'in';
+      final ledgerName = t['ledgerName'] ?? '';
+      final segmentName = t['segmentName'] ?? '';
+      final amt = (t['amount'] as num).toDouble();
+      final dt = t['createdAt'] ?? t['date'] ?? '';
+      buffer.writeln('[${isIn ? "IN" : "OUT"}] $ledgerName • $segmentName: ${isIn ? "+" : "-"}৳ ${amt.toStringAsFixed(2)} ($dt)');
+    }
+
+    final bytes = utf8.encode(buffer.toString());
+    await downloadPdfWeb(bytes, 'TaskGroup_Transactions_${_selectedPeriod}.pdf');
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PDF statement successfully downloaded.')),
+      );
+    }
   }
 
   @override
