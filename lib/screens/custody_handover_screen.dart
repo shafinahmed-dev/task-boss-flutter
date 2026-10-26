@@ -68,7 +68,11 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
         rawList = rawData is List ? rawData : (rawData['custodians'] ?? rawData['data'] ?? []);
       }
       
-      final currentId = app.user?.id?.toString() ?? '';
+      final currentUserId = app.user?.id ?? app.user?.userId;
+      debugPrint('CURRENT LOGGED IN USER: $currentUserId');
+      debugPrint('RAW USERS RECEIVED: ${rawList.length}');
+
+      final currentId = currentUserId?.toString();
       final currentUserName = (app.user?.name ?? '').trim().toLowerCase();
 
       // Load all active personnel across the organization, excluding self and suite admin (do not restrict by concern)
@@ -80,13 +84,15 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
 
         if (uType == 'company' || uName.contains('root')) return false;
         // Exclude self
-        if (currentId.isNotEmpty && (uId == currentId || u['id']?.toString() == currentId)) return false;
+        if (currentId != null && currentId.isNotEmpty && (uId == currentId || u['id']?.toString() == currentId)) return false;
         if (currentUserName.isNotEmpty && uName == currentUserName) return false;
         // Exclude suite/admin roles
         if (role == 'suite' || role == 'admin') return false;
         
         return true;
       }).toList();
+
+      debugPrint('ELIGIBLE HANDOVER USERS: ${eligibleRecipients.length}');
 
       eligibleRecipients.sort((a, b) {
         final aRole = (a['role'] ?? a['user']?['role'] ?? a['linkedUser']?['role'] ?? '').toString().toUpperCase();

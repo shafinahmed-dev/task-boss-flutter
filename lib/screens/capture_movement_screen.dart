@@ -43,6 +43,52 @@ class _CaptureState extends State<CaptureMovementScreen> {
   String get _tab => _flowType == 'INFLOW' ? 'in' : 'out';
 
   Map<String, dynamic>? _lastSavedReceipt;
+  List<dynamic> _eligibleUsers = [];
+  bool _loadingEligibleUsers = false;
+
+  Future<void> _fetchEligibleUsers() async {
+    final app = context.read<AppState>();
+    if (app.user == null) return;
+    setState(() {
+      _loadingEligibleUsers = true;
+    });
+    try {
+      final res = await app.authRequest('GET', Uri.parse('${app.apiBaseUrl}/custody/custodians?companyId=${app.user!.companyId}'));
+      List<dynamic> rawUsers = [];
+      if (res.statusCode == 200) {
+        final rawData = jsonDecode(res.body);
+        rawUsers = rawData is List ? rawData : (rawData['custodians'] ?? rawData['data'] ?? []);
+      }
+
+      final currentUserId = app.user?.id ?? app.user?.userId;
+      debugPrint('CURRENT LOGGED IN USER: $currentUserId');
+      debugPrint('RAW USERS RECEIVED: ${rawUsers.length}');
+
+      final currentId = currentUserId?.toString();
+
+      _eligibleUsers = rawUsers.where((u) {
+        final uId = u['id']?.toString() ?? u['userId']?.toString() ?? u['user']?['id']?.toString();
+        final role = u['role']?.toString().toLowerCase() ?? u['user']?['role']?.toString().toLowerCase() ?? '';
+
+        // Exclude self and suite admin
+        if (uId == null || uId == currentId) return false;
+        if (role == 'suite' || role == 'admin') return false;
+
+        return true;
+      }).toList();
+
+      debugPrint('ELIGIBLE HANDOVER USERS: ${_eligibleUsers.length}');
+    } catch (e) {
+      debugPrint('_fetchEligibleUsers error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingEligibleUsers = false;
+        });
+      }
+    }
+  }
+
 
   @override
   void initState() {
