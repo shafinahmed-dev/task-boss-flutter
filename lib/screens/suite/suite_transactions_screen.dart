@@ -1,11 +1,14 @@
 import 'dart:ui';
 import 'dart:convert';
+import 'dart:typed_data';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import '../../services/app_state.dart';
 
 String formatBdt(num value) {
@@ -17,7 +20,7 @@ String formatBdt(num value) {
   return formatter.format(value);
 }
 
-Future<void> downloadPdfWeb(List<int> bytes, String fileName) async {
+void downloadPdfWeb(Uint8List bytes, String fileName) {
   if (kIsWeb) {
     final blob = html.Blob([bytes], 'application/pdf');
     final url = html.Url.createObjectUrlFromBlob(blob);
@@ -91,41 +94,104 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
 
   Future<void> _exportPdf(
       List<Map<String, dynamic>> items, double inflow, double outflow) async {
-    final labels = {
-      'all_time': 'All Time',
-      'today': 'Today',
-      'this_week': 'This Week',
-      'this_month': 'This Month',
-    };
-    final net = inflow - outflow;
-    final periodStr = labels[_selectedPeriod] ?? 'All Time';
+    try {
+      final labels = {
+        'all_time': 'All Time',
+        'today': 'Today',
+        'this_week': 'This Week',
+        'this_month': 'This Month',
+      };
+      final periodStr = labels[_selectedPeriod] ?? 'All Time';
+      final net = inflow - outflow;
 
-    final buffer = StringBuffer();
-    buffer.writeln('TASK Group — Transaction Statement');
-    buffer.writeln('Period: $periodStr');
-    buffer.writeln('Export Date: ${DateTime.now().toLocal()}');
-    buffer.writeln('Total Transactions: ${items.length}');
-    buffer.writeln('Total Inflow: +৳ ${inflow.toStringAsFixed(2)}');
-    buffer.writeln('Total Outflow: -৳ ${outflow.toStringAsFixed(2)}');
-    buffer.writeln('Net Balance: ${net >= 0 ? '+' : ''}৳ ${net.toStringAsFixed(2)}');
-    buffer.writeln('--------------------------------------------------');
-    buffer.writeln('Itemized Entries:');
-    for (var t in items) {
-      final isIn = t['direction'] == 'in';
-      final ledgerName = t['ledgerName'] ?? '';
-      final segmentName = t['segmentName'] ?? '';
-      final amt = (t['amount'] as num).toDouble();
-      final dt = t['createdAt'] ?? t['date'] ?? '';
-      buffer.writeln('[${isIn ? "IN" : "OUT"}] $ledgerName • $segmentName: ${isIn ? "+" : "-"}৳ ${amt.toStringAsFixed(2)} ($dt)');
-    }
+      final pdf = pw.Document();
 
-    final bytes = utf8.encode(buffer.toString());
-    await downloadPdfWeb(bytes, 'TaskGroup_Transactions_${_selectedPeriod}.pdf');
+      final tableData = items.map((tx) {
+        final date = tx['createdAt']?.toString() ?? tx['date']?.toString() ?? '';
+        final ledger = tx['ledgerName']?.toString() ?? '';
+        final segment = tx['segmentName']?.toString() ?? '';
+        final desc = tx['description']?.toString() ?? '';
+        final isInflow = tx['direction']?.toString() == 'in';
+        final amount = (tx['amount'] as num? ?? 0.0).toDouble();
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PDF statement successfully downloaded.')),
+        return [
+          date,
+          '$ledger • $segment${desc.isNotEmpty ? ' ($desc)' : ''}',
+          isInflow ? '+BDT ${amount.toStringAsFixed(2)}' : '',
+          !isInflow ? '-BDT ${amount.toStringAsFixed(2)}' : '',
+        ];
+      }).toList();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (pw.Context ctx) => [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('TASK GROUP', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('Suite Financial Transaction Statement', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text('Period: $periodStr', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                    pw.Text('Total Records: ${items.length}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                    pw.Text('Date: ${DateTime.now().toLocal().toString().split('.').first}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 12),
+            pw.Divider(thickness: 1, color: PdfColors.grey300),
+            pw.SizedBox(height: 12),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+              children: [
+                pw.Text('Total Inflow: +BDT ${inflow.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.green700)),
+                pw.Text('Total Outflow: -BDT ${outflow.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.red700)),
+                pw.Text('Net: BDT ${net.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              ],
+            ),
+            pw.SizedBox(height: 16),
+            pw.Table.fromTextArray(
+              headers: ['Date', 'Ledger • Segment (Description)', 'Inflow', 'Outflow'],
+              data: tableData,
+              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 10),
+              headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF0F172A)),
+              cellStyle: const pw.TextStyle(fontSize: 9),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellAlignments: {
+                0: pw.Alignment.centerLeft,
+                1: pw.Alignment.centerLeft,
+                2: pw.Alignment.centerRight,
+                3: pw.Alignment.centerRight,
+              },
+            ),
+          ],
+        ),
       );
+
+      final Uint8List pdfBytes = await pdf.save();
+      downloadPdfWeb(pdfBytes, 'TASK_Group_Transactions_${_selectedPeriod}_${DateTime.now().millisecondsSinceEpoch}.pdf');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Statement PDF downloaded successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
     }
   }
 
