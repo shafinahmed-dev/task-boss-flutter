@@ -388,17 +388,17 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF0F172A), // Slate 900
-            Color(0xFF020617), // Deep pitch obsidian
+            Color(0xFF0F172A), // Deep Slate 900
+            Color(0xFF030712), // Deep Obsidian Black
           ],
         ),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: Colors.white.withValues(alpha: 0.10),
           width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.22),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -408,24 +408,24 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
         borderRadius: BorderRadius.circular(20),
         child: Stack(
           children: [
-            // 1. Bottom-Right Faint Ledger Watermark
+            // 1. Watermark: Semi-visible tilted book icon
             Positioned(
-              right: 14,
-              bottom: -6,
+              right: 8,
+              bottom: -10,
               child: IgnorePointer(
                 child: Icon(
                   Icons.menu_book_rounded,
-                  size: 80,
-                  color: Colors.white.withValues(alpha: 0.03),
+                  size: 96,
+                  color: Colors.white.withValues(alpha: 0.04),
                 ),
               ),
             ),
 
-            // 2. Left Glowing Accent Line
+            // 2. Left Neon Accent Bar with Glow
             Positioned(
               left: 0,
-              top: 16,
-              bottom: 16,
+              top: 14,
+              bottom: 14,
               width: 4,
               child: Container(
                 decoration: BoxDecoration(
@@ -433,8 +433,8 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                   color: isSpecial ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
                   boxShadow: [
                     BoxShadow(
-                      color: (isSpecial ? const Color(0xFFF59E0B) : const Color(0xFF10B981)).withValues(alpha: 0.5),
-                      blurRadius: 6,
+                      color: (isSpecial ? const Color(0xFFF59E0B) : const Color(0xFF10B981)).withValues(alpha: 0.6),
+                      blurRadius: 8,
                     ),
                   ],
                 ),
@@ -491,56 +491,78 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                     ),
                     const SizedBox(width: 14),
 
-                    // Inflow & Outflow Telemetry
+                    // Luminous Frosted Telemetry Pills (Matches Dashboard Money Flow)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              'INFLOW  ',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                                color: Color(0xFF64748B),
-                              ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                              width: 1,
                             ),
-                            Text(
-                              '+${formatBdt(inflow)}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF10B981), // Emerald Green
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (outflow > 0) ...[
-                          const SizedBox(height: 4),
-                          Row(
+                          ),
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Text(
-                                'OUTFLOW  ',
+                                'INFLOW  ',
                                 style: TextStyle(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.5,
-                                  color: Color(0xFF64748B),
+                                  color: Color(0xFF6EE7B7),
                                 ),
                               ),
                               Text(
-                                '-${formatBdt(outflow)}',
+                                '+${formatBdt(inflow)}',
                                 style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFFF43F5E), // Rose Red
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF34D399),
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                        if (outflow > 0) ...[
+                          const SizedBox(height: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF43F5E).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFFF43F5E).withValues(alpha: 0.25),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  'OUTFLOW  ',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                    color: Color(0xFFFDA4AF),
+                                  ),
+                                ),
+                                Text(
+                                  '-${formatBdt(outflow)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFFB7185),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ],
@@ -555,73 +577,5 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
     );
   }
 
-  Widget _buildLedgerBalanceColumn(double inflow, double outflow) {
-    final hasInflow = inflow > 0;
-    final hasOutflow = outflow > 0;
 
-    if (!hasInflow && !hasOutflow) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            formatBdt(0),
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF64748B),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (hasInflow) ...[
-          const Text(
-            'INFLOW',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-              color: Color(0xFF64748B),
-            ),
-          ),
-          Text(
-            '+${formatBdt(inflow)}',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.2,
-              color: Color(0xFF34D399), // Mint Emerald
-            ),
-          ),
-        ],
-        if (hasInflow && hasOutflow) const SizedBox(height: 6),
-        if (hasOutflow) ...[
-          const Text(
-            'OUTFLOW',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-              color: Color(0xFF64748B),
-            ),
-          ),
-          Text(
-            '-${formatBdt(outflow)}',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.2,
-              color: Color(0xFFFB7185), // Coral Rose
-            ),
-          ),
-        ],
-      ],
-    );
-  }
 }

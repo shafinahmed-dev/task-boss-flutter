@@ -1083,9 +1083,9 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1152,7 +1152,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: const Color(0xFF0F172A),
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(5),
             ),
             child: Text(
               code.toUpperCase(),
@@ -1161,33 +1161,32 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  formatBdt(balance),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF059669),
-                  ),
-                ),
-              ],
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
             ),
           ),
-          Text(
-            '$memberCount Members',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+          // Beautiful Emerald Balance Pill (consistent with other rows)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
+            ),
+            child: Text(
+              formatBdt(balance),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
+            ),
           ),
           const SizedBox(width: 8),
+          Text(
+            '$memberCount Members',
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(width: 6),
           IconButton(
             icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
             onPressed: () => _showEditConcernModal(context, c),
@@ -1351,12 +1350,12 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color(0xFF0F172A),
+                Color(0xFF0B132B),
                 Color(0xFF020617),
               ],
             ),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: Colors.white.withValues(alpha: 0.10),
               width: 1.0,
             ),
             boxShadow: [
@@ -1393,10 +1392,10 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
+                              color: Colors.white.withValues(alpha: 0.06),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.12),
+                                color: Colors.white.withValues(alpha: 0.14),
                               ),
                             ),
                             child: const Icon(Icons.security_rounded, color: Colors.white, size: 22),
@@ -1435,15 +1434,18 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: OutlinedButton.icon(
+                            child: ElevatedButton.icon(
                               onPressed: () => _showChangeSuitePasswordModal(context),
                               icon: const Icon(Icons.lock_reset_rounded, size: 16, color: Colors.white),
                               label: const Text(
                                 'Change Password',
                                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
                               ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1E293B).withValues(alpha: 0.5),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
@@ -1451,15 +1453,18 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: OutlinedButton.icon(
+                            child: ElevatedButton.icon(
                               onPressed: () => _confirmLogout(context),
                               icon: const Icon(Icons.logout_rounded, size: 16, color: Color(0xFFF43F5E)),
                               label: const Text(
                                 'Log Out',
                                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFF43F5E)),
                               ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: const Color(0xFFF43F5E).withValues(alpha: 0.3)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF43F5E).withValues(alpha: 0.08),
+                                foregroundColor: const Color(0xFFF43F5E),
+                                elevation: 0,
+                                side: BorderSide(color: const Color(0xFFF43F5E).withValues(alpha: 0.25)),
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
