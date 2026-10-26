@@ -20,6 +20,41 @@ String formatBdt(num value) {
   return formatter.format(value);
 }
 
+// Converts raw ISO timestamp (e.g. 2026-10-24T06:10:19Z) to clean "24 Oct 2026, 06:10 AM/PM"
+String _formatPdfDateTime(String? raw) {
+  if (raw == null || raw.isEmpty) return '-';
+  try {
+    final dt = DateTime.parse(raw).toLocal();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    final min = dt.minute.toString().padLeft(2, '0');
+    return '${dt.day.toString().padLeft(2, '0')}${months[dt.month - 1]} ${dt.year}\n${hour.toString().padLeft(2, '0')}:$min$ampm';
+  } catch (_) {
+    return raw.length > 10 ? raw.substring(0, 10) : raw;
+  }
+}
+
+// Formats number into South Asian comma-separated BDT: 195000.00 -> "BDT 1,95,000.00"
+String _formatPdfCurrency(num? amount, {bool showSign = false, bool isInflow = true}) {
+  if (amount == null) return 'BDT 0.00';
+  final val = amount.abs().toDouble();
+  final fixed = val.toStringAsFixed(2);
+  final parts = fixed.split('.');
+  String integer = parts[0];
+  final decimal = parts[1];
+
+  if (integer.length > 3) {
+    final last3 = integer.substring(integer.length - 3);
+    String rest = integer.substring(0, integer.length - 3);
+    rest = rest.replaceAllMapped(RegExp(r'(\d)(?=(\d{2})+(?!\d))'), (Match m) => '${m[1]},');
+    integer = '$rest,$last3';
+  }
+
+  final prefix = showSign ? (isInflow ? '+ ' : '- ') : '';
+  return '${prefix}BDT $integer.$decimal';
+}
+
 void downloadPdfWeb(Uint8List bytes, String fileName) {
   if (kIsWeb) {
     final blob = html.Blob([bytes], 'application/pdf');
@@ -426,33 +461,103 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
       final ledgerName = _ledger?['name']?.toString() ?? widget.initialName;
       final net = totalInflow - totalOutflow;
 
+      // Filter out all empty/zeroed segments where inflow == 0 and outflow == 0 and transactions count == 0
+      final activeSegments = filteredSegments.where((s) {
+        final sIn = double.tryParse(s['totalInflow']?.toString() ?? '0') ?? 0.0;
+        final sOut = double.tryParse(s['totalOutflow']?.toString() ?? '0') ?? 0.0;
+        final txns = (s['transactions'] as List?) ?? [];
+        return sIn != 0.0 || sOut != 0.0 || txns.isNotEmpty;
+      }).toList();
+
       final pdf = pw.Document();
 
-      final tableData = <List<String>>[];
-      for (var s in filteredSegments) {
+      final tableRows = <pw.TableRow>[];
+      int rowIndex = 0;
+
+      for (var s in activeSegments) {
         final sName = s['name']?.toString() ?? 'Segment';
         final sIn = double.tryParse(s['totalInflow']?.toString() ?? '0') ?? 0.0;
         final sOut = double.tryParse(s['totalOutflow']?.toString() ?? '0') ?? 0.0;
-        
-        tableData.add([
-          sName,
-          'Segment Total',
-          '+BDT ${sIn.toStringAsFixed(2)}',
-          '-BDT ${sOut.toStringAsFixed(2)}',
-        ]);
+
+        // Segment Header Row
+        tableRows.add(
+          pw.TableRow(
+            decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF1F5F9)),
+            children: [
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: pw.Text(sName, style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF0F172A))),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: pw.Text('Segment Summary', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF475569))),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: pw.Text('', style: const pw.TextStyle(fontSize: 8)),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: pw.Align(
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Text(sIn > 0 ? _formatPdfCurrency(sIn, showSign: true, isInflow: true) : '-', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF059669))),
+                ),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: pw.Align(
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Text(sOut > 0 ? _formatPdfCurrency(sOut, showSign: true, isInflow: false) : '-', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFFDC2626))),
+                ),
+              ),
+            ],
+          ),
+        );
 
         final txns = (s['transactions'] as List?) ?? [];
         for (var t in txns) {
-          final isIn = t['direction'] == 'in';
+          final dateStr = _formatPdfDateTime(t['createdAt']?.toString() ?? t['date']?.toString());
+          final isIn = t['direction']?.toString() == 'in';
           final amt = double.tryParse(t['amount']?.toString() ?? '0') ?? 0.0;
-          final collector = t['userName'] ?? t['collectorName'] ?? '';
-          final tDate = t['createdAt']?.toString() ?? t['date']?.toString() ?? '';
-          tableData.add([
-            tDate.isNotEmpty ? tDate : '-',
-            '   -> ${collector.isNotEmpty ? "$collector: " : ""}Transaction',
-            isIn ? '+BDT ${amt.toStringAsFixed(2)}' : '',
-            !isIn ? '-BDT ${amt.toStringAsFixed(2)}' : '',
-          ]);
+          final collector = t['userName']?.toString() ?? t['collectorName']?.toString() ?? '';
+          final notes = t['notes']?.toString() ?? t['description']?.toString() ?? '';
+
+          tableRows.add(
+            pw.TableRow(
+              decoration: pw.BoxDecoration(
+                color: rowIndex % 2 == 1 ? const PdfColor.fromInt(0xFFF8FAFC) : PdfColors.white,
+              ),
+              children: [
+                pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  child: pw.Text(dateStr, style: const pw.TextStyle(fontSize: 7.5, color: PdfColor.fromInt(0xFF475569))),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  child: pw.Text(notes.isNotEmpty ? notes : 'Transaction Entry', style: const pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFF0F172A))),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  child: pw.Text(collector, style: const pw.TextStyle(fontSize: 7.5, color: PdfColor.fromInt(0xFF334155))),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  child: pw.Align(
+                    alignment: pw.Alignment.centerRight,
+                    child: pw.Text(isIn ? _formatPdfCurrency(amt, showSign: true, isInflow: true) : '-', style: pw.TextStyle(fontSize: 8, color: isIn ? const PdfColor.fromInt(0xFF059669) : const PdfColor.fromInt(0xFF94A3B8))),
+                  ),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  child: pw.Align(
+                    alignment: pw.Alignment.centerRight,
+                    child: pw.Text(!isIn ? _formatPdfCurrency(amt, showSign: true, isInflow: false) : '-', style: pw.TextStyle(fontSize: 8, color: !isIn ? const PdfColor.fromInt(0xFFDC2626) : const PdfColor.fromInt(0xFF94A3B8))),
+                  ),
+                ),
+              ],
+            ),
+          );
+          rowIndex++;
         }
       }
 
@@ -461,65 +566,142 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(28),
           build: (pw.Context ctx) => [
-            // Header
+            // Corporate Header
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('TASK GROUP', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF0F172A))),
+                    pw.Text('TASK GROUP', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF0F172A))),
                     pw.SizedBox(height: 2),
-                    pw.Text('Ledger Statement: $ledgerName', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                    pw.Text('Ledger Statement: $ledgerName', style: const pw.TextStyle(fontSize: 11, color: PdfColor.fromInt(0xFF64748B))),
                   ],
                 ),
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
                     if (_searchQuery.isNotEmpty)
-                      pw.Text('Filter: "$_searchQuery"', style: const pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
-                    pw.Text('Date: ${DateTime.now().toLocal().toString().split('.').first}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                      pw.Text('Filter: "$_searchQuery"', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF0F172A))),
+                    pw.SizedBox(height: 2),
+                    pw.Text('Generated: ${_formatPdfDateTime(DateTime.now().toIso8601String()).replaceAll('\n', ' ')}', style: const pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFF64748B))),
+                    pw.Text('Active Segments: ${activeSegments.length}', style: const pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFF64748B))),
                   ],
                 ),
               ],
             ),
-            pw.SizedBox(height: 12),
-            pw.Divider(thickness: 1, color: PdfColors.grey300),
+            pw.SizedBox(height: 14),
+            pw.Divider(thickness: 1, color: const PdfColor.fromInt(0xFFE2E8F0)),
             pw.SizedBox(height: 12),
 
-            // Summary Metric Box
-            pw.Container(
-              padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: const pw.BoxDecoration(
-                color: PdfColors.grey100,
-                borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
-              ),
-              child: pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
-                children: [
-                  pw.Text('Total Inflow: +BDT ${totalInflow.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.green700, fontSize: 10)),
-                  pw.Text('Total Outflow: -BDT ${totalOutflow.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.red700, fontSize: 10)),
-                  pw.Text('Net Balance: BDT ${net.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF0F172A), fontSize: 10)),
-                ],
-              ),
+            // 3-Card KPI Summary Bar
+            pw.Row(
+              children: [
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: pw.BoxDecoration(
+                      color: const PdfColor.fromInt(0xFFECFDF5),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                      border: pw.Border.all(color: const PdfColor.fromInt(0xFFA7F3D0)),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('TOTAL INFLOW', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF059669))),
+                        pw.SizedBox(height: 3),
+                        pw.Text(_formatPdfCurrency(totalInflow), style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF065F46))),
+                      ],
+                    ),
+                  ),
+                ),
+                pw.SizedBox(width: 10),
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: pw.BoxDecoration(
+                      color: const PdfColor.fromInt(0xFFFFF1F2),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                      border: pw.Border.all(color: const PdfColor.fromInt(0xFFFECDD3)),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('TOTAL OUTFLOW', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFFE11D48))),
+                        pw.SizedBox(height: 3),
+                        pw.Text(_formatPdfCurrency(totalOutflow), style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF9F1239))),
+                      ],
+                    ),
+                  ),
+                ),
+                pw.SizedBox(width: 10),
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: pw.BoxDecoration(
+                      color: const PdfColor.fromInt(0xFFF8FAFC),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                      border: pw.Border.all(color: const PdfColor.fromInt(0xFFCBD5E1)),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('NET POSITION', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF475569))),
+                        pw.SizedBox(height: 3),
+                        pw.Text(_formatPdfCurrency(net), style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF0F172A))),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
             pw.SizedBox(height: 18),
 
-            // Itemized Table
-            pw.Table.fromTextArray(
-              headers: ['Date', 'Segment / Item', 'Inflow', 'Outflow'],
-              data: tableData,
-              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9),
-              headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF0F172A)),
-              cellStyle: const pw.TextStyle(fontSize: 8),
-              cellAlignment: pw.Alignment.centerLeft,
-              cellAlignments: {
-                0: pw.Alignment.centerLeft,
-                1: pw.Alignment.centerLeft,
-                2: pw.Alignment.centerRight,
-                3: pw.Alignment.centerRight,
+            // Structured Itemized Table with FIXED column widths
+            pw.Table(
+              columnWidths: const {
+                0: pw.FixedColumnWidth(85),
+                1: pw.FlexColumnWidth(3.0),
+                2: pw.FlexColumnWidth(1.5),
+                3: pw.FixedColumnWidth(95),
+                4: pw.FixedColumnWidth(95),
               },
+              border: pw.TableBorder.all(color: const PdfColor.fromInt(0xFFE2E8F0), width: 0.5),
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF0F172A)),
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                      child: pw.Text('DATE & TIME', style: pw.TextStyle(color: PdfColors.white, fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                      child: pw.Text('DESCRIPTION', style: pw.TextStyle(color: PdfColors.white, fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                      child: pw.Text('USER / CONCERN', style: pw.TextStyle(color: PdfColors.white, fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                      child: pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text('INFLOW', style: pw.TextStyle(color: PdfColors.white, fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                      child: pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text('OUTFLOW', style: pw.TextStyle(color: PdfColors.white, fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+                ...tableRows,
+              ],
             ),
           ],
         ),
