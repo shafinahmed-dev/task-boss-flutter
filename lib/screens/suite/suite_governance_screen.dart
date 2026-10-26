@@ -1079,13 +1079,13 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -1314,8 +1314,8 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0F172A),
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
           children: concerns.map((c) => _buildSlimConcernRow(context, c)).toList(),
@@ -1330,8 +1330,8 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0F172A),
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
           children: managers.map((m) => _buildSlimManagerRow(context, m)).toList(),
@@ -1343,60 +1343,135 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
           children: employees.map((e) => _buildSlimEmployeeRow(context, e)).toList(),
         ),
         const SizedBox(height: 24),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Suite Account Security', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        CircleAvatar(radius: 20, backgroundColor: Color(0xFF0F172A), child: Icon(Icons.security_rounded, color: Colors.white, size: 20)),
-                        SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('TASK Group Suite', style: TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
-                            Text('@suite.taskgroup', style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(color: Color(0xFFE2E8F0), height: 1),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showChangeSuitePasswordModal(context),
-                            icon: const Icon(Icons.lock_reset_rounded, size: 16),
-                            label: const Text('Change Suite Password'),
-                            style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF0F172A), side: const BorderSide(color: Color(0xFF0F172A)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _confirmLogout(context),
-                            icon: const Icon(Icons.logout_rounded, size: 16),
-                            label: const Text('Log Out'),
-                            style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444), side: const BorderSide(color: Color(0xFFEF4444)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF0F172A),
+                Color(0xFF020617),
+              ],
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F172A).withValues(alpha: 0.2),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
             ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: 12,
+                  bottom: -10,
+                  child: IgnorePointer(
+                    child: Icon(
+                      Icons.shield_outlined,
+                      size: 110,
+                      color: Colors.white.withValues(alpha: 0.03),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.12),
+                              ),
+                            ),
+                            child: const Icon(Icons.security_rounded, color: Colors.white, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'TASK Group Suite',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '@suite.taskgroup',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Divider(height: 1, thickness: 1, color: Colors.white.withValues(alpha: 0.08)),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showChangeSuitePasswordModal(context),
+                              icon: const Icon(Icons.lock_reset_rounded, size: 16, color: Colors.white),
+                              label: const Text(
+                                'Change Password',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _confirmLogout(context),
+                              icon: const Icon(Icons.logout_rounded, size: 16, color: Color(0xFFF43F5E)),
+                              label: const Text(
+                                'Log Out',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFF43F5E)),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: const Color(0xFFF43F5E).withValues(alpha: 0.3)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 40),

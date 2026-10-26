@@ -355,7 +355,7 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                           padding: const EdgeInsets.only(bottom: 24),
                           itemCount: _ledgers.length,
                           itemBuilder: (context, index) {
-                            return _buildEnterpriseLedgerCard(context, _ledgers[index]);
+                            return _buildLedgerCard(context, _ledgers[index]);
                           },
                         ),
             ),
@@ -373,142 +373,183 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
     return formatter.format(value);
   }
 
-  Widget _buildEnterpriseLedgerCard(BuildContext context, Map<String, dynamic> ledger) {
-    final isDefault = ledger['code'] == 'GEN-OPS';
-    final status = (ledger['status'] ?? 'ACTIVE').toString().toUpperCase();
-    final isFrozen = status == 'FROZEN';
+  Widget _buildLedgerCard(BuildContext context, Map<String, dynamic> ledger) {
+    final name = ledger['name']?.toString() ?? 'Unnamed Ledger';
+    final description = ledger['description']?.toString() ?? '';
+    final inflow = (ledger['inflow'] as num? ?? ledger['totalInflow'] as num? ?? 0).toDouble();
+    final outflow = (ledger['outflow'] as num? ?? ledger['totalOutflow'] as num? ?? 0).toDouble();
+    final isSpecial = name.toLowerCase().contains('general') || ledger['code'] == 'GEN-OPS';
 
-    final Color accentColor = isDefault
-        ? const Color(0xFFF59E0B) // Amber
-        : (isFrozen ? const Color(0xFF64748B) : const Color(0xFF10B981)); // Emerald Green
-
-    final double inflow = (ledger['inflow'] as num? ?? 0).toDouble();
-    final double outflow = (ledger['outflow'] as num? ?? 0).toDouble();
-
-    return Opacity(
-      opacity: isFrozen ? 0.72 : 1.0,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF000000), // Pitch Black
-              Color(0xFF050B14), // Obsidian Charcoal Transition
-              Color(0xFF0B192C), // Deep Midnight Blue
-            ],
-            stops: [0.0, 0.45, 1.0],
-          ),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.08),
-            width: 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.35),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-            BoxShadow(
-              color: const Color(0xFF0B192C).withOpacity(0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 2),
-            ),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0F172A), // Slate 900
+            Color(0xFF020617), // Deep pitch obsidian
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            children: [
-              // 1. Top Edge Frosted Glass Highlight Reflection
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 1,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.0),
-                        Colors.white.withOpacity(0.22),
-                        Colors.white.withOpacity(0.0),
-                      ],
-                    ),
-                  ),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            // 1. Bottom-Right Faint Ledger Watermark
+            Positioned(
+              right: 14,
+              bottom: -6,
+              child: IgnorePointer(
+                child: Icon(
+                  Icons.menu_book_rounded,
+                  size: 80,
+                  color: Colors.white.withValues(alpha: 0.03),
                 ),
               ),
+            ),
 
-              // 2. Card Content with 4px Left Accent Bar
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(width: 4, color: accentColor),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => LedgerDetailsScreen(
-                                ledgerId: ledger['id'].toString(),
-                                initialName: ledger['name']?.toString() ?? 'Ledger',
-                              ),
-                            ),
-                          ).then((_) => _loadLedgers());
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Left: Title & Description
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      ledger['name']?.toString() ?? 'Ledger',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: -0.2,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      ledger['description']?.toString().isNotEmpty == true
-                                          ? ledger['description'].toString()
-                                          : 'Operational budget container',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF94A3B8),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              // Right: Financial Balances
-                              _buildLedgerBalanceColumn(inflow, outflow),
-                            ],
-                          ),
-                        ),
-                      ),
+            // 2. Left Glowing Accent Line
+            Positioned(
+              left: 0,
+              top: 16,
+              bottom: 16,
+              width: 4,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(4)),
+                  color: isSpecial ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isSpecial ? const Color(0xFFF59E0B) : const Color(0xFF10B981)).withValues(alpha: 0.5),
+                      blurRadius: 6,
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+
+            // 3. Card Content
+            InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => LedgerDetailsScreen(
+                      ledgerId: ledger['id'].toString(),
+                      initialName: name,
+                    ),
+                  ),
+                ).then((_) => _loadLedgers());
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Title & Description
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          if (description.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              description,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.white.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+
+                    // Inflow & Outflow Telemetry
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'INFLOW  ',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            Text(
+                              '+${formatBdt(inflow)}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF10B981), // Emerald Green
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (outflow > 0) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'OUTFLOW  ',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                              Text(
+                                '-${formatBdt(outflow)}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFFF43F5E), // Rose Red
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
