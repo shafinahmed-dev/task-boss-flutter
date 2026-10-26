@@ -2076,6 +2076,38 @@ void _showAccountBottomSheet(BuildContext context) {
     );
   }
 
+  void _confirmDeleteEmployee(BuildContext context, String employeeId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Employee'),
+        content: const Text('Are you sure you want to delete this employee?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final app = context.read<AppState>();
+                final resp = await app.authRequest('DELETE', Uri.parse('${app.apiBaseUrl}/manager/employees/$employeeId'));
+                if (resp.statusCode >= 200 && resp.statusCode < 300) {
+                  await app.fetchSuiteEmployees();
+                  _loadData();
+                } else {
+                  final data = jsonDecode(resp.body);
+                  throw Exception(data['message'] ?? 'Failed to delete employee');
+                }
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showEditEmployeeModal(BuildContext context, Map<String, dynamic> employee) {
     final nameController = TextEditingController(text: employee['name']);
     final handle = employee['handle']?.toString() ?? '';
@@ -2150,12 +2182,14 @@ void _showAccountBottomSheet(BuildContext context) {
                       onPressed: () async {
                         try {
                           await app.updateEmployee(
-                            id: employee['id'],
-                            name: nameController.text.trim(),
-                            designation: designationController.text.trim(),
-                            handlePrefix: handleController.text.trim(),
-                            newPassword: passwordController.text.trim().isNotEmpty ? passwordController.text.trim() : null,
-                            companyId: selectedCompanyId,
+                            employee['id'].toString(),
+                            {
+                              'name': nameController.text.trim(),
+                              'designation': designationController.text.trim(),
+                              'handlePrefix': handleController.text.trim(),
+                              if (passwordController.text.trim().isNotEmpty) 'password': passwordController.text.trim(),
+                              if (selectedCompanyId != null) 'companyId': selectedCompanyId,
+                            },
                           );
                           if (mounted) { Navigator.pop(ctx); _loadData(); }
                         } catch (e) {
@@ -2171,7 +2205,7 @@ void _showAccountBottomSheet(BuildContext context) {
                     child: TextButton.icon(
                       onPressed: () {
                         Navigator.pop(ctx);
-                        _confirmDeleteManager(context, employee['id']?.toString() ?? '');
+                        _confirmDeleteEmployee(context, employee['id']?.toString() ?? '');
                       },
                       icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
                       label: const Text(
