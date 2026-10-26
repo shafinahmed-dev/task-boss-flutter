@@ -138,32 +138,91 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                     );
                   },
                   child: Container(
-                    padding: const EdgeInsets.all(20),
+                    margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
                     decoration: BoxDecoration(
-                      color: darkSlate,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(20),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF0F172A), // Midnight Slate 900
+                          Color(0xFF020617), // Deep pitch obsidian black
+                        ],
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.10), // Crisp 1px glass edge
+                        width: 1.0,
+                      ),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.3),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
+                        ),
                       ],
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          company['name'] ?? 'Consolidated Concern',
-                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '৳ ${_formatAmount(companyTotalBalance, forceShow: true)}',
-                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Consolidated cash held across active custodians',
-                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                        ),
-                      ],
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Stack(
+                        children: [
+                          // 1. Right Watermark Icon (Mirrors Suite Dashboard Total Group Balance)
+                          Positioned(
+                            right: 12,
+                            bottom: -10,
+                            child: IgnorePointer(
+                              child: Icon(
+                                Icons.domain_rounded,
+                                size: 110,
+                                color: Colors.white.withValues(alpha: 0.05),
+                              ),
+                            ),
+                          ),
+
+                          // 2. Card Content
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Concern Name / Micro-header
+                                Text(
+                                  activeCompanyName.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                    color: Colors.white.withValues(alpha: 0.65),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+
+                                // Formatted Balance Display
+                                Text(
+                                  '৳ ${_formatAmount(companyTotalBalance, forceShow: true)}',
+                                  style: const TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -0.5,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Updated Human Micro-copy Subtitle
+                                Text(
+                                  'Total fund held by all active employees under the concern',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                    letterSpacing: -0.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
