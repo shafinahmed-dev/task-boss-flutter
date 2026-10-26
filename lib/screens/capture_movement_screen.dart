@@ -1142,95 +1142,156 @@ class _CaptureState extends State<CaptureMovementScreen> {
     ]),
   );
   Widget _buildFlowPill() {
-  final isInflow = _flowType == 'INFLOW';
-  return Container(
-    height: 48,
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(
-      color: const Color(0xFF1E2638),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              if (_flowType != 'INFLOW') {
-                setState(() {
-                  _flowType = 'INFLOW';
-                  _selectedCategory = null;
-                });
-              }
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                color: isInflow ? Colors.white : Colors.transparent,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.arrow_downward_rounded,
-                    size: 16,
-                    color: isInflow ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+    final isInflow = _flowType == 'INFLOW';
+    return Container(
+      height: 52,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A), // Deep Obsidian Glass Track
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // 1. INFLOW TAB (EMERALD GLOW GRADIENT WHEN ACTIVE)
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                if (!isInflow) {
+                  setState(() {
+                    _flowType = 'INFLOW';
+                    _selectedCategory = null;
+                  });
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: isInflow
+                      ? const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF059669), // Vivid Emerald
+                            Color(0xFF047857), // Deep Forest Emerald
+                          ],
+                        )
+                      : null,
+                  color: isInflow ? null : Colors.transparent,
+                  boxShadow: isInflow
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.45),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.arrow_downward_rounded,
+                        size: 16,
+                        color: isInflow ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Inflow',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: isInflow ? FontWeight.w700 : FontWeight.w500,
+                          color: isInflow ? Colors.white : Colors.white.withValues(alpha: 0.6),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Inflow',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isInflow ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              if (_flowType != 'OUTFLOW') {
-                setState(() {
-                  _flowType = 'OUTFLOW';
-                  _selectedCategory = null;
-                });
-              }
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                color: !isInflow ? Colors.white : Colors.transparent,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.arrow_upward_rounded,
-                    size: 16,
-                    color: !isInflow ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+
+          // 2. OUTFLOW TAB (ROSE/RUBY GLOW GRADIENT WHEN ACTIVE)
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                if (isInflow) {
+                  setState(() {
+                    _flowType = 'OUTFLOW';
+                    _selectedCategory = null;
+                  });
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: !isInflow
+                      ? const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFFE11D48), // Rose Crimson
+                            Color(0xFFBE123C), // Deep Ruby Red
+                          ],
+                        )
+                      : null,
+                  color: !isInflow ? null : Colors.transparent,
+                  boxShadow: !isInflow
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFFF43F5E).withValues(alpha: 0.45),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.arrow_upward_rounded,
+                        size: 16,
+                        color: !isInflow ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Outflow',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: !isInflow ? FontWeight.w700 : FontWeight.w500,
+                          color: !isInflow ? Colors.white : Colors.white.withValues(alpha: 0.6),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Outflow',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: !isInflow ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
 }
