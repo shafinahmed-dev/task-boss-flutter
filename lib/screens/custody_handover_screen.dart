@@ -60,7 +60,6 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
       _error = null;
     });
     
-    // Re-implemented with robust error handling to prevent Handover screen crashes
     try {
       final res = await app.authRequest('GET', Uri.parse('${app.apiBaseUrl}/custody/custodians?companyId=${app.user!.companyId}'));
       List<dynamic> rawList = [];
@@ -69,22 +68,27 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
         rawList = rawData is List ? rawData : (rawData['custodians'] ?? rawData['data'] ?? []);
       }
       
-      final currentUserId = app.user?.id ?? '';
+      final currentId = app.user?.id?.toString() ?? '';
       final currentUserName = (app.user?.name ?? '').trim().toLowerCase();
 
-      final filtered = rawList.where((c) {
-        final cId = c['id']?.toString() ?? '';
-        final cUserId = c['linkedUserId']?.toString() ?? c['userId']?.toString() ?? c['user']?['id']?.toString() ?? '';
-        final cName = (c['name'] ?? c['user']?['name'] ?? '').toString().trim().toLowerCase();
-        final cType = (c['type'] ?? '').toString().toLowerCase();
+      // Load all active personnel across the organization, excluding self and suite admin (do not restrict by concern)
+      final eligibleRecipients = rawList.where((u) {
+        final uId = u['id']?.toString() ?? u['linkedUserId']?.toString() ?? u['userId']?.toString() ?? u['user']?['id']?.toString() ?? '';
+        final role = (u['role'] ?? u['user']?['role'] ?? u['linkedUser']?['role'] ?? '').toString().toLowerCase();
+        final uName = (u['name'] ?? u['user']?['name'] ?? '').toString().trim().toLowerCase();
+        final uType = (u['type'] ?? '').toString().toLowerCase();
 
-        if (cType == 'company' || cName.contains('root')) return false;
-        if (currentUserId.isNotEmpty && (cId == currentUserId || cUserId == currentUserId)) return false;
-        if (currentUserName.isNotEmpty && cName == currentUserName) return false;
+        if (uType == 'company' || uName.contains('root')) return false;
+        // Exclude self
+        if (currentId.isNotEmpty && (uId == currentId || u['id']?.toString() == currentId)) return false;
+        if (currentUserName.isNotEmpty && uName == currentUserName) return false;
+        // Exclude suite/admin roles
+        if (role == 'suite' || role == 'admin') return false;
+        
         return true;
       }).toList();
 
-      filtered.sort((a, b) {
+      eligibleRecipients.sort((a, b) {
         final aRole = (a['role'] ?? a['user']?['role'] ?? a['linkedUser']?['role'] ?? '').toString().toUpperCase();
         final bRole = (b['role'] ?? b['user']?['role'] ?? b['linkedUser']?['role'] ?? '').toString().toUpperCase();
         final aIsManager = a['isManager'] == true || aRole == 'MANAGER' || aRole == 'SUITE_ADMIN';
@@ -98,7 +102,7 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
 
       if (mounted) {
         setState(() {
-          _custodians = filtered;
+          _custodians = eligibleRecipients;
           _loadingCustodians = false;
         });
       }
@@ -419,52 +423,31 @@ class _CustodyHandoverScreenState extends State<CustodyHandoverScreen> {
                     c['user']?['role']?.toString() ??
                     c['linkedUser']?['role']?.toString() ??
                     '';
-                final isManager = c['isManager'] == true ||
-                    cRole.toUpperCase() == 'MANAGER' ||
-                    cRole.toUpperCase() == 'SUITE_ADMIN';
+                final cDesignation = c['designation']?.toString() ??
+                    c['user']?['designation']?.toString() ??
+                    '';
+                final concernBadge = c['concernCode']?.toString() ??
+                    c['concern']?.toString() ??
+                    c['companyCode']?.toString() ??
+                    '';
+
+                final designationPart = cDesignation.isNotEmpty ? cDesignation : (cRole.isNotEmpty ? cRole : '');
+                final displayText = [
+                  cName,
+                  if (concernBadge.isNotEmpty) '[$concernBadge]',
+                  if (designationPart.isNotEmpty) '• $designationPart',
+                ].join(' ');
 
                 return DropdownMenuItem<String>(
                   value: cId,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          cName,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                      ),
-                      if (isManager) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEF3C7),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                                color: const Color(0xFFF59E0B), width: 1),
-                          ),
-                          child: const Text(
-                            'Manager',
-                            style: TextStyle(
-                              color: Color(0xFFB45309),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                      ] else if (cRole.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          '($cRole)',
-                          style: const TextStyle(
-                              color: AppTheme.secondaryText, fontSize: 11),
-                        ),
-                      ],
-                    ],
+                  child: Text(
+                    displayText,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: AppTheme.primaryText,
+                    ),
                   ),
                 );
               }).toList(),
