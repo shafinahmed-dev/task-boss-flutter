@@ -35,17 +35,26 @@ export class CustodyController {
 
   /**
    * POST /custody/transfers/:id/confirm
+   * POST /custody/transfers/:id/accept
+   * POST /custody/handovers/:id/accept
    * Receiver confirms acceptance.
    */
   @Post('transfers/:id/confirm')
+  @Post('transfers/:id/accept')
+  @Post('handovers/:id/accept')
+  @Post('handovers/:id/confirm')
   @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
   @HttpCode(HttpStatus.OK)
   async confirmTransfer(
     @Param('id') id: string,
-    @Body() body?: { toWalletId?: string },
+    @Body() body?: { toWalletId?: string; destinationWalletId?: string },
     @Req() req?: any,
   ) {
-    return this.custodyService.confirmTransfer(id, req?.user, body?.toWalletId);
+    return this.custodyService.confirmTransfer(
+      id,
+      req?.user,
+      body?.destinationWalletId || body?.toWalletId,
+    );
   }
 
   /**

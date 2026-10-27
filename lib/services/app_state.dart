@@ -172,6 +172,7 @@ class AppState extends ChangeNotifier {
       final payload = <String, dynamic>{};
       if (toWalletId != null && toWalletId.isNotEmpty) {
         payload['toWalletId'] = toWalletId;
+        payload['destinationWalletId'] = toWalletId;
       }
       final response = await authRequest(
         'POST',
@@ -187,11 +188,22 @@ class AppState extends ChangeNotifier {
         }
         notifyListeners();
         return true;
+      } else {
+        String msg = 'Failed to accept handover (${response.statusCode})';
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map && decoded['message'] != null) {
+            msg = decoded['message'] is List
+                ? (decoded['message'] as List).join(', ')
+                : decoded['message'].toString();
+          }
+        } catch (_) {}
+        throw Exception(msg);
       }
     } catch (e) {
       debugPrint('acceptHandover error: $e');
+      rethrow;
     }
-    return false;
   }
 
   Future<bool> cancelHandover(String transferId) async {

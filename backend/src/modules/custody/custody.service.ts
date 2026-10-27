@@ -229,84 +229,110 @@ export class CustodyService {
       throw new ConflictException('Cannot confirm a disputed transfer');
     }
 
-    const recipientUserId = reqUser?.id || reqUser?.sub || transfer.toCustodian?.linkedUserId;
-    const operationalCompanyId = transfer.fromCustodian?.companyId || transfer.toCustodian?.companyId;
+    const userId = reqUser?.id || reqUser?.sub;
+    const operationalCompanyId =
+      transfer.fromCustodian?.companyId ||
+      transfer.toCustodian?.companyId ||
+      (transfer.metadata as any)?.companyId;
 
-    let recipientUser = transfer.toCustodian?.linkedUser;
-    if (!recipientUser && recipientUserId) {
-      recipientUser = await this.prisma.user.findUnique({
-        where: { id: recipientUserId },
-      });
-    }
-
-    // Ensure recipient has a valid CustodianAccount
-    let recipientCustodian: any = transfer.toCustodian;
-
-    if (recipientUserId) {
-      let existingCustodian = await this.prisma.custodianAccount.findFirst({
+    // Find current user's custodian account in this company
+    let currentCustodian: any = null;
+    if (userId) {
+      currentCustodian = await this.prisma.custodianAccount.findFirst({
         where: {
-          linkedUserId: recipientUserId,
-          ...(operationalCompanyId ? { companyId: operationalCompanyId } : {}),
+          companyId: operationalCompanyId,
+          linkedUserId: userId,
         },
         include: { linkedUser: true },
       });
-
-      if (!existingCustodian) {
-        existingCustodian = await this.prisma.custodianAccount.findFirst({
-          where: { linkedUserId: recipientUserId },
-          include: { linkedUser: true },
-        });
-      }
-
-      if (!existingCustodian && operationalCompanyId) {
-        existingCustodian = await this.prisma.custodianAccount.create({
-          data: {
-            companyId: operationalCompanyId,
-            linkedUserId: recipientUserId,
-            name: recipientUser?.name || reqUser?.name || 'Recipient User',
-            type: 'person',
+      if (!currentCustodian) {
+        currentCustodian = await this.prisma.custodianAccount.findFirst({
+          where: {
+            linkedUserId: userId,
           },
           include: { linkedUser: true },
         });
       }
-
-      if (existingCustodian) {
-        recipientCustodian = existingCustodian;
-      }
     }
 
-    // Ensure recipient has a destination wallet
-    let targetToWalletId = providedToWalletId || transfer.toWalletId;
-    if (!targetToWalletId && recipientCustodian?.id) {
-      let userWallet = await this.prisma.wallet.findFirst({
-        where: { custodianId: recipientCustodian.id, isArchived: false },
+    // Resilient Recipient Ownership Check:
+    // Allow accept if current user is either the linked user OR the custodian account
+    const recipientUserId = transfer.toCustodian?.linkedUserId || (transfer.metadata as any)?.recipientUserId;
+    const recipientCustodianId = transfer.toCustodianId;
+
+    const isAuthorizedRecipient =
+      !userId ||
+      (recipientUserId && recipientUserId === userId) ||
+      (recipientCustodianId && currentCustodian && recipientCustodianId === currentCustodian.id) ||
+      (transfer.toCustodian?.linkedUserId === userId);
+
+    if (userId && !isAuthorizedRecipient) {
+      this.logger.error(
+        `Unauthorized accept: user ${userId} tried to accept handover intended for custodian ${recipientCustodianId} / user ${recipientUserId}`,
+      );
+      throw new ForbiddenException('You are not authorized to accept this handover');
+    }
+
+    // Ensure recipient has a valid CustodianAccount
+    let recipientCustodian: any = currentCustodian || transfer.toCustodian;
+
+    if (!recipientCustodian && userId && operationalCompanyId) {
+      recipientCustodian = await this.prisma.custodianAccount.create({
+        data: {
+          companyId: operationalCompanyId,
+          linkedUserId: userId,
+          name: reqUser?.name || 'Recipient User',
+          type: (reqUser?.role || 'employee').toLowerCase(),
+        },
+        include: { linkedUser: true },
       });
-      if (!userWallet && operationalCompanyId) {
-        userWallet = await this.prisma.wallet.create({
+    }
+
+    // AUTO-RESOLVE DESTINATION WALLET:
+    let destWallet: any = null;
+    const destWalletId = providedToWalletId || transfer.toWalletId;
+    if (destWalletId) {
+      destWallet = await this.prisma.wallet.findUnique({
+        where: { id: destWalletId },
+      });
+    }
+
+    if (!destWallet && recipientCustodian) {
+      destWallet = await this.prisma.wallet.findFirst({
+        where: {
+          custodianId: recipientCustodian.id,
+          type: 'CASH',
+          isArchived: false,
+        },
+      });
+
+      if (!destWallet && operationalCompanyId) {
+        destWallet = await this.prisma.wallet.create({
           data: {
-            custodianId: recipientCustodian.id,
             companyId: operationalCompanyId,
-            name: `${recipientUser?.name || reqUser?.name || 'Cash'} Wallet`,
+            custodianId: recipientCustodian.id,
+            name: 'Physical Cash',
             type: 'CASH',
             isDefault: true,
           },
         });
       }
-      targetToWalletId = userWallet?.id ?? null;
     }
+
+    const targetToWalletId = destWallet?.id ?? null;
 
     const meta = typeof transfer.metadata === 'object' && transfer.metadata !== null ? transfer.metadata as any : {};
     const feeVal = Number(transfer.fee || meta.fee || 0);
-    const channelVal = meta.channel || 'cash';
+    const channelVal = meta.channel || meta.paymentMethod || 'cash';
 
-    const senderName = transfer.fromCustodian?.linkedUser?.name || transfer.fromCustodian?.name || 'Sender Custodian';
-    const recipientName = recipientUser?.name || recipientCustodian?.name || transfer.toCustodian?.name || 'Recipient Custodian';
+    const senderUser = transfer.fromCustodian?.linkedUser;
+    const receiverUser = recipientCustodian?.linkedUser || reqUser;
     const receiptNo = meta.voucherNumber || `HND-${transfer.id.substring(0, 8).toUpperCase()}`;
 
     try {
-      await this.prisma.$transaction(async (tx) => {
-        // 1. Update transfer status
-        await tx.custodyTransfer.update({
+      const result = await this.prisma.$transaction(async (tx) => {
+        // 1. Mark handover as confirmed
+        const updatedTransfer = await tx.custodyTransfer.update({
           where: { id: transferId },
           data: {
             status: 'confirmed',
@@ -316,12 +342,7 @@ export class CustodyService {
           },
         });
 
-        // 0. Prepare Movement Context
-        const senderUser = transfer.fromCustodian?.linkedUser;
-        const receiverUser = recipientUser || transfer.toCustodian?.linkedUser || reqUser;
-        const voucherNum = receiptNo; // Use the already defined receiptNo
-
-        // 1. Sender Outflow Movement
+        // 2. Sender Outflow Movement
         await tx.moneyMovement.create({
           data: {
             idempotencyKey: crypto.randomUUID(),
@@ -338,19 +359,19 @@ export class CustodyService {
             notes: `Sent to ${receiverUser?.name || 'Staff'}`,
             metadata: {
               transferId: transfer.id,
-              voucherNumber: voucherNum,
+              voucherNumber: receiptNo,
               channel: channelVal,
               recipientName: receiverUser?.name || 'Staff',
               recipientUserId: receiverUser?.id || null,
-              senderName: senderUser?.name || reqUser?.name || 'Sender',
-              senderUserId: senderUser?.id || reqUser?.id || null,
+              senderName: senderUser?.name || 'Sender',
+              senderUserId: senderUser?.id || null,
             },
             occurredAt: new Date(),
             syncStatus: 'synced',
           },
         });
 
-        // 2. Recipient Inflow Movement
+        // 3. Recipient Inflow Movement
         await tx.moneyMovement.create({
           data: {
             idempotencyKey: crypto.randomUUID(),
@@ -367,7 +388,7 @@ export class CustodyService {
             notes: `Received from ${senderUser?.name || 'Manager'}`,
             metadata: {
               transferId: transfer.id,
-              voucherNumber: voucherNum,
+              voucherNumber: receiptNo,
               channel: channelVal,
               senderName: senderUser?.name || 'Sender',
               senderUserId: senderUser?.id || null,
@@ -378,14 +399,23 @@ export class CustodyService {
             syncStatus: 'synced',
           },
         });
+
+        return updatedTransfer;
       });
 
-      this.logger.log(`[Handover Confirm] Created movements for sender and receiver via ledger: ${transferId}`);
-      return { success: true, message: 'Handover accepted successfully' };
+      this.logger.log(`[Handover Confirm] Atomic acceptance complete for transfer: ${transferId}`);
+      return { success: true, message: 'Handover accepted successfully', transfer: result };
     } catch (error) {
-      this.logger.error('Failed to accept handover:', error);
+      this.logger.error(`Error processing atomic acceptance for handover ${transferId}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Alias for confirmTransfer to support handover accept terminology
+   */
+  async acceptHandover(handoverId: string, reqUser?: any, dto?: { destinationWalletId?: string; toWalletId?: string }) {
+    return this.confirmTransfer(handoverId, reqUser, dto?.destinationWalletId || dto?.toWalletId);
   }
 
   /**

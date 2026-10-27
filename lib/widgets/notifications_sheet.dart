@@ -138,7 +138,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                           setState(() => _processingId = transferId);
                           final success = await context.read<AppState>().cancelHandover(transferId);
                           if (mounted) setState(() => _processingId = null);
-                          if (success && mounted) {
+                          if (success && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Handover cancelled successfully.'),
@@ -175,7 +175,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                             setState(() => _processingId = transferId);
                             final success = await context.read<AppState>().declineHandover(transferId);
                             if (mounted) setState(() => _processingId = null);
-                            if (success && mounted) {
+                            if (success && context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('Handover declined.'),
@@ -203,7 +203,35 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                   child: ElevatedButton.icon(
                     onPressed: _processingId == transferId
                         ? null
-                        : () => _promptWalletAndAccept(context, t),
+                        : () async {
+                            final app = context.read<AppState>();
+                            setState(() => _processingId = transferId);
+                            try {
+                              await app.acceptHandover(transferId);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Handover accepted successfully!'),
+                                    backgroundColor: Color(0xFF059669),
+                                  ),
+                                );
+                                // Refresh notifications & user balances
+                                Navigator.of(context).pop();
+                              }
+                            } catch (e) {
+                              debugPrint('Handover Accept Error: $e');
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to accept: $e'),
+                                    backgroundColor: const Color(0xFFDC2626),
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (mounted) setState(() => _processingId = null);
+                            }
+                          },
                     icon: const Icon(Icons.check_rounded, size: 16),
                     label: Text(
                       _processingId == transferId ? '...' : 'Accept',
@@ -225,106 +253,6 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
       ),
     );
   }
-  void _promptWalletAndAccept(BuildContext context, Map<String, dynamic> transfer) {
-    final app = context.read<AppState>();
-    final wallets = app.wallets;
-    final transferId = transfer['id'].toString();
-    final channel = (transfer['channel'] ?? '').toString().toLowerCase();
-    final amt = _formatAmount(transfer['amount']);
-
-    if (wallets.length <= 1) {
-      final singleWalletId = wallets.isNotEmpty ? wallets.first.id : null;
-      _executeAccept(transferId, singleWalletId, amt);
-      return;
-    }
-
-    String selectedWalletId = wallets.first.id;
-    for (final w in wallets) {
-      final wName = w.name.toLowerCase();
-      if (channel.isNotEmpty && (wName.contains(channel) || channel.contains(wName))) {
-        selectedWalletId = w.id;
-        break;
-      }
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalCtx) {
-        String currentSelected = selectedWalletId;
-        return StatefulBuilder(
-          builder: (ctx, setModal) {
-            return Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)))),
-                  const SizedBox(height: 16),
-                  const Text('Select Destination Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  const SizedBox(height: 4),
-                  Text('Sender transferred via ${transfer['channel'] ?? 'Cash'}. Where did you receive this?', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                  const SizedBox(height: 16),
-                  ...wallets.map((w) {
-                    final isSelected = currentSelected == w.id;
-                    return InkWell(
-                      onTap: () => setModal(() => currentSelected = w.id),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: isSelected ? const Color(0xFF10B981) : const Color(0xFFE2E8F0), width: isSelected ? 1.5 : 1.0),
-                        ),
-                        child: Row(children: [
-                          Icon(isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: isSelected ? const Color(0xFF10B981) : const Color(0xFF94A3B8), size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(child: Text(w.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, fontSize: 14, color: const Color(0xFF0F172A)))),
-                        ]),
-                      ),
-                    );
-                  }),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () { Navigator.of(modalCtx).pop(); _executeAccept(transferId, currentSelected, amt); },
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(vertical: 12)),
-                      child: Text('Confirm & Deposit ৳ $amt', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _executeAccept(String transferId, String? toWalletId, String amt) async {
-    setState(() => _processingId = transferId);
-    final success = await context.read<AppState>().acceptHandover(transferId, toWalletId: toWalletId);
-    if (mounted) setState(() => _processingId = null);
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Received ৳ $amt successfully!'), backgroundColor: const Color(0xFF10B981)),
-      );
-      Navigator.of(context, rootNavigator: true).pop();
-    }
-  }
-
-
-
 
   @override
   Widget build(BuildContext context) {
