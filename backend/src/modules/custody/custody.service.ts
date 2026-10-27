@@ -394,7 +394,6 @@ export class CustodyService {
         where: {
           companyId: targetCompanyId,
           type: { not: 'company' },
-          name: { not: { contains: 'Root', mode: 'insensitive' } },
           linkedUserId: { not: null },
           linkedUser: {
             role: { not: 'SYSTEM' },
@@ -407,7 +406,14 @@ export class CustodyService {
         },
       });
 
-      const mapped = list.map((c) => {
+      // Clean in-memory filtering: remove any root or system accounts
+      const eligibleCustodians = list.filter((acc) => {
+        const name = (acc.name || '').toLowerCase();
+        const role = (acc.linkedUser?.role || '').toUpperCase();
+        return !name.includes('root') && role !== 'SYSTEM';
+      });
+
+      const mapped = eligibleCustodians.map((c) => {
         const role = c.linkedUser?.role || '';
         const isManager =
           role.toUpperCase() === 'MANAGER' || role.toUpperCase() === 'SUITE_ADMIN';
