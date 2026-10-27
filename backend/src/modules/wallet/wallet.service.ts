@@ -38,14 +38,26 @@ export class WalletService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getWallets(custodianId: string) {
+    let resolvedCustodianId = custodianId;
+    if (custodianId) {
+      const custodianById = await this.prisma.custodianAccount.findFirst({
+        where: {
+          OR: [{ id: custodianId }, { linkedUserId: custodianId }],
+        },
+      });
+      if (custodianById) {
+        resolvedCustodianId = custodianById.id;
+      }
+    }
+
     let wallets = await this.prisma.wallet.findMany({
-      where: { custodianId, isArchived: false },
+      where: { custodianId: resolvedCustodianId, isArchived: false },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
     });
 
-    if (wallets.length === 0 && custodianId) {
+    if (wallets.length === 0 && resolvedCustodianId) {
       const custodian = await this.prisma.custodianAccount.findUnique({
-        where: { id: custodianId },
+        where: { id: resolvedCustodianId },
       });
       if (custodian) {
         const defaultWallet = await this.prisma.wallet.create({
@@ -92,9 +104,9 @@ export class WalletService {
         for (const m of movements) {
           const amt = Number(m.amount);
           const fee = m.fee ? Number(m.fee) : 0;
-          if (m.direction === 'in') {
+          if (m.direction?.toLowerCase() === 'in') {
             totalIn += amt;
-          } else if (m.direction === 'out') {
+          } else if (m.direction?.toLowerCase() === 'out') {
             totalOut += amt;
           }
           totalFees += fee;
@@ -104,6 +116,7 @@ export class WalletService {
 
         return {
           ...wallet,
+          balance: Math.max(0, currentBalance),
           currentBalance: Math.max(0, currentBalance),
         };
       }),

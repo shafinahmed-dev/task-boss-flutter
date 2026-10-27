@@ -264,7 +264,9 @@ export class CustodyService {
       !userId ||
       (recipientUserId && recipientUserId === userId) ||
       (recipientCustodianId && currentCustodian && recipientCustodianId === currentCustodian.id) ||
-      (transfer.toCustodian?.linkedUserId === userId);
+      (transfer.toCustodian?.linkedUserId === userId) ||
+      reqUser?.role === 'MANAGER' ||
+      reqUser?.role === 'SUITE_ADMIN';
 
     if (userId && !isAuthorizedRecipient) {
       this.logger.error(

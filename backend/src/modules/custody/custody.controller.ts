@@ -140,8 +140,9 @@ export class CustodyController {
   ) {
     const identifier =
       queryCustodianId ||
-      req?.user?.custodianId ||
       req?.user?.id ||
+      req?.user?.userId ||
+      req?.user?.custodianId ||
       req?.user?.sub;
     return this.custodyService.getCustodianWallets(identifier, queryCompanyId);
   }

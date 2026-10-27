@@ -138,6 +138,8 @@ export class ManagerService {
     success: true,
     company,
     assignedConcerns,
+    managerPersonalBalance: Number(managerBalance),
+    managerBalance: Number(managerBalance),
     balance: Number(consolidatedTotal),
     totalBalance: Number(consolidatedTotal),
     inflow: Number(totalInflow),

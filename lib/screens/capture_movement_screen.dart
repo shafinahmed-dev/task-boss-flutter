@@ -218,7 +218,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
     final app = context.read<AppState>();
     List<dynamic> loadedWallets = [];
     try {
-      final identifier = app.user?.custodianId ?? app.user?.userId ?? '';
+      final identifier = (app.user?.custodianId.isNotEmpty ?? false)
+          ? app.user!.custodianId
+          : (app.user?.userId ?? '');
       final res = await app.authRequest(
         'GET',
         Uri.parse('${app.apiBaseUrl}/custody/wallets?custodianId=$identifier'),
@@ -247,18 +249,33 @@ class _CaptureState extends State<CaptureMovementScreen> {
     }
     await app.refreshBalance();
 
+    debugPrint('[CaptureMovement] _loadWallets: ${_wallets.length} wallets, appState: ${app.wallets.length}');
+
     if (mounted) {
-      if (loadedWallets.isNotEmpty) {
+      final availableWallets = loadedWallets.isNotEmpty
+          ? loadedWallets
+          : app.wallets.map((w) => {
+              'id': w.id,
+              'name': w.name,
+              'type': w.type,
+              'isDefault': w.isDefault,
+              'currentBalance': w.currentBalance,
+              'balance': w.currentBalance,
+            }).toList();
+
+      if (availableWallets.isNotEmpty) {
         setState(() {
-          _wallets = loadedWallets;
-          final defaultWallet = loadedWallets.firstWhere(
-            (w) => w['isDefault'] == true,
-            orElse: () => loadedWallets.first,
-          );
-          _selectedWalletId = defaultWallet['id']?.toString();
-          final wType = defaultWallet['type']?.toString() ?? 'CASH';
-          final methods = PaymentRails.getMethods(wType, _tab);
-          _selectedPaymentMethod = methods.isNotEmpty ? methods.first : 'Physical Cash';
+          _wallets = availableWallets;
+          if (_selectedWalletId == null || !availableWallets.any((w) => w['id']?.toString() == _selectedWalletId)) {
+            final defaultWallet = availableWallets.firstWhere(
+              (w) => w['isDefault'] == true,
+              orElse: () => availableWallets.first,
+            );
+            _selectedWalletId = defaultWallet['id']?.toString() ?? availableWallets.first['id']?.toString();
+            final wType = defaultWallet['type']?.toString() ?? 'CASH';
+            final methods = PaymentRails.getMethods(wType, _tab);
+            _selectedPaymentMethod = methods.isNotEmpty ? methods.first : 'Physical Cash';
+          }
         });
       }
     }
