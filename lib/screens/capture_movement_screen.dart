@@ -213,12 +213,52 @@ class _CaptureState extends State<CaptureMovementScreen> {
     );
   }
 
+  Future<void> _loadWallets() async {
+    final app = context.read<AppState>();
+    try {
+      final identifier = app.user?.custodianId ?? app.user?.userId ?? '';
+      final res = await app.authRequest(
+        'GET',
+        Uri.parse('${app.apiBaseUrl}/custody/wallets?custodianId=$identifier'),
+      );
+      if (res.statusCode == 200) {
+        final List list = jsonDecode(res.body);
+        if (list.isNotEmpty) {
+          app.wallets = list.map((item) => Wallet.fromJson(item)).toList();
+        }
+      }
+    } catch (_) {}
+
+    if (app.wallets.isEmpty) {
+      await app.fetchWallets();
+    }
+    await app.refreshBalance();
+
+    if (mounted) {
+      final wallets = app.wallets;
+      if (wallets.isNotEmpty) {
+        if (_selectedWalletId == null || !wallets.any((w) => w.id == _selectedWalletId)) {
+          final defaultWallet = wallets.firstWhere(
+            (w) => w.isDefault,
+            orElse: () => wallets.first,
+          );
+          setState(() {
+            _selectedWalletId = defaultWallet.id;
+            final methods = PaymentRails.getMethods(defaultWallet.type, _tab);
+            _selectedPaymentMethod = methods.isNotEmpty ? methods.first : 'Physical Cash';
+          });
+        }
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final app = context.read<AppState>();
       _fetchEligibleUsers();
+      await _loadWallets();
       await app.fetchMyLedgers();
       if (app.myLedgers.isNotEmpty && mounted) {
         final genOps = app.myLedgers.firstWhere(
@@ -593,6 +633,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
           );
         }
         await app.refreshBalance();
+        await _loadWallets();
       } else {
         final err = jsonDecode(res.body)['message'];
         throw Exception(err is List ? err.join(', ') : (err?.toString() ?? 'Failed (HTTP ${res.statusCode})'));
@@ -609,9 +650,16 @@ class _CaptureState extends State<CaptureMovementScreen> {
     final app = context.watch<AppState>();
     final wallets = app.wallets;
 
-    if (_selectedWalletId == null && wallets.isNotEmpty) {
-      final defaultWallet = wallets.firstWhere((w) => w.isDefault, orElse: () => wallets.first);
-      _selectedWalletId = defaultWallet.id;
+    if (wallets.isNotEmpty) {
+      if (_selectedWalletId == null || !wallets.any((w) => w.id == _selectedWalletId)) {
+        final defaultWallet = wallets.firstWhere(
+          (w) => w.isDefault,
+          orElse: () => wallets.first,
+        );
+        _selectedWalletId = defaultWallet.id;
+      }
+    } else {
+      _selectedWalletId = null;
     }
 
     Wallet? selectedWallet;
@@ -627,7 +675,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
         : ['Physical Cash'];
 
     if (_selectedPaymentMethod == null || !availableMethods.contains(_selectedPaymentMethod)) {
-      _selectedPaymentMethod = availableMethods.first;
+      _selectedPaymentMethod = availableMethods.isNotEmpty ? availableMethods.first : 'Physical Cash';
     }
 
     final amtVal = double.tryParse(_amtCtl.text.trim()) ?? 0.0;
@@ -732,6 +780,10 @@ class _CaptureState extends State<CaptureMovementScreen> {
                         key: ValueKey('wallet_$_selectedWalletId'),
                         initialValue: _selectedWalletId,
                         isExpanded: true,
+                        hint: Text(
+                          wallets.isEmpty ? 'No wallets found' : 'Select Wallet',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        ),
                         items: wallets.map((w) {
                           final walletLabel = '${w.name} (৳${w.currentBalance.toStringAsFixed(0)})';
                           return DropdownMenuItem<String>(

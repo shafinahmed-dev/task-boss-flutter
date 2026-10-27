@@ -634,60 +634,83 @@ export class CustodyService {
    * Returns wallets for a custodian account or user, guaranteeing the primary
    * "Cash in Hand" wallet is returned as the default with accurate balance.
    */
-  async getCustodianWallets(custodianIdOrUserId: string) {
-    if (!custodianIdOrUserId) return [];
+  async getCustodianWallets(userIdOrCustodianId: string, companyId?: string) {
+    this.logger.log(`Fetching wallets for identifier: ${userIdOrCustodianId}, companyId: ${companyId}`);
+    if (!userIdOrCustodianId) return [];
 
-    let custodian = await this.prisma.custodianAccount.findUnique({
-      where: { id: custodianIdOrUserId },
-      include: { linkedUser: true, wallets: true },
+    // 1. Find all custodian accounts associated with this user
+    const custodianAccounts = await this.prisma.custodianAccount.findMany({
+      where: {
+        OR: [
+          { id: userIdOrCustodianId },
+          { linkedUserId: userIdOrCustodianId },
+        ],
+      },
     });
 
-    if (!custodian) {
-      custodian = await this.prisma.custodianAccount.findFirst({
-        where: { linkedUserId: custodianIdOrUserId },
-        include: { linkedUser: true, wallets: true },
-      });
+    const custodianIds = custodianAccounts.map((c) => c.id);
+    if (custodianIds.length === 0) {
+      custodianIds.push(userIdOrCustodianId);
     }
 
-    if (custodian?.linkedUserId) {
-      const primaryCustodian = await this.prisma.custodianAccount.findFirst({
+    // 2. Query all active wallets belonging to any of these custodian accounts
+    let wallets = await this.prisma.wallet.findMany({
+      where: {
+        custodianId: { in: custodianIds },
+        isArchived: false,
+      },
+      include: {
+        custodian: true,
+      },
+    });
+
+    // 3. Fallback: If no wallets found, look for ANY wallet linked to the user's name (e.g. "Cash in Hand")
+    if (wallets.length === 0) {
+      const user = await this.prisma.user.findFirst({
         where: {
-          linkedUserId: custodian.linkedUserId,
-          wallets: {
-            some: {
-              name: { equals: 'Cash in Hand', mode: 'insensitive' },
-              isArchived: false,
-            },
-          },
+          OR: [
+            { id: userIdOrCustodianId },
+            { id: custodianAccounts[0]?.linkedUserId || undefined },
+          ],
         },
-        include: { linkedUser: true, wallets: true },
       });
-      if (primaryCustodian) {
-        custodian = primaryCustodian;
+
+      if (user) {
+        // Find any existing "Cash in Hand" wallet for this user or their name
+        wallets = await this.prisma.wallet.findMany({
+          where: {
+            OR: [
+              { name: { contains: 'Cash', mode: 'insensitive' } },
+              { name: { contains: user.name, mode: 'insensitive' } },
+            ],
+            isArchived: false,
+          },
+          include: {
+            custodian: true,
+          },
+        });
+
+        // If still none, ensure one primary Cash in Hand wallet is created
+        if (wallets.length === 0 && custodianAccounts.length > 0) {
+          const primaryCustodian = custodianAccounts[0];
+          const newWallet = await this.prisma.wallet.create({
+            data: {
+              companyId: primaryCustodian.companyId,
+              custodianId: primaryCustodian.id,
+              name: 'Cash in Hand',
+              type: 'CASH',
+              isDefault: true,
+            },
+            include: {
+              custodian: true,
+            },
+          });
+          wallets = [newWallet];
+        }
       }
     }
 
-    if (!custodian) {
-      return [];
-    }
-
-    let wallets = await this.prisma.wallet.findMany({
-      where: { custodianId: custodian.id, isArchived: false },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
-    });
-
-    if (wallets.length === 0) {
-      const defaultWallet = await this.prisma.wallet.create({
-        data: {
-          custodianId: custodian.id,
-          companyId: custodian.companyId,
-          name: 'Cash in Hand',
-          type: 'CASH',
-          isDefault: true,
-        },
-      });
-      wallets = [defaultWallet];
-    }
+    this.logger.log(`Found ${wallets.length} wallets for ${userIdOrCustodianId}`);
 
     const supersededRows = await this.prisma.moneyMovement.findMany({
       where: { editedFromId: { not: null } },
@@ -733,6 +756,7 @@ export class CustodyService {
         return {
           ...wallet,
           currentBalance: Math.max(0, currentBalance),
+          balance: Math.max(0, currentBalance),
         };
       }),
     );

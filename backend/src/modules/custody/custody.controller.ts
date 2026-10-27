@@ -126,4 +126,35 @@ export class CustodyController {
   async getCustodians(@Query('companyId') companyId: string) {
     return this.custodyService.getCustodians(companyId);
   }
+
+  /**
+   * GET /custody/wallets
+   * List all wallets for the logged-in user or custodian.
+   */
+  @Get('wallets')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
+  async getWallets(
+    @Query('custodianId') queryCustodianId?: string,
+    @Query('companyId') queryCompanyId?: string,
+    @Req() req?: any,
+  ) {
+    const identifier =
+      queryCustodianId ||
+      req?.user?.custodianId ||
+      req?.user?.id ||
+      req?.user?.sub;
+    return this.custodyService.getCustodianWallets(identifier, queryCompanyId);
+  }
+
+  /**
+   * GET /custody/custodians/:id/wallets
+   */
+  @Get('custodians/:id/wallets')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
+  async getCustodianWalletsById(
+    @Param('id') id: string,
+    @Query('companyId') queryCompanyId?: string,
+  ) {
+    return this.custodyService.getCustodianWallets(id, queryCompanyId);
+  }
 }
