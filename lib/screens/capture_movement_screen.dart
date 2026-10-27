@@ -38,6 +38,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
   
   String? _selectedWalletId;
   String? _selectedPaymentMethod;
+  List<dynamic> _wallets = [];
   bool _saving = false;
   String? _error;
   String get _tab => _flowType == 'INFLOW' ? 'in' : 'out';
@@ -215,6 +216,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
 
   Future<void> _loadWallets() async {
     final app = context.read<AppState>();
+    List<dynamic> loadedWallets = [];
     try {
       final identifier = app.user?.custodianId ?? app.user?.userId ?? '';
       final res = await app.authRequest(
@@ -224,30 +226,40 @@ class _CaptureState extends State<CaptureMovementScreen> {
       if (res.statusCode == 200) {
         final List list = jsonDecode(res.body);
         if (list.isNotEmpty) {
+          loadedWallets = list;
           app.wallets = list.map((item) => Wallet.fromJson(item)).toList();
         }
       }
     } catch (_) {}
 
-    if (app.wallets.isEmpty) {
+    if (loadedWallets.isEmpty) {
       await app.fetchWallets();
+      if (app.wallets.isNotEmpty) {
+        loadedWallets = app.wallets.map((w) => {
+          'id': w.id,
+          'name': w.name,
+          'type': w.type,
+          'isDefault': w.isDefault,
+          'currentBalance': w.currentBalance,
+          'balance': w.currentBalance,
+        }).toList();
+      }
     }
     await app.refreshBalance();
 
     if (mounted) {
-      final wallets = app.wallets;
-      if (wallets.isNotEmpty) {
-        if (_selectedWalletId == null || !wallets.any((w) => w.id == _selectedWalletId)) {
-          final defaultWallet = wallets.firstWhere(
-            (w) => w.isDefault,
-            orElse: () => wallets.first,
+      if (loadedWallets.isNotEmpty) {
+        setState(() {
+          _wallets = loadedWallets;
+          final defaultWallet = loadedWallets.firstWhere(
+            (w) => w['isDefault'] == true,
+            orElse: () => loadedWallets.first,
           );
-          setState(() {
-            _selectedWalletId = defaultWallet.id;
-            final methods = PaymentRails.getMethods(defaultWallet.type, _tab);
-            _selectedPaymentMethod = methods.isNotEmpty ? methods.first : 'Physical Cash';
-          });
-        }
+          _selectedWalletId = defaultWallet['id']?.toString();
+          final wType = defaultWallet['type']?.toString() ?? 'CASH';
+          final methods = PaymentRails.getMethods(wType, _tab);
+          _selectedPaymentMethod = methods.isNotEmpty ? methods.first : 'Physical Cash';
+        });
       }
     }
   }
@@ -648,7 +660,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final wallets = app.wallets;
+    final wallets = app.wallets.isNotEmpty
+        ? app.wallets
+        : _wallets.map((w) => Wallet.fromJson(Map<String, dynamic>.from(w))).toList();
 
     if (wallets.isNotEmpty) {
       if (_selectedWalletId == null || !wallets.any((w) => w.id == _selectedWalletId)) {
