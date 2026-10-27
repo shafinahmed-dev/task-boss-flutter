@@ -55,47 +55,32 @@ class _CaptureState extends State<CaptureMovementScreen> {
       _error = null;
     });
     try {
-      // Primary user service query aligning with Suite Governance user source
-      await Future.wait<void>([
-        app.fetchManagers(),
-        app.fetchSuiteEmployees(),
-      ]);
-
-      final List<dynamic> rawUsers = [
-        ...app.managers,
-        ...app.suiteEmployees,
-      ];
-
-      // Enrich with company custodians if available without restricting to a single concern
-      try {
-        final res = await app.authRequest('GET', Uri.parse('${app.apiBaseUrl}/custody/custodians'));
-        if (res.statusCode == 200) {
-          final rawData = jsonDecode(res.body);
-          final custList = rawData is List ? rawData : (rawData['custodians'] ?? rawData['data'] ?? []);
-          for (final c in custList) {
-            final cId = c['id']?.toString() ?? c['linkedUserId']?.toString();
-            if (cId != null && !rawUsers.any((u) => u['id']?.toString() == cId)) {
-              rawUsers.add(c);
-            }
-          }
-        }
-      } catch (_) {}
+      final res = await app.authRequest('GET', Uri.parse('${app.apiBaseUrl}/custody/custodians'));
+      List<dynamic> rawUsers = [];
+      if (res.statusCode == 200) {
+        final rawData = jsonDecode(res.body);
+        rawUsers = rawData is List ? rawData : (rawData['custodians'] ?? rawData['data'] ?? []);
+      }
 
       final currentUserId = app.user?.id ?? app.user?.userId;
-      debugPrint('CURRENT LOGGED IN USER: $currentUserId');
+      final currentCustodianId = app.user?.custodianId;
+      debugPrint('CURRENT LOGGED IN USER: $currentUserId, CUSTODIAN: $currentCustodianId');
       debugPrint('RAW USERS RECEIVED: ${rawUsers.length}');
 
       final currentId = currentUserId?.toString();
+      final currentCustId = currentCustodianId?.toString();
 
       final eligible = rawUsers.where((u) {
-        final uId = u['id']?.toString() ?? u['userId']?.toString();
-        final role = (u['role'] ?? u['user']?['role'] ?? '').toString().toLowerCase();
+        final uId = u['id']?.toString();
+        final linkedUserId = u['linkedUserId']?.toString() ?? u['linkedUser']?['id']?.toString() ?? u['userId']?.toString();
+        final role = (u['role'] ?? u['user']?['role'] ?? u['linkedUser']?['role'] ?? '').toString().toLowerCase();
 
         // Exclude current logged-in user (cannot handover to self)
-        if (uId == null || uId == currentId) return false;
+        if (uId != null && uId == currentCustId) return false;
+        if (linkedUserId != null && linkedUserId == currentId) return false;
 
         // Exclude suite administrative account
-        if (role == 'suite' || role == 'admin') return false;
+        if (role == 'suite' || role == 'admin' || role == 'suite_admin') return false;
 
         return true;
       }).toList();

@@ -12,8 +12,10 @@ import {
 import { CustodyService } from './custody.service.js';
 import type { InitiateTransferDto } from './custody.service.js';
 import { PrismaService } from '../../database/prisma.service.js';
+import { Roles } from '../auth/roles.decorator.js';
 
 @Controller('custody')
+@Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
 export class CustodyController {
   constructor(
     private readonly custodyService: CustodyService,
@@ -25,6 +27,7 @@ export class CustodyController {
    * Initiate a custody transfer (status: pending).
    */
   @Post('transfers')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
   @HttpCode(HttpStatus.CREATED)
   async initiateTransfer(@Body() dto: InitiateTransferDto) {
     return this.custodyService.initiateTransfer(dto);
@@ -35,6 +38,7 @@ export class CustodyController {
    * Receiver confirms acceptance.
    */
   @Post('transfers/:id/confirm')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
   @HttpCode(HttpStatus.OK)
   async confirmTransfer(
     @Param('id') id: string,
@@ -49,19 +53,22 @@ export class CustodyController {
    * Receiver flags discrepancy.
    */
   @Post('transfers/:id/dispute')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
   @HttpCode(HttpStatus.OK)
   async disputeTransfer(@Param('id') id: string) {
     return this.custodyService.disputeTransfer(id);
   }
 
   @Post('transfers/:id/cancel')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
   async cancelTransfer(@Param('id') id: string, @Req() req: any) {
-    return this.custodyService.cancelTransfer(id, req.user);
+    return this.custodyService.cancelTransfer(id, req?.user);
   }
 
   @Post('transfers/:id/decline')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
   async declineTransfer(@Param('id') id: string, @Req() req: any) {
-    return this.custodyService.declineTransfer(id, req.user);
+    return this.custodyService.declineTransfer(id, req?.user);
   }
 
   /**
@@ -69,6 +76,7 @@ export class CustodyController {
    * Returns all custody transfers involving this custodian (incoming and outgoing).
    */
   @Get('transfers')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
   async getTransfers(@Query() query: any) {
     try {
       return await this.custodyService.getTransfers(query?.custodianId);
@@ -83,6 +91,7 @@ export class CustodyController {
    * Returns pending handover requests and recent movement activity.
    */
   @Get('notifications')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
   async getNotifications(
     @Query('custodianId') custodianId: string,
     @Query('companyId') companyId: string,
@@ -94,6 +103,7 @@ export class CustodyController {
    * GET /custody/transfers/pending
    */
   @Get('transfers/pending')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
   async getPendingTransfers(@Req() req: any) {
     return this.custodyService.getPendingTransfers(req?.user);
   }
@@ -103,6 +113,7 @@ export class CustodyController {
    * List all custodians for the company.
    */
   @Get('custodians')
+  @Roles('MANAGER', 'EMPLOYEE', 'SUITE_ADMIN')
   async getCustodians(@Query('companyId') companyId: string) {
     return this.custodyService.getCustodians(companyId);
   }

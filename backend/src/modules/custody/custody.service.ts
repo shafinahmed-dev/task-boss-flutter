@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -31,6 +32,7 @@ export interface InitiateTransferDto {
 
 @Injectable()
 export class CustodyService {
+  private readonly logger = new Logger(CustodyService.name);
   private transferMetadata = new Map<
     string,
     { fee: number; channel: string; baseAmount: number }
@@ -220,30 +222,77 @@ export class CustodyService {
     if (!transfer) {
       throw new NotFoundException("Unable to complete handover. Transfer could not be found.");
     }
-    if (transfer.status === 'confirmed') {
+    if (transfer.status === 'confirmed' || transfer.status === 'ACCEPTED' || transfer.status === 'accepted') {
       return { success: true, message: 'Transfer already confirmed', transfer };
     }
     if (transfer.status === 'disputed') {
       throw new ConflictException('Cannot confirm a disputed transfer');
     }
 
-    let targetToWalletId = providedToWalletId || transfer.toWalletId;
-    if (!targetToWalletId && reqUser?.id) {
-      const userWallet = await this.prisma.wallet.findFirst({
-        where: { custodianId: transfer.toCustodianId, isArchived: false },
-        select: { id: true },
+    const recipientUserId = reqUser?.id || reqUser?.sub || transfer.toCustodian?.linkedUserId;
+    const operationalCompanyId = transfer.fromCustodian?.companyId || transfer.toCustodian?.companyId;
+
+    let recipientUser = transfer.toCustodian?.linkedUser;
+    if (!recipientUser && recipientUserId) {
+      recipientUser = await this.prisma.user.findUnique({
+        where: { id: recipientUserId },
       });
-      targetToWalletId = userWallet?.id ?? null;
     }
-    if (!targetToWalletId) {
-      const defaultWallet =
-        await this.prisma.wallet.findFirst({
-          where: { custodianId: transfer.toCustodianId, isDefault: true, isArchived: false },
-        }) ||
-        await this.prisma.wallet.findFirst({
-          where: { custodianId: transfer.toCustodianId, isArchived: false },
+
+    // Ensure recipient has a valid CustodianAccount
+    let recipientCustodian: any = transfer.toCustodian;
+
+    if (recipientUserId) {
+      let existingCustodian = await this.prisma.custodianAccount.findFirst({
+        where: {
+          linkedUserId: recipientUserId,
+          ...(operationalCompanyId ? { companyId: operationalCompanyId } : {}),
+        },
+        include: { linkedUser: true },
+      });
+
+      if (!existingCustodian) {
+        existingCustodian = await this.prisma.custodianAccount.findFirst({
+          where: { linkedUserId: recipientUserId },
+          include: { linkedUser: true },
         });
-      targetToWalletId = defaultWallet?.id || null;
+      }
+
+      if (!existingCustodian && operationalCompanyId) {
+        existingCustodian = await this.prisma.custodianAccount.create({
+          data: {
+            companyId: operationalCompanyId,
+            linkedUserId: recipientUserId,
+            name: recipientUser?.name || reqUser?.name || 'Recipient User',
+            type: 'person',
+          },
+          include: { linkedUser: true },
+        });
+      }
+
+      if (existingCustodian) {
+        recipientCustodian = existingCustodian;
+      }
+    }
+
+    // Ensure recipient has a destination wallet
+    let targetToWalletId = providedToWalletId || transfer.toWalletId;
+    if (!targetToWalletId && recipientCustodian?.id) {
+      let userWallet = await this.prisma.wallet.findFirst({
+        where: { custodianId: recipientCustodian.id, isArchived: false },
+      });
+      if (!userWallet && operationalCompanyId) {
+        userWallet = await this.prisma.wallet.create({
+          data: {
+            custodianId: recipientCustodian.id,
+            companyId: operationalCompanyId,
+            name: `${recipientUser?.name || reqUser?.name || 'Cash'} Wallet`,
+            type: 'CASH',
+            isDefault: true,
+          },
+        });
+      }
+      targetToWalletId = userWallet?.id ?? null;
     }
 
     const meta = typeof transfer.metadata === 'object' && transfer.metadata !== null ? transfer.metadata as any : {};
@@ -251,86 +300,92 @@ export class CustodyService {
     const channelVal = meta.channel || 'cash';
 
     const senderName = transfer.fromCustodian?.linkedUser?.name || transfer.fromCustodian?.name || 'Sender Custodian';
-    const recipientName = transfer.toCustodian?.linkedUser?.name || transfer.toCustodian?.name || 'Recipient Custodian';
+    const recipientName = recipientUser?.name || recipientCustodian?.name || transfer.toCustodian?.name || 'Recipient Custodian';
     const receiptNo = meta.voucherNumber || `HND-${transfer.id.substring(0, 8).toUpperCase()}`;
 
-    await this.prisma.$transaction(async (tx) => {
-      // 1. Update transfer status
-      await tx.custodyTransfer.update({
-        where: { id: transferId },
-        data: {
-          status: 'confirmed',
-          toWalletId: targetToWalletId,
-          confirmedAt: new Date(),
-        },
-      });
-
-      // 0. Prepare Movement Context
-      const senderUser = transfer.fromCustodian?.linkedUser;
-      const receiverUser = transfer.toCustodian?.linkedUser || reqUser;
-      const voucherNum = receiptNo; // Use the already defined receiptNo
-
-      // 1. Sender Outflow Movement
-      await tx.moneyMovement.create({
-        data: {
-          idempotencyKey: crypto.randomUUID(),
-          direction: 'out',
-          amount: transfer.amount,
-          fee: feeVal > 0 ? new Decimal(feeVal) : null,
-          currency: 'BDT',
-          channel: channelVal,
-          custodianId: transfer.fromCustodianId,
-          collectorId: transfer.fromCustodian?.linkedUserId || transfer.fromCustodianId,
-          walletId: transfer.fromWalletId || null,
-          entryTag: 'handover_out',
-          movementType: 'Handover Sent',
-          notes: `Sent to ${receiverUser?.name || 'Staff'}`,
-          metadata: {
-            transferId: transfer.id,
-            voucherNumber: voucherNum,
-            channel: channelVal,
-            recipientName: receiverUser?.name || 'Staff',
-            recipientUserId: receiverUser?.id || null,
-            senderName: senderUser?.name || reqUser.name,
-            senderUserId: senderUser?.id || reqUser.id,
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // 1. Update transfer status
+        await tx.custodyTransfer.update({
+          where: { id: transferId },
+          data: {
+            status: 'confirmed',
+            toCustodianId: recipientCustodian.id,
+            toWalletId: targetToWalletId,
+            confirmedAt: new Date(),
           },
-          occurredAt: new Date(),
-          syncStatus: 'synced',
-        },
-      });
+        });
 
-      // 2. Recipient Inflow Movement
-      await tx.moneyMovement.create({
-        data: {
-          idempotencyKey: crypto.randomUUID(),
-          direction: 'in',
-          amount: transfer.amount,
-          fee: 0,
-          currency: 'BDT',
-          channel: channelVal,
-          custodianId: transfer.toCustodianId,
-          collectorId: transfer.toCustodian?.linkedUserId || transfer.toCustodianId,
-          walletId: targetToWalletId,
-          entryTag: 'handover_in',
-          movementType: 'Handover Received',
-          notes: `Received from ${senderUser?.name || 'Manager'}`,
-          metadata: {
-            transferId: transfer.id,
-            voucherNumber: voucherNum,
+        // 0. Prepare Movement Context
+        const senderUser = transfer.fromCustodian?.linkedUser;
+        const receiverUser = recipientUser || transfer.toCustodian?.linkedUser || reqUser;
+        const voucherNum = receiptNo; // Use the already defined receiptNo
+
+        // 1. Sender Outflow Movement
+        await tx.moneyMovement.create({
+          data: {
+            idempotencyKey: crypto.randomUUID(),
+            direction: 'out',
+            amount: transfer.amount,
+            fee: feeVal > 0 ? new Decimal(feeVal) : null,
+            currency: 'BDT',
             channel: channelVal,
-            senderName: senderUser?.name || 'Sender',
-            senderUserId: senderUser?.id || null,
-            recipientName: receiverUser?.name || reqUser.name,
-            recipientUserId: receiverUser?.id || reqUser.id,
+            custodianId: transfer.fromCustodianId,
+            collectorId: transfer.fromCustodian?.linkedUserId || transfer.fromCustodianId,
+            walletId: transfer.fromWalletId || null,
+            entryTag: 'handover_out',
+            movementType: 'Handover Sent',
+            notes: `Sent to ${receiverUser?.name || 'Staff'}`,
+            metadata: {
+              transferId: transfer.id,
+              voucherNumber: voucherNum,
+              channel: channelVal,
+              recipientName: receiverUser?.name || 'Staff',
+              recipientUserId: receiverUser?.id || null,
+              senderName: senderUser?.name || reqUser?.name || 'Sender',
+              senderUserId: senderUser?.id || reqUser?.id || null,
+            },
+            occurredAt: new Date(),
+            syncStatus: 'synced',
           },
-          occurredAt: new Date(),
-          syncStatus: 'synced',
-        },
-      });
-    });
+        });
 
-    console.log('[Handover Confirm] Created movements for sender and receiver via ledger:', transferId);
-    return { success: true, message: 'Handover accepted successfully' };
+        // 2. Recipient Inflow Movement
+        await tx.moneyMovement.create({
+          data: {
+            idempotencyKey: crypto.randomUUID(),
+            direction: 'in',
+            amount: transfer.amount,
+            fee: 0,
+            currency: 'BDT',
+            channel: channelVal,
+            custodianId: recipientCustodian.id,
+            collectorId: recipientCustodian.linkedUserId || recipientCustodian.id,
+            walletId: targetToWalletId,
+            entryTag: 'handover_in',
+            movementType: 'Handover Received',
+            notes: `Received from ${senderUser?.name || 'Manager'}`,
+            metadata: {
+              transferId: transfer.id,
+              voucherNumber: voucherNum,
+              channel: channelVal,
+              senderName: senderUser?.name || 'Sender',
+              senderUserId: senderUser?.id || null,
+              recipientName: receiverUser?.name || reqUser?.name || 'Recipient',
+              recipientUserId: receiverUser?.id || reqUser?.id || null,
+            },
+            occurredAt: new Date(),
+            syncStatus: 'synced',
+          },
+        });
+      });
+
+      this.logger.log(`[Handover Confirm] Created movements for sender and receiver via ledger: ${transferId}`);
+      return { success: true, message: 'Handover accepted successfully' };
+    } catch (error) {
+      this.logger.error('Failed to accept handover:', error);
+      throw error;
+    }
   }
 
   /**
