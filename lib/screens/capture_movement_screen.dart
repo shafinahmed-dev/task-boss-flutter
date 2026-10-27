@@ -45,20 +45,41 @@ class _CaptureState extends State<CaptureMovementScreen> {
   Map<String, dynamic>? _lastSavedReceipt;
   List<dynamic> _eligibleUsers = [];
   bool _loadingEligibleUsers = false;
+  String? _selectedRecipientId;
 
   Future<void> _fetchEligibleUsers() async {
     final app = context.read<AppState>();
     if (app.user == null) return;
     setState(() {
       _loadingEligibleUsers = true;
+      _error = null;
     });
     try {
-      final res = await app.authRequest('GET', Uri.parse('${app.apiBaseUrl}/custody/custodians?companyId=${app.user!.companyId}'));
-      List<dynamic> rawUsers = [];
-      if (res.statusCode == 200) {
-        final rawData = jsonDecode(res.body);
-        rawUsers = rawData is List ? rawData : (rawData['custodians'] ?? rawData['data'] ?? []);
-      }
+      // Primary user service query aligning with Suite Governance user source
+      await Future.wait<void>([
+        app.fetchManagers(),
+        app.fetchSuiteEmployees(),
+      ]);
+
+      final List<dynamic> rawUsers = [
+        ...app.managers,
+        ...app.suiteEmployees,
+      ];
+
+      // Enrich with company custodians if available without restricting to a single concern
+      try {
+        final res = await app.authRequest('GET', Uri.parse('${app.apiBaseUrl}/custody/custodians'));
+        if (res.statusCode == 200) {
+          final rawData = jsonDecode(res.body);
+          final custList = rawData is List ? rawData : (rawData['custodians'] ?? rawData['data'] ?? []);
+          for (final c in custList) {
+            final cId = c['id']?.toString() ?? c['linkedUserId']?.toString();
+            if (cId != null && !rawUsers.any((u) => u['id']?.toString() == cId)) {
+              rawUsers.add(c);
+            }
+          }
+        }
+      } catch (_) {}
 
       final currentUserId = app.user?.id ?? app.user?.userId;
       debugPrint('CURRENT LOGGED IN USER: $currentUserId');
@@ -66,18 +87,29 @@ class _CaptureState extends State<CaptureMovementScreen> {
 
       final currentId = currentUserId?.toString();
 
-      _eligibleUsers = rawUsers.where((u) {
-        final uId = u['id']?.toString() ?? u['userId']?.toString() ?? u['user']?['id']?.toString();
-        final role = u['role']?.toString().toLowerCase() ?? u['user']?['role']?.toString().toLowerCase() ?? '';
+      final eligible = rawUsers.where((u) {
+        final uId = u['id']?.toString() ?? u['userId']?.toString();
+        final role = (u['role'] ?? u['user']?['role'] ?? '').toString().toLowerCase();
 
-        // Exclude self and suite admin
+        // Exclude current logged-in user (cannot handover to self)
         if (uId == null || uId == currentId) return false;
+
+        // Exclude suite administrative account
         if (role == 'suite' || role == 'admin') return false;
 
         return true;
       }).toList();
 
-      debugPrint('ELIGIBLE HANDOVER USERS: ${_eligibleUsers.length}');
+      debugPrint('ELIGIBLE HANDOVER USERS: ${eligible.length}');
+
+      if (mounted) {
+        setState(() {
+          _eligibleUsers = eligible;
+          if (_selectedRecipientId == null && eligible.isNotEmpty) {
+            _selectedRecipientId = eligible.first['id']?.toString();
+          }
+        });
+      }
     } catch (e) {
       debugPrint('_fetchEligibleUsers error: $e');
     } finally {
@@ -89,12 +121,117 @@ class _CaptureState extends State<CaptureMovementScreen> {
     }
   }
 
+  Widget _buildHandoverRecipientSection() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.swap_horiz_rounded, size: 18, color: AppTheme.slateMid),
+              const SizedBox(width: 8),
+              const Text(
+                'Select User',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: AppTheme.primaryText,
+                ),
+              ),
+              const Spacer(),
+              if (_loadingEligibleUsers)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.refresh, size: 18, color: AppTheme.secondaryText),
+                  onPressed: _fetchEligibleUsers,
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_loadingEligibleUsers)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12.0),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (_eligibleUsers.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.pendingBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.pendingBorder),
+              ),
+              child: const Text(
+                'No other users found in your company.',
+                style: TextStyle(color: AppTheme.pendingText, fontSize: 13),
+              ),
+            )
+          else
+            DropdownButtonFormField<String>(
+              initialValue: _selectedRecipientId,
+              hint: const Text('Select User', style: TextStyle(color: AppTheme.mutedText, fontSize: 13)),
+              items: _eligibleUsers.map((u) {
+                final uId = u['id']?.toString() ?? u['userId']?.toString() ?? '';
+                final name = u['name'] ?? u['user']?['name'] ?? 'Unknown';
+                final concern = u['concern_code'] ?? u['concernCode'] ?? u['concern'] ?? 'TDC';
+                final designation = u['designation'] ?? u['role'] ?? '';
+                final displayText = designation.isNotEmpty
+                    ? '$name [$concern] • $designation'
+                    : '$name [$concern]';
+
+                return DropdownMenuItem<String>(
+                  value: uId,
+                  child: Text(
+                    displayText,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: AppTheme.primaryText,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: (val) {
+                setState(() => _selectedRecipientId = val);
+              },
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final app = context.read<AppState>();
+      _fetchEligibleUsers();
       await app.fetchMyLedgers();
       if (app.myLedgers.isNotEmpty && mounted) {
         final genOps = app.myLedgers.firstWhere(
@@ -517,6 +654,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
             if (_error != null) _banner(_error!),
             _buildFlowPill(),
             const SizedBox(height: 14),
+            if (_flowType == 'OUTFLOW') _buildHandoverRecipientSection(),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -1054,8 +1192,8 @@ class _CaptureState extends State<CaptureMovementScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: const [
+        const Row(
+          children: [
             Icon(Icons.category_outlined, size: 18, color: Color(0xFF0F172A)),
             SizedBox(width: 8),
             Text(
