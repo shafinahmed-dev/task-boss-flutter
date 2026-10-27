@@ -169,6 +169,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
             )
           else
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _selectedRecipientId,
               hint: const Text('Select User', style: TextStyle(color: AppTheme.mutedText, fontSize: 13)),
               items: _eligibleUsers.map((u) {
@@ -184,6 +185,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   value: uId,
                   child: Text(
                     displayText,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
@@ -287,13 +289,16 @@ class _CaptureState extends State<CaptureMovementScreen> {
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
                 onPressed: () async {
                   if (name.isEmpty) return;
+                  final messenger = ScaffoldMessenger.of(this.context);
+                  final nav = Navigator.of(ctx);
                   final newCat = await app.createCategory(name: name, type: type, companyId: cid);
-                  if (newCat != null && mounted) {
+                  if (!mounted) return;
+                  if (newCat != null) {
                     setState(() { _selectedCategory = newCat; _categorySearchCtrl.clear(); });
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Category "$name" created')));
-                  } else if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(app.errorMessage ?? 'Failed to create category')));
+                    nav.pop();
+                    messenger.showSnackBar(SnackBar(content: Text('Category "$name" created')));
+                  } else {
+                    messenger.showSnackBar(SnackBar(content: Text(app.errorMessage ?? 'Failed to create category')));
                   }
                 },
                 child: const Text('Create Category', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -325,6 +330,8 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   IconButton(
                     icon: const Icon(Icons.delete_rounded, color: Colors.red),
                     onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(this.context);
+                      final nav = Navigator.of(ctx);
                       final confirm = await showDialog<bool>(
                         context: ctx,
                         builder: (dialogContext) => AlertDialog(
@@ -346,23 +353,21 @@ class _CaptureState extends State<CaptureMovementScreen> {
                       if (confirm == true) {
                         try {
                           await app.deleteCategory(categoryId);
-                          if (mounted) {
-                            Navigator.pop(ctx);
-                            if (_selectedCategory?['id'] == categoryId) {
-                              setState(() {
-                                _selectedCategory = null;
-                              });
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Category deleted successfully')),
-                            );
+                          if (!mounted) return;
+                          nav.pop();
+                          if (_selectedCategory?['id'] == categoryId) {
+                            setState(() {
+                              _selectedCategory = null;
+                            });
                           }
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('Category deleted successfully')),
+                          );
                         } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to delete: ${e.toString()}')),
-                            );
-                          }
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('Failed to delete: ${e.toString()}')),
+                          );
                         }
                       }
                     },
@@ -389,6 +394,8 @@ class _CaptureState extends State<CaptureMovementScreen> {
                 onPressed: () async {
                   if (name.isEmpty) return;
 
+                  final messenger = ScaffoldMessenger.of(this.context);
+                  final nav = Navigator.of(ctx);
                   try {
                     await app.updateCategory(
                       id: categoryId,
@@ -396,18 +403,16 @@ class _CaptureState extends State<CaptureMovementScreen> {
                       type: type,
                     );
 
-                    if (mounted) {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Category updated successfully')),
-                      );
-                    }
+                    if (!mounted) return;
+                    nav.pop();
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Category updated successfully')),
+                    );
                   } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to update: ${e.toString()}')),
-                      );
-                    }
+                    if (!mounted) return;
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('Failed to update: ${e.toString()}')),
+                    );
                   }
                 },
                 child: const Text('Update Category'),
@@ -726,7 +731,19 @@ class _CaptureState extends State<CaptureMovementScreen> {
                       DropdownButtonFormField<String>(
                         key: ValueKey('wallet_$_selectedWalletId'),
                         initialValue: _selectedWalletId,
-                        items: wallets.map((w) => DropdownMenuItem<String>(value: w.id, child: Text('${w.name} (৳${w.currentBalance.toStringAsFixed(0)})', overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)))).toList(),
+                        isExpanded: true,
+                        items: wallets.map((w) {
+                          final walletLabel = '${w.name} (৳${w.currentBalance.toStringAsFixed(0)})';
+                          return DropdownMenuItem<String>(
+                            value: w.id,
+                            child: Text(
+                              walletLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          );
+                        }).toList(),
                         onChanged: (v) {
                           if (v != null) {
                             setState(() {
@@ -784,8 +801,17 @@ class _CaptureState extends State<CaptureMovementScreen> {
                             )
                           : DropdownButtonFormField<String>(
                               key: ValueKey('method_${selectedWallet?.id}_$_selectedPaymentMethod'),
+                              isExpanded: true,
                               initialValue: availableMethods.contains(_selectedPaymentMethod) ? _selectedPaymentMethod : availableMethods.first,
-                              items: availableMethods.map((m) => DropdownMenuItem<String>(value: m, child: Text(m, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12), overflow: TextOverflow.ellipsis))).toList(),
+                              items: availableMethods.map((m) => DropdownMenuItem<String>(
+                                value: m,
+                                child: Text(
+                                  m,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                                ),
+                              )).toList(),
                               onChanged: (v) {
                                 if (v != null) setState(() => _selectedPaymentMethod = v);
                               },
