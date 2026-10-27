@@ -355,9 +355,9 @@ export class CustodyService {
             collectorId: transfer.fromCustodian?.linkedUserId || transfer.fromCustodianId,
             walletId: transfer.fromWalletId || null,
             entryTag: 'handover_out',
-            movementType: 'Handover Sent',
             notes: `Sent to ${receiverUser?.name || 'Staff'}`,
             metadata: {
+              movementType: 'Handover Sent',
               transferId: transfer.id,
               voucherNumber: receiptNo,
               channel: channelVal,
@@ -384,9 +384,9 @@ export class CustodyService {
             collectorId: recipientCustodian.linkedUserId || recipientCustodian.id,
             walletId: targetToWalletId,
             entryTag: 'handover_in',
-            movementType: 'Handover Received',
             notes: `Received from ${senderUser?.name || 'Manager'}`,
             metadata: {
+              movementType: 'Handover Received',
               transferId: transfer.id,
               voucherNumber: receiptNo,
               channel: channelVal,
