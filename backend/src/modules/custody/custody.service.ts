@@ -417,34 +417,20 @@ export class CustodyService {
    */
   async ensureColleaguesExist(companyId: string) {
     try {
-      const company = await this.prisma.company.findUnique({
-        where: { id: companyId },
-        select: { tenantId: true },
-      });
-
       // Find all active company users (Managers AND Employees)
       const activeUsers = await this.prisma.user.findMany({
         where: {
           role: {
             in: ['MANAGER', 'EMPLOYEE', 'manager', 'employee'],
           },
-          OR: [
-            {
-              companies: {
-                some: {
-                  companyId,
-                },
-              },
-            },
-            ...(company?.tenantId ? [{ tenantId: company.tenantId }] : []),
-          ],
         },
       });
 
       for (const u of activeUsers) {
-        // Check if a custodian account is already linked to this user
+        // Check if a custodian account is already linked to this user in this company
         let account = await this.prisma.custodianAccount.findFirst({
           where: {
+            companyId,
             linkedUserId: u.id,
           },
         });
