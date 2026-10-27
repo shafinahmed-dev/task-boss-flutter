@@ -416,8 +416,97 @@ export class CustodyService {
    * Helper to ensure colleague accounts exist in the company so users can select them as recipients.
    */
   async ensureColleaguesExist(companyId: string) {
-    // DISABLED: Auto-seeding colleagues is prohibited by "Zero Ghost Data" policy.
-    return;
+    try {
+      const company = await this.prisma.company.findUnique({
+        where: { id: companyId },
+        select: { tenantId: true },
+      });
+
+      // Find all active company users (Managers AND Employees)
+      const activeUsers = await this.prisma.user.findMany({
+        where: {
+          role: {
+            in: ['MANAGER', 'EMPLOYEE', 'manager', 'employee'],
+          },
+          OR: [
+            {
+              companies: {
+                some: {
+                  companyId,
+                },
+              },
+            },
+            ...(company?.tenantId ? [{ tenantId: company.tenantId }] : []),
+          ],
+        },
+      });
+
+      for (const u of activeUsers) {
+        // Check if a custodian account is already linked to this user
+        let account = await this.prisma.custodianAccount.findFirst({
+          where: {
+            linkedUserId: u.id,
+          },
+        });
+
+        if (!account) {
+          // Check if an unlinked custodian account with the user's name exists
+          account = await this.prisma.custodianAccount.findFirst({
+            where: {
+              companyId,
+              name: u.name,
+            },
+          });
+
+          if (account) {
+            // Link the existing account to this user
+            await this.prisma.custodianAccount.update({
+              where: { id: account.id },
+              data: {
+                linkedUserId: u.id,
+                type: u.role.toLowerCase(), // 'manager' or 'employee'
+              },
+            });
+          } else {
+            // Create a fresh custodian account for the user
+            account = await this.prisma.custodianAccount.create({
+              data: {
+                companyId,
+                linkedUserId: u.id,
+                name: u.name,
+                type: u.role.toLowerCase(), // 'manager' or 'employee'
+              },
+            });
+          }
+        } else if (account.type === 'company') {
+          // If it was marked as 'company', update type so it won't be filtered out
+          await this.prisma.custodianAccount.update({
+            where: { id: account.id },
+            data: { type: u.role.toLowerCase() },
+          });
+        }
+
+        // Also ensure a default cash wallet exists for this custodian account
+        if (account) {
+          const wallet = await this.prisma.wallet.findFirst({
+            where: { custodianId: account.id, isArchived: false },
+          });
+          if (!wallet) {
+            await this.prisma.wallet.create({
+              data: {
+                custodianId: account.id,
+                companyId,
+                name: `${u.name} Cash Wallet`,
+                type: 'CASH',
+                isDefault: true,
+              },
+            });
+          }
+        }
+      }
+    } catch (err) {
+      this.logger.error('ensureColleaguesExist error:', err);
+    }
   }
 
   /**
