@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -53,9 +54,22 @@ export class LedgerController {
     return this.ledgerService.deleteLedger(req.user, id);
   }
 
-  @Get('my')
-  async getMyLedgers(@Req() req: any) {
-    return this.ledgerService.getMyLedgers(req.user);
+  @Get('my-ledgers')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  async getMyLedgersEndpoint(@Req() req: any) {
+    const userId = req.user.id || req.user.userId;
+    return this.ledgerService.getLedgersForUser(userId, req.user);
+  }
+
+  @Patch(':id/assign-employees')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  async assignEmployees(
+    @Param('id') ledgerId: string,
+    @Body() body: { employeeUserIds: string[] },
+    @Req() req: any,
+  ) {
+    const userId = req.user.id || req.user.userId;
+    return this.ledgerService.assignEmployeesToLedger(ledgerId, body.employeeUserIds, userId, req.user);
   }
 
   @Get('manager')

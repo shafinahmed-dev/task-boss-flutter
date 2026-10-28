@@ -605,6 +605,135 @@ export class LedgerService {
     const allLedgers = defaultLedger ? [defaultLedger, ...assignedLedgers] : assignedLedgers;
     return { success: true, ledgers: allLedgers };
   }
+  async getLedgersForUser(userId: string, reqUser: any) {
+    const tenantId = reqUser?.tenantId || reqUser?.tenant_id;
+    if (!tenantId) throw new BadRequestException('Tenant ID required');
+
+    await this.ensureDefaultLedger(tenantId);
+
+    const isSuite = reqUser?.role === 'SUITE_ADMIN';
+
+    const ledgers = await this.prisma.ledger.findMany({
+      where: {
+        tenantId,
+        status: { not: 'ARCHIVED' },
+        ...(isSuite
+          ? {}
+          : {
+              OR: [
+                { assignments: { some: { userId } } },
+                { code: 'GEN-OPS' },
+              ],
+            }),
+      },
+      include: {
+        assignments: {
+          include: { user: { select: { id: true, name: true, handle: true, role: true } } },
+        },
+        segments: { select: { id: true, name: true } },
+        movements: { select: { amount: true, direction: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const serialized = ledgers.map((l) => {
+      let inflow = 0;
+      let outflow = 0;
+      for (const m of l.movements) {
+        const amt = Number(m.amount || 0);
+        const dir = (m.direction || '').toUpperCase();
+        if (dir === 'IN') inflow += amt;
+        else if (dir === 'OUT') outflow += amt;
+      }
+
+      const managers = l.assignments
+        .filter((a) => a.role === 'MANAGER')
+        .map((a) => ({
+          id: a.user.id,
+          name: a.user.name,
+          handle: a.user.handle,
+        }));
+
+      const employees = l.assignments
+        .filter((a) => a.role === 'EMPLOYEE')
+        .map((a) => ({
+          id: a.user.id,
+          name: a.user.name,
+          handle: a.user.handle,
+        }));
+
+      return {
+        id: l.id,
+        name: l.name,
+        code: l.code,
+        description: l.description || '',
+        isPerpetual: l.isPerpetual,
+        startDate: l.startDate?.toISOString() || null,
+        endDate: l.endDate?.toISOString() || null,
+        status: l.status,
+        segmentsCount: l.segments.length,
+        managersCount: managers.length,
+        managers: managers,
+        employees: employees,
+        inflow: inflow,
+        outflow: outflow,
+        netVelocity: inflow - outflow,
+      };
+    });
+
+    serialized.sort((a, b) => {
+      if (a.code === 'GEN-OPS') return -1;
+      if (b.code === 'GEN-OPS') return 1;
+      return 0;
+    });
+
+    return { success: true, ledgers: serialized };
+  }
+
+  async assignEmployeesToLedger(ledgerId: string, employeeUserIds: string[], managerUserId: string, reqUser: any) {
+    const tenantId = reqUser?.tenantId || reqUser?.tenant_id;
+    const ledger = await this.prisma.ledger.findFirst({
+      where: { id: ledgerId, tenantId },
+      include: { assignments: true },
+    });
+    if (!ledger) throw new NotFoundException('Ledger not found');
+
+    const isSuite = reqUser?.role === 'SUITE_ADMIN';
+    if (!isSuite) {
+      const isAssignedManager = ledger.assignments.some(
+        (a) => a.userId === managerUserId && a.role === 'MANAGER',
+      );
+      if (!isAssignedManager) {
+        throw new BadRequestException('You are not assigned as a manager to this ledger.');
+      }
+    }
+
+    // Remove existing employee assignments for this ledger
+    await this.prisma.ledgerMember.deleteMany({
+      where: { ledgerId, role: 'EMPLOYEE' },
+    });
+
+    if (Array.isArray(employeeUserIds) && employeeUserIds.length > 0) {
+      await this.prisma.ledgerMember.createMany({
+        data: employeeUserIds.map((userId) => ({
+          ledgerId,
+          userId,
+          role: 'EMPLOYEE',
+        })),
+      });
+    }
+
+    const updated = await this.prisma.ledger.findUnique({
+      where: { id: ledgerId },
+      include: {
+        assignments: {
+          include: { user: { select: { id: true, name: true, handle: true, role: true } } },
+        },
+      },
+    });
+
+    return { success: true, ledger: updated };
+  }
 
   async getSuiteLedgers(reqUser: any, search?: string, status?: string) {
     const tenantId = reqUser?.tenantId;

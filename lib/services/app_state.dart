@@ -562,6 +562,24 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> assignEmployeesToLedger(String ledgerId, List<String> employeeUserIds) async {
+    try {
+      final res = await authRequest(
+        'PATCH',
+        Uri.parse('$apiBaseUrl/ledgers/$ledgerId/assign-employees'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'employeeUserIds': employeeUserIds}),
+      );
+      if (res.statusCode == 200) {
+        await fetchMyLedgers();
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('assignEmployeesToLedger error: $e');
+    }
+    return false;
+  }
 
   Future<bool> createSegmentInLedger(String ledgerId, String name, {String? description}) async {
     try {
