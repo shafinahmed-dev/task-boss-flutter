@@ -854,10 +854,18 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.tune_rounded, color: Color(0xFF0F172A)),
-            onPressed: _openEditModal,
-            tooltip: 'Edit Ledger',
+          Consumer<AppState>(
+            builder: (context, app, _) {
+              final role = app.user!.role.toUpperCase();
+              if (role == 'SUITE_ADMIN' || role == 'SUITE') {
+                return IconButton(
+                  icon: const Icon(Icons.tune_rounded, color: Color(0xFF0F172A)),
+                  onPressed: _openEditModal,
+                  tooltip: 'Edit Ledger',
+                );
+              }
+              return const SizedBox.shrink();
+            },
           ),
         ],
       ),
