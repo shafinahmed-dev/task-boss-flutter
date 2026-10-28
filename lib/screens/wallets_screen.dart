@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:task_boss/theme.dart';
 import 'package:task_boss/models/models.dart';
 import 'package:task_boss/services/app_state.dart';
+import 'package:task_boss/screens/suite/ledger_details_screen.dart';
 
 class WalletsScreen extends StatefulWidget {
   const WalletsScreen({super.key});
@@ -490,45 +491,8 @@ class _WalletsScreenState extends State<WalletsScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Container(
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(16),
-                    color: Colors.red,
-                    child: const Text(
-                      'RENDER TEST: ASSIGNED LEDGERS ANCHOR',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ),
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF0F172A), Color(0xFF020617)],
-                      ),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1.0),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Barakah Condominium Project',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Net Position: ৳ 20,000.00',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.75)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
+                
+                  
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -546,6 +510,8 @@ class _WalletsScreenState extends State<WalletsScreen> {
                     const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
                   else
                     ...wallets.map((wallet) => _buildWalletCard(wallet)),
+                    _buildAssignedLedgersSection(),
+                    const SizedBox(height: 36),
                 ],
               ),
             ),
@@ -808,4 +774,277 @@ class _WalletsScreenState extends State<WalletsScreen> {
       ),
     );
   }
-}
+Widget _buildAssignedLedgersSection() {
+    final ledgers = [
+      {
+        'id': 'barakah-condo-id',
+        'name': 'Barakah Condominium Project',
+        'status': 'ACTIVE',
+        'netBalance': 20000.0,
+        'description': 'Our ongoing project at Priyanka Runway City',
+      }
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 28),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Assigned Ledgers',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${ledgers.length} Active',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...ledgers.map((ledger) {
+          final name = ledger['name']?.toString() ?? 'Barakah Condominium Project';
+          final status = ledger['status']?.toString().toUpperCase() ?? 'ACTIVE';
+          final net = (ledger['netBalance'] as num? ?? 20000).toDouble();
+
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF0F172A), // Midnight Slate
+                  Color(0xFF020617), // Deep Obsidian
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.10),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF059669).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          status,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF34D399),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Net Position: ৳ ${net.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.75),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _showManageTeamModal(context, ledger),
+                        icon: const Icon(Icons.group_add_outlined, size: 14, color: Colors.white),
+                        label: const Text(
+                          'Manage Team',
+                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      const Spacer(),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LedgerDetailsScreen(
+                                ledgerId: ledger['id']?.toString() ?? '',
+                                initialName: name,
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.12),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('View Ledger', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                            SizedBox(width: 4),
+                            Icon(Icons.arrow_forward_rounded, size: 14),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  void _showManageTeamModal(BuildContext context, Map<String, dynamic> ledger) {
+    final List<Map<String, String>> employees = [
+      {'id': 'shafin-id', 'name': 'Shafin Ahmed', 'handle': 'shafin.taskgroup'},
+      {'id': 'ayaz-id', 'name': 'Ayaz Mustaqeem', 'handle': 'ayaz.taskgroup'},
+    ];
+
+    List<String> selectedEmployeeIds = List<String>.from(ledger['assignedEmployeeIds'] ?? []);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Delegate Team: ${ledger['name'] ?? 'Ledger'}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(modalCtx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Assign employees who can record expenses and view segments in this ledger.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 16),
+                  ...employees.map((emp) {
+                    final empId = emp['id'] ?? '';
+                    final isAssigned = selectedEmployeeIds.contains(empId);
+                    return Material(
+                      color: Colors.transparent,
+                      child: CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(emp['name'] ?? 'Employee', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text('@${emp['handle'] ?? 'employee'}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        value: isAssigned,
+                        activeColor: const Color(0xFF0F172A),
+                        onChanged: (val) {
+                          setModalState(() {
+                            if (val == true) {
+                              selectedEmployeeIds.add(empId);
+                            } else {
+                              selectedEmployeeIds.remove(empId);
+                            }
+                          });
+                        },
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F172A),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(modalCtx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Team assignments updated successfully!'), backgroundColor: Color(0xFF059669)),
+                        );
+                      },
+                      child: const Text('Save Assignments', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+  }
