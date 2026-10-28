@@ -490,6 +490,46 @@ class _WalletsScreenState extends State<WalletsScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  Container(
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.red,
+                    child: const Text(
+                      'RENDER TEST: ASSIGNED LEDGERS ANCHOR',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF0F172A), Color(0xFF020617)],
+                      ),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1.0),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Barakah Condominium Project',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Net Position: ৳ 20,000.00',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.75)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
