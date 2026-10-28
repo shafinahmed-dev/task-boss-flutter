@@ -649,16 +649,24 @@ class AppState extends ChangeNotifier {
 
     try {
       http.Response response;
-      if (method == 'GET') {
-        response = await http.get(url, headers: mergedHeaders).timeout(const Duration(seconds: 15));
-      } else if (method == 'POST') {
-        response = await http.post(url, headers: mergedHeaders, body: body).timeout(const Duration(seconds: 15));
-      } else if (method == 'PATCH') {
-        response = await http.patch(url, headers: mergedHeaders, body: body).timeout(const Duration(seconds: 15));
-      } else if (method == 'DELETE') {
-        response = await http.delete(url, headers: mergedHeaders, body: body).timeout(const Duration(seconds: 15));
-      } else {
-        throw Exception('Unsupported method');
+      switch (method.toUpperCase()) {
+        case 'GET':
+          response = await http.get(url, headers: mergedHeaders).timeout(const Duration(seconds: 15));
+          break;
+        case 'POST':
+          response = await http.post(url, headers: mergedHeaders, body: body).timeout(const Duration(seconds: 15));
+          break;
+        case 'PUT':
+          response = await http.put(url, headers: mergedHeaders, body: body).timeout(const Duration(seconds: 15));
+          break;
+        case 'PATCH':
+          response = await http.patch(url, headers: mergedHeaders, body: body).timeout(const Duration(seconds: 15));
+          break;
+        case 'DELETE':
+          response = await http.delete(url, headers: mergedHeaders, body: body).timeout(const Duration(seconds: 15));
+          break;
+        default:
+          throw Exception('Unsupported method: $method');
       }
 
       if (response.statusCode == 401) {

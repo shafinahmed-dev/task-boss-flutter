@@ -346,22 +346,25 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                             final mName = m['name']?.toString() ?? 'Manager';
                             final isSelected = selectedManagerIds.contains(mId);
 
-                            return CheckboxListTile(
-                              value: isSelected,
-                              title: Text(mName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                              subtitle: Text(m['handle']?.toString() ?? '', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                              activeColor: const Color(0xFF0F172A),
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              onChanged: (val) {
-                                setSheetState(() {
-                                  if (val == true) {
-                                    selectedManagerIds.add(mId);
-                                  } else {
-                                    selectedManagerIds.remove(mId);
-                                  }
-                                });
-                              },
+                            return Material(
+                              color: Colors.transparent,
+                              child: CheckboxListTile(
+                                value: isSelected,
+                                title: Text(mName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                subtitle: Text(m['handle']?.toString() ?? '', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                activeColor: const Color(0xFF0F172A),
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                onChanged: (val) {
+                                  setSheetState(() {
+                                    if (val == true) {
+                                      selectedManagerIds.add(mId);
+                                    } else {
+                                      selectedManagerIds.remove(mId);
+                                    }
+                                  });
+                                },
+                              ),
                             );
                           },
                         ),
