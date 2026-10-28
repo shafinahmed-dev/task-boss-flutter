@@ -554,6 +554,41 @@ class _WalletsScreenState extends State<WalletsScreen> {
                     const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
                   else
                     ...wallets.map((wallet) => _buildWalletCard(wallet)),
+                   const SizedBox(height: 24),
+                   Padding(
+                     padding: const EdgeInsets.symmetric(horizontal: 16),
+                     child: Row(
+                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                       children: [
+                         const Text(
+                           'Assigned Ledgers',
+                           style: TextStyle(
+                             fontSize: 16,
+                             fontWeight: FontWeight.w800,
+                             letterSpacing: -0.3,
+                             color: Color(0xFF0F172A),
+                           ),
+                         ),
+                         Container(
+                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                           decoration: BoxDecoration(
+                             color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+                             borderRadius: BorderRadius.circular(12),
+                           ),
+                           child: Text(
+                             '${_assignedLedgers.length} Active',
+                             style: const TextStyle(
+                               fontSize: 11,
+                               fontWeight: FontWeight.w700,
+                               color: Color(0xFF0F172A),
+                             ),
+                           ),
+                         ),
+                       ],
+                     ),
+                   ),
+                   const SizedBox(height: 12),
+
                 ],
                    const SizedBox(height: 28),
                    Padding(
@@ -562,6 +597,57 @@ class _WalletsScreenState extends State<WalletsScreen> {
                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                        children: [
                          const Text(
+                   if (_isLoadingLedgers)
+                     const Padding(
+                       padding: EdgeInsets.all(24.0),
+                       child: Center(child: CircularProgressIndicator()),
+                     )
+                   else if (_assignedLedgers.isEmpty)
+                     Container(
+                       margin: const EdgeInsets.symmetric(horizontal: 16),
+                       padding: const EdgeInsets.all(16),
+                       decoration: BoxDecoration(
+                         color: const Color(0xFFF8FAFC),
+                         borderRadius: BorderRadius.circular(16),
+                         border: Border.all(color: const Color(0xFFE2E8F0)),
+                       ),
+                       child: const Center(
+                         child: Text(
+                           'No ledgers currently assigned to your account.',
+                           style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                         ),
+                       ),
+                     )
+                   else
+                     ..._assignedLedgers.map((ledger) {
+                       final name = ledger['name']?.toString() ?? 'Barakah Condominium Project';
+                       final status = ledger['status']?.toString().toUpperCase() ?? 'ACTIVE';
+                       final net = (ledger['netBalance'] as num? ?? ledger['balance'] as num? ?? 20000).toDouble();
+
+                       return Container(
+                         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                         decoration: BoxDecoration(
+                           borderRadius: BorderRadius.circular(18),
+                           gradient: const LinearGradient(
+                             begin: Alignment.topLeft,
+                             end: Alignment.bottomRight,
+                             colors: [
+                               Color(0xFF0F172A),
+                               Color(0xFF020617),
+                             ],
+                           ),
+                           border: Border.all(
+                             color: Colors.white.withValues(alpha: 0.10),
+                             width: 1.0,
+                           ),
+                           boxShadow: [
+                             BoxShadow(
+                               color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                               blurRadius: 14,
+                               offset: const Offset(0, 5),
+                             ),
+                           ],
+                         ),
                            'Assigned Ledgers',
                            style: TextStyle(
                              fontSize: 16,
@@ -631,6 +717,92 @@ class _WalletsScreenState extends State<WalletsScreen> {
                              colors: [
                                Color(0xFF0F172A),
                                Color(0xFF020617),
+                         child: Padding(
+                           padding: const EdgeInsets.all(18),
+                           child: Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               Row(
+                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                 children: [
+                                   Expanded(
+                                     child: Text(
+                                       name,
+                                       style: const TextStyle(
+                                         fontSize: 16,
+                                         fontWeight: FontWeight.w800,
+                                         color: Colors.white,
+                                         letterSpacing: -0.3,
+                                       ),
+                                     ),
+                                   ),
+                                   Container(
+                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                     decoration: BoxDecoration(
+                                       color: const Color(0xFF059669).withValues(alpha: 0.2),
+                                       borderRadius: BorderRadius.circular(8),
+                                       border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.4)),
+                                     ),
+                                     child: Text(
+                                       status,
+                                       style: const TextStyle(
+                                         fontSize: 10,
+                                         fontWeight: FontWeight.w800,
+                                         color: Color(0xFF34D399),
+                                       ),
+                                     ),
+                                   ),
+                                 ],
+                               ),
+                               const SizedBox(height: 10),
+                               Text(
+                                 'Net Position: ৳ ${net.toStringAsFixed(2)}',
+                                 style: TextStyle(
+                                   fontSize: 13,
+                                   fontWeight: FontWeight.w600,
+                                   color: Colors.white.withValues(alpha: 0.75),
+                                 ),
+                               ),
+                               const SizedBox(height: 16),
+                               Row(
+                                 children: [
+                                   OutlinedButton.icon(
+                                     onPressed: () {},
+                                     icon: const Icon(Icons.group_add_outlined, size: 14, color: Colors.white),
+                                     label: const Text('Manage Team', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                                     style: OutlinedButton.styleFrom(
+                                       side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                     ),
+                                   ),
+                                   const Spacer(),
+                                   ElevatedButton(
+                                     onPressed: () {},
+                                     style: ElevatedButton.styleFrom(
+                                       backgroundColor: Colors.white.withValues(alpha: 0.12),
+                                       foregroundColor: Colors.white,
+                                       elevation: 0,
+                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                     ),
+                                     child: const Row(
+                                       mainAxisSize: MainAxisSize.min,
+                                       children: [
+                                         Text('View Ledger', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                         SizedBox(width: 4),
+                                         Icon(Icons.arrow_forward_rounded, size: 14),
+                                       ],
+                                     ),
+                                   ),
+                                 ],
+                               ),
+                             ],
+                           ),
+                         ),
+                       );
+                     }),
+                   const SizedBox(height: 36),
                              ],
                            ),
                            border: Border.all(
