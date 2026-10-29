@@ -363,7 +363,21 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   final newCat = await app.createCategory(name: name, type: type, companyId: cid);
                   if (!mounted) return;
                   if (newCat != null) {
-                    setState(() { _selectedCategory = newCat; _categorySearchCtrl.clear(); });
+                    final createdCat = {
+                      'id': newCat['id']?.toString() ?? name,
+                      'name': name,
+                      'ledgerId': _selectedLedgerId,
+                      'type': type,
+                    };
+                    setState(() {
+                      app.concernCategories.removeWhere((c) => c['name'].toString().toLowerCase() == name.toLowerCase());
+                      app.concernCategories.add(createdCat);
+                      _selectedCategory = createdCat;
+                      _categorySearchCtrl.clear();
+                    });
+                    await app.fetchMyLedgers();
+
+
                     nav.pop();
                     messenger.showSnackBar(SnackBar(content: Text('Category "$name" created')));
                   } else {
