@@ -290,17 +290,20 @@ class _CaptureState extends State<CaptureMovementScreen> {
       _fetchEligibleUsers();
       await _loadWallets();
       await app.fetchMyLedgers();
-      if (app.myLedgers.isNotEmpty && mounted) {
-        final genOps = app.myLedgers.firstWhere(
-          (l) => l['code'] == 'GEN-OPS',
-          orElse: () => app.myLedgers.first,
-        );
-        setState(() {
-          _selectedLedgerId = genOps['id'].toString();
-          if (genOps['segments'] is List) {
-            _visibleSegments = List<dynamic>.from(genOps['segments']);
-          }
-        });
+      final ledgers = app.myLedgers;
+      if (ledgers.isNotEmpty && mounted) {
+        if (_selectedLedgerId == null || !ledgers.any((l) => l['id']?.toString() == _selectedLedgerId)) {
+          final genOps = ledgers.firstWhere(
+            (l) => l['code'] == 'GEN-OPS' || (l['name']?.toString() ?? '').toLowerCase().contains('general'),
+            orElse: () => ledgers.first,
+          );
+          setState(() {
+            _selectedLedgerId = genOps['id']?.toString() ?? ledgers.first['id']?.toString();
+            if (genOps['segments'] is List) {
+              _visibleSegments = List<dynamic>.from(genOps['segments']);
+            }
+          });
+        }
       }
       if (app.selectedManagerCompanyId == null || app.selectedManagerCompanyId!.isEmpty) {
         await app.fetchManagerOverview();
@@ -769,7 +772,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     key: ValueKey('ledger_${_selectedLedgerId ?? (app.myLedgers.isNotEmpty ? app.myLedgers.first['id'].toString() : 'none')}'),
-                    initialValue: _selectedLedgerId ?? (app.myLedgers.isNotEmpty ? app.myLedgers.first['id'].toString() : null),
+                    initialValue: (app.myLedgers.any((l) => l['id']?.toString() == _selectedLedgerId))
+                        ? _selectedLedgerId
+                        : (app.myLedgers.isNotEmpty ? app.myLedgers.first['id']?.toString() : null),
                     hint: const Text('Select Ledger', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Color(0xFF94A3B8))),
                     items: app.myLedgers.map((l) {
                       final isGenOps = l['code'] == 'GEN-OPS';
