@@ -55,7 +55,7 @@ export class LedgerController {
   }
 
   @Get('my-ledgers')
-  @Roles('MANAGER', 'SUITE_ADMIN')
+  @Roles('MANAGER', 'SUITE_ADMIN', 'EMPLOYEE')
   async getMyLedgersEndpoint(@Req() req: any) {
     const userId = req.user.id || req.user.userId;
     return this.ledgerService.getLedgersForUser(userId, req.user);

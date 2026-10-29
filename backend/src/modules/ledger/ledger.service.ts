@@ -627,6 +627,13 @@ export class LedgerService {
   }
 
   async getMyLedgers(reqUser: any) {
+    const role = (reqUser?.role || '').toUpperCase();
+    const userId = reqUser?.id || reqUser?.userId;
+    if (role === 'EMPLOYEE' && userId) {
+      const res = await this.getLedgersForUser(userId, reqUser);
+      return { success: true, ledgers: res };
+    }
+
     const tenantId = reqUser?.tenantId || reqUser?.tenant_id;
     if (!tenantId) throw new BadRequestException('Tenant ID required');
 
