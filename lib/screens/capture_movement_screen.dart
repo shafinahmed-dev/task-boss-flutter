@@ -32,6 +32,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
   Map<String, dynamic>? _selectedCategory;
   final TextEditingController _categorySearchCtrl = TextEditingController();
 
+  List<dynamic> _visibleSegments = [];
   final _amtCtl = TextEditingController();
   final _chgCtl = TextEditingController();
   final _noteCtl = TextEditingController();
