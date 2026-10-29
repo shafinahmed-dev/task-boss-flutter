@@ -101,16 +101,23 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
 
   Future<void> _loadDetails() async {
     setState(() => _isLoading = true);
-    final app = context.read<AppState>();
-    if (app.managers.isEmpty) {
-      await app.fetchManagers();
-    }
-    final data = await app.fetchLedgerDetails(widget.ledgerId);
-    if (mounted) {
-      setState(() {
-        _ledger = data;
-        _isLoading = false;
-      });
+    try {
+      final app = context.read<AppState>();
+      if (app.managers.isEmpty) {
+        await app.fetchManagers();
+      }
+      final data = await app.fetchLedgerDetails(widget.ledgerId);
+      if (mounted) {
+        setState(() {
+          _ledger = data;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading ledger: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
