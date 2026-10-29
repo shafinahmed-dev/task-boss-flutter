@@ -723,7 +723,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
             if (_error != null) _banner(_error!),
             _buildFlowPill(),
             const SizedBox(height: 14),
-            if (_flowType == 'OUTFLOW') _buildHandoverRecipientSection(),
+            // Hidden on Activity Outflow (only shown on Handover tab)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
