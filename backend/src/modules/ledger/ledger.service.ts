@@ -653,89 +653,43 @@ export class LedgerService {
     const allLedgers = defaultLedger ? [defaultLedger, ...assignedLedgers] : assignedLedgers;
     return { success: true, ledgers: allLedgers };
   }
-  async getLedgersForUser(userId: string, reqUser: any) {
-    const tenantId = reqUser?.tenantId || reqUser?.tenant_id;
-    if (!tenantId) throw new BadRequestException('Tenant ID required');
-
-    await this.ensureDefaultLedger(tenantId);
-
-    const isSuite = reqUser?.role === 'SUITE_ADMIN';
-
+  async getLedgersForUser(userId: string, user?: any) {
+    const companyId = user?.companyId;
     const ledgers = await this.prisma.ledger.findMany({
-      where: {
-        tenantId,
-        status: { not: 'ARCHIVED' },
-        ...(isSuite
-          ? {}
-          : {
-              OR: [
-                { assignments: { some: { userId } } },
-                { code: 'GEN-OPS' },
-              ],
-            }),
-      },
+      where: companyId ? { companyId } : {},
       include: {
-        assignments: {
-          include: { user: { select: { id: true, name: true, handle: true, role: true } } },
+        segments: true,
+        movements: {
+          select: {
+            id: true,
+            amount: true,
+            direction: true,
+            type: true,
+            categoryId: true,
+            createdAt: true,
+          },
         },
-        segments: { select: { id: true, name: true } },
-        movements: { select: { amount: true, direction: true } },
       },
-      orderBy: { createdAt: 'desc' },
     });
 
-    const serialized = ledgers.map((l) => {
+    return ledgers.map((l) => {
       let inflow = 0;
       let outflow = 0;
-      for (const m of l.movements) {
-        const amt = Number(m.amount || 0);
-        const dir = (m.direction || '').toUpperCase();
-        if (dir === 'IN') inflow += amt;
-        else if (dir === 'OUT') outflow += amt;
+      for (const m of l.movements || []) {
+        const amt = Number(m.amount) || 0;
+        if (m.direction === 'in' || m.type === 'INFLOW') {
+          inflow += amt;
+        } else {
+          outflow += amt;
+        }
       }
-
-      const managers = l.assignments
-        .filter((a) => a.role === 'MANAGER')
-        .map((a) => ({
-          id: a.user.id,
-          name: a.user.name,
-          handle: a.user.handle,
-        }));
-
-      const employees = l.assignments
-        .filter((a) => a.role === 'EMPLOYEE')
-        .map((a) => ({
-          id: a.user.id,
-          name: a.user.name,
-          handle: a.user.handle,
-        }));
-
       return {
-        id: l.id,
-        name: l.name,
-        code: l.code,
-        description: l.description || '',
-        isPerpetual: l.isPerpetual,
-        startDate: l.startDate?.toISOString() || null,
-        endDate: l.endDate?.toISOString() || null,
-        status: l.status,
-        segmentsCount: l.segments.length,
-        managersCount: managers.length,
-        managers: managers,
-        employees: employees,
-        inflow: inflow,
-        outflow: outflow,
-        netVelocity: inflow - outflow,
+        ...l,
+        netBalance: inflow - outflow,
+        totalInflow: inflow,
+        totalOutflow: outflow,
       };
     });
-
-    serialized.sort((a, b) => {
-      if (a.code === 'GEN-OPS') return -1;
-      if (b.code === 'GEN-OPS') return 1;
-      return 0;
-    });
-
-    return { success: true, ledgers: serialized };
   }
 
   async assignEmployeesToLedger(ledgerId: string, employeeUserIds: string[], managerUserId: string, reqUser: any) {
