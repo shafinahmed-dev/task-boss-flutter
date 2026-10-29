@@ -295,7 +295,12 @@ class _CaptureState extends State<CaptureMovementScreen> {
           (l) => l['code'] == 'GEN-OPS',
           orElse: () => app.myLedgers.first,
         );
-        setState(() => _selectedLedgerId = genOps['id'].toString());
+        setState(() {
+          _selectedLedgerId = genOps['id'].toString();
+          if (genOps['segments'] is List) {
+            _visibleSegments = List<dynamic>.from(genOps['segments']);
+          }
+        });
       }
       if (app.selectedManagerCompanyId == null || app.selectedManagerCompanyId!.isEmpty) {
         await app.fetchManagerOverview();
@@ -362,7 +367,16 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   final messenger = ScaffoldMessenger.of(this.context);
                   final nav = Navigator.of(ctx);
                   final targetLedgerId = _selectedLedgerId ?? 'bd4bf36e-be9c-4bc2-b3dc-805c360b2164';
-                  final newCat = await app.createCategory(name: name, type: type, companyId: cid);
+                  final res = await app.authRequest(
+                    'POST',
+                    Uri.parse('${app.apiBaseUrl}/ledger/$targetLedgerId/segments'),
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'x-company-id': cid,
+                    },
+                    body: jsonEncode({'name': name}),
+                  );
+                  final newCat = res.statusCode >= 200 && res.statusCode < 300 ? jsonDecode(res.body) : await app.createCategory(name: name, type: type, companyId: cid);
                   if (!mounted) return;
                   if (newCat != null) {
                     final createdCat = {
@@ -771,6 +785,12 @@ class _CaptureState extends State<CaptureMovementScreen> {
                     onChanged: (v) => setState(() {
                       _selectedLedgerId = v;
                       _selectedCategory = null;
+                      final l = app.myLedgers.firstWhere((item) => item['id'].toString() == v, orElse: () => {});
+                      if (l['segments'] is List) {
+                        _visibleSegments = List<dynamic>.from(l['segments']);
+                      } else {
+                        _visibleSegments = [];
+                      }
                     }),
                     decoration: InputDecoration(
                       filled: true,
@@ -1277,6 +1297,12 @@ class _CaptureState extends State<CaptureMovementScreen> {
         selectedLedger['segments'] is List &&
         (selectedLedger['segments'] as List).isNotEmpty) {
       categories = (selectedLedger['segments'] as List).where((s) {
+        final matchesSearch = query.isEmpty ||
+            (s['name']?.toString().toLowerCase().contains(query) ?? false);
+        return matchesSearch;
+      }).toList();
+    } else if (_visibleSegments.isNotEmpty) {
+      categories = _visibleSegments.where((s) {
         final matchesSearch = query.isEmpty ||
             (s['name']?.toString().toLowerCase().contains(query) ?? false);
         return matchesSearch;
