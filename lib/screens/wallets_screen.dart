@@ -825,7 +825,6 @@ Widget _buildAssignedLedgersSection() {
         ...ledgers.map((ledger) {
           final name = ledger['name']?.toString() ?? 'Barakah Condominium Project';
           final status = ledger['status']?.toString().toUpperCase() ?? 'ACTIVE';
-          final net = (ledger['netBalance'] as num? ?? 20000).toDouble();
 
           return Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -888,15 +887,7 @@ Widget _buildAssignedLedgersSection() {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Net Position: ৳ ${net.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.75),
-                    ),
-                  ),
+
                   const SizedBox(height: 16),
                   Row(
                     children: [
