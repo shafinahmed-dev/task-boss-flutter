@@ -374,6 +374,44 @@ export class LedgerService {
         }
       }
 
+      // Resolve a valid category/segment ID to satisfy foreign key constraint
+      let validCategoryId: string | null = null;
+      const requestedCat = (dto as any).categoryId || (dto as any).segmentId || (dto as any).categoryName || (dto as any).segmentName;
+
+      if (requestedCat) {
+        // 1. Try finding by ID
+        let existingCat = await this.prisma.category.findUnique({
+          where: { id: requestedCat },
+        }).catch(() => null);
+
+        // 2. Try finding by name in this ledger or company
+        if (!existingCat && effectiveLedgerId) {
+          existingCat = await this.prisma.category.findFirst({
+            where: {
+              ledgerId: effectiveLedgerId,
+              name: { equals: requestedCat, mode: 'insensitive' },
+            },
+          }).catch(() => null);
+        }
+
+        // 3. If it does not exist, auto-create it on the fly!
+        if (!existingCat && effectiveLedgerId) {
+          try {
+            existingCat = await this.prisma.category.create({
+              data: {
+                ledgerId: effectiveLedgerId,
+                name: requestedCat,
+                type: dirVal === 'in' ? 'INFLOW' : 'OUTFLOW',
+              },
+            });
+          } catch (_) {}
+        }
+
+        if (existingCat) {
+          validCategoryId = existingCat.id;
+        }
+      }
+
       const movement = await this.prisma.moneyMovement.create({
         data: {
           fee: feeVal > 0 ? new Decimal(feeVal) : null,
@@ -393,7 +431,7 @@ export class LedgerService {
           digitalReceiptId: dto.digitalReceiptId ?? null,
           clientId: dto.clientId ?? null,
           projectId: dto.projectId ?? null,
-          categoryId: dto.categoryId ?? null,
+          categoryId: validCategoryId ?? dto.categoryId ?? null,
           ledgerId: effectiveLedgerId || null,
           segmentId: effectiveSegmentId,
           loanId: dto.loanId ?? null,
