@@ -654,9 +654,27 @@ export class LedgerService {
     return { success: true, ledgers: allLedgers };
   }
   async getLedgersForUser(userId: string, user?: any) {
+    const role = (user?.role || '').toUpperCase();
     const companyId = user?.companyId;
+
+    let whereClause: any = {};
+    if (role === 'SUITE_ADMIN' || role === 'SUITE') {
+      whereClause = companyId ? { companyId } : {};
+    } else if (role === 'MANAGER') {
+      whereClause = companyId ? { companyId } : {};
+    } else {
+      // EMPLOYEE: Only assigned ledgers OR GEN-OPS default ledger
+      whereClause = {
+        OR: [
+          { assignments: { some: { userId } } },
+          { code: 'GEN-OPS' },
+          ...(companyId ? [{ companyId }] : []),
+        ],
+      };
+    }
+
     const ledgers = await this.prisma.ledger.findMany({
-      where: companyId ? { companyId } : {},
+      where: whereClause,
       include: {
         segments: true,
         assignments: true,

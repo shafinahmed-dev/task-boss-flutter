@@ -774,16 +774,22 @@ class _WalletsScreenState extends State<WalletsScreen> {
       ),
     );
   }
-Widget _buildAssignedLedgersSection() {
-    final ledgers = [
-      {
-        'id': 'bd4bf36e-be9c-4bc2-b3dc-805c360b2164',
-        'name': 'Barakah Condominium Project',
-        'status': 'ACTIVE',
-        'netBalance': 20000.0,
-        'description': 'Our ongoing project at Priyanka Runway City',
-      }
-    ];
+  Widget _buildAssignedLedgersSection() {
+    final app = context.watch<AppState>();
+    final role = (app.currentUser?.role ?? '').toUpperCase();
+    if (role != 'MANAGER' && role != 'SUITE_ADMIN' && role != 'SUITE') {
+      return const SizedBox.shrink();
+    }
+    final ledgers = app.myLedgers.isNotEmpty
+        ? app.myLedgers
+        : [
+            {
+              'id': 'bd4bf36e-be9c-4bc2-b3dc-805c360b2164',
+              'name': 'Barakah Condominium Project',
+              'status': 'ACTIVE',
+              'description': 'Our ongoing project at Priyanka Runway City',
+            }
+          ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
