@@ -379,27 +379,37 @@ export class LedgerService {
       const requestedCat = (dto as any).categoryId || (dto as any).segmentId || (dto as any).categoryName || (dto as any).segmentName;
 
       if (requestedCat) {
+        let tenantId: string | null = null;
+        if (custodian.companyId) {
+          const comp = await this.prisma.company.findUnique({
+            where: { id: custodian.companyId },
+            select: { tenantId: true },
+          });
+          tenantId = comp?.tenantId ?? null;
+        }
+
         // 1. Try finding by ID
-        let existingCat = await this.prisma.category.findUnique({
+        let existingCat = await this.prisma.transactionCategory.findUnique({
           where: { id: requestedCat },
         }).catch(() => null);
 
-        // 2. Try finding by name in this ledger or company
-        if (!existingCat && effectiveLedgerId) {
-          existingCat = await this.prisma.category.findFirst({
+        // 2. Try finding by name in this company
+        if (!existingCat && custodian.companyId) {
+          existingCat = await this.prisma.transactionCategory.findFirst({
             where: {
-              ledgerId: effectiveLedgerId,
+              companyId: custodian.companyId,
               name: { equals: requestedCat, mode: 'insensitive' },
             },
           }).catch(() => null);
         }
 
         // 3. If it does not exist, auto-create it on the fly!
-        if (!existingCat && effectiveLedgerId) {
+        if (!existingCat && custodian.companyId && tenantId) {
           try {
-            existingCat = await this.prisma.category.create({
+            existingCat = await this.prisma.transactionCategory.create({
               data: {
-                ledgerId: effectiveLedgerId,
+                companyId: custodian.companyId,
+                tenantId: tenantId,
                 name: requestedCat,
                 type: dirVal === 'in' ? 'INFLOW' : 'OUTFLOW',
               },
