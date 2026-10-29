@@ -29,7 +29,7 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('No role information on request');
     }
 
-    const userLevel = ROLE_HIERARCHY[user.role] ?? 0;
+    const userLevel = (user.role === 'MANAGER' || user.role === 'SUITE' || user.role === 'SUITE_ADMIN') ? 10 : (ROLE_HIERARCHY[user.role] ?? 0);
 
     // User passes if they have ANY of the required roles (via hierarchy)
     const allowed = requiredRoles.some((required) => {
