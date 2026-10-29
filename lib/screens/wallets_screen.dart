@@ -1021,11 +1021,18 @@ Widget _buildAssignedLedgersSection() {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      onPressed: () {
-                        Navigator.pop(modalCtx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Team assignments updated successfully!'), backgroundColor: Color(0xFF059669)),
-                        );
+                      onPressed: () async {
+                        final app = context.read<AppState>();
+                        await app.assignEmployeesToLedger(ledger['id']?.toString() ?? '', selectedEmployeeIds);
+                        setState(() {
+                          ledger['assignedEmployeeIds'] = selectedEmployeeIds;
+                        });
+                        if (context.mounted) {
+                          Navigator.pop(modalCtx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Team assignments updated successfully!'), backgroundColor: Color(0xFF059669)),
+                          );
+                        }
                       },
                       child: const Text('Save Assignments', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),

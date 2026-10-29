@@ -659,6 +659,7 @@ export class LedgerService {
       where: companyId ? { companyId } : {},
       include: {
         segments: true,
+        assignments: true,
         movements: {
           select: {
             id: true,
@@ -683,8 +684,13 @@ export class LedgerService {
           outflow += amt;
         }
       }
+      const assignedEmployeeIds = l.assignments
+        ?.filter((a) => a.role === 'EMPLOYEE')
+        ?.map((a) => a.userId) || [];
+
       return {
         ...l,
+        assignedEmployeeIds,
         netBalance: inflow - outflow,
         totalInflow: inflow,
         totalOutflow: outflow,
@@ -692,49 +698,31 @@ export class LedgerService {
     });
   }
 
-  async assignEmployeesToLedger(ledgerId: string, employeeUserIds: string[], managerUserId: string, reqUser: any) {
-    const tenantId = reqUser?.tenantId || reqUser?.tenant_id;
-    const ledger = await this.prisma.ledger.findFirst({
-      where: { id: ledgerId, tenantId },
-      include: { assignments: true },
-    });
-    if (!ledger) throw new NotFoundException('Ledger not found');
-
-    const isSuite = reqUser?.role === 'SUITE_ADMIN';
-    if (!isSuite) {
-      const isAssignedManager = ledger.assignments.some(
-        (a) => a.userId === managerUserId && a.role === 'MANAGER',
-      );
-      if (!isAssignedManager) {
-        throw new BadRequestException('You are not assigned as a manager to this ledger.');
-      }
-    }
-
-    // Remove existing employee assignments for this ledger
-    await this.prisma.ledgerMember.deleteMany({
-      where: { ledgerId, role: 'EMPLOYEE' },
-    });
-
-    if (Array.isArray(employeeUserIds) && employeeUserIds.length > 0) {
-      await this.prisma.ledgerMember.createMany({
-        data: employeeUserIds.map((userId) => ({
+  async assignEmployeesToLedger(ledgerId: string, employeeUserIds: string[], userId: string, user?: any) {
+    await this.prisma.$transaction([
+      this.prisma.ledgerMember.deleteMany({
+        where: {
           ledgerId,
-          userId,
-          role: 'EMPLOYEE',
-        })),
-      });
-    }
+          role: { not: 'MANAGER' },
+        },
+      }),
+      ...(Array.isArray(employeeUserIds) ? employeeUserIds : []).map((empId) =>
+        this.prisma.ledgerMember.create({
+          data: {
+            ledgerId,
+            userId: empId,
+            role: 'EMPLOYEE',
+          },
+        })
+      ),
+    ]);
 
     const updated = await this.prisma.ledger.findUnique({
       where: { id: ledgerId },
-      include: {
-        assignments: {
-          include: { user: { select: { id: true, name: true, handle: true, role: true } } },
-        },
-      },
+      include: { assignments: true },
     });
 
-    return { success: true, ledger: updated };
+    return { success: true, ledgerId, employeeUserIds, ledger: updated };
   }
 
   async getSuiteLedgers(reqUser: any, search?: string, status?: string) {
