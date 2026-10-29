@@ -226,6 +226,120 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
   }
 
 
+  void _showAddSegmentModal() {
+    final nameCtrl = TextEditingController();
+    bool saving = false;
+    String? modalError;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                top: 16,
+                left: 20,
+                right: 20,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Add Segment',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (modalError != null) ...[
+                      Text(modalError!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                      const SizedBox(height: 8),
+                    ],
+                    const Text('Segment Name *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Labours Meal',
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: saving ? null : () async {
+                          final name = nameCtrl.text.trim();
+                          if (name.isEmpty) {
+                            setSheetState(() => modalError = 'Segment name cannot be empty.');
+                            return;
+                          }
+                          setSheetState(() {
+                            saving = true;
+                            modalError = null;
+                          });
+                          try {
+                            final app = context.read<AppState>();
+                            final success = await app.createSegmentInLedger(widget.ledgerId, name);
+                            if (success) {
+                              if (ctx.mounted) Navigator.of(ctx).pop();
+                              await _loadDetails();
+                            } else {
+                              setSheetState(() {
+                                saving = false;
+                                modalError = app.errorMessage ?? 'Failed to create segment.';
+                              });
+                            }
+                          } catch (e) {
+                            setSheetState(() {
+                              saving = false;
+                              modalError = e.toString();
+                            });
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F172A),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: saving
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text('Create Segment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+
   void _openEditModal() {
     if (_ledger == null) return;
     final ledger = _ledger!;
@@ -875,6 +989,13 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
             },
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddSegmentModal,
+        backgroundColor: const Color(0xFF0F172A),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Add Segment', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF1E2638)))

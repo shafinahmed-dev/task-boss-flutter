@@ -777,7 +777,7 @@ class _WalletsScreenState extends State<WalletsScreen> {
 Widget _buildAssignedLedgersSection() {
     final ledgers = [
       {
-        'id': 'barakah-condo-id',
+        'id': 'bd4bf36e-be9c-4bc2-b3dc-805c360b2164',
         'name': 'Barakah Condominium Project',
         'status': 'ACTIVE',
         'netBalance': 20000.0,

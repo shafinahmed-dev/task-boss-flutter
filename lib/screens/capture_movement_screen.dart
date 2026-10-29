@@ -360,13 +360,14 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   if (name.isEmpty) return;
                   final messenger = ScaffoldMessenger.of(this.context);
                   final nav = Navigator.of(ctx);
+                  final targetLedgerId = _selectedLedgerId ?? 'bd4bf36e-be9c-4bc2-b3dc-805c360b2164';
                   final newCat = await app.createCategory(name: name, type: type, companyId: cid);
                   if (!mounted) return;
                   if (newCat != null) {
                     final createdCat = {
                       'id': newCat['id']?.toString() ?? name,
                       'name': name,
-                      'ledgerId': _selectedLedgerId,
+                      'ledgerId': targetLedgerId,
                       'type': type,
                     };
                     setState(() {
@@ -374,6 +375,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                       app.concernCategories.add(createdCat);
                       _selectedCategory = createdCat;
                       _categorySearchCtrl.clear();
+                      _visibleSegments = app.concernCategories.where((s) => s['ledgerId'] == _selectedLedgerId).toList();
                     });
                     await app.fetchMyLedgers();
 
