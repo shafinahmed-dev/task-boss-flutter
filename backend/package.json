@@ -6,6 +6,10 @@
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
+  "main": "dist/main.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "nest build",
     "deploy": "nest deploy",
@@ -13,6 +17,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
+    "prebuild": "true",
     "prestart:prod": "npm run build",
     "start:prod": "node dist/main.js",
     "lint": "oxlint src/ test/",
@@ -59,3 +64,4 @@
     "vitest": "^4.1.2"
   }
 }
+
