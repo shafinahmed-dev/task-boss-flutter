@@ -574,15 +574,16 @@ class AppState extends ChangeNotifier {
         headers: {'Content-Type': 'application/json'},
         body: body,
       );
-      if (res.statusCode == 200) {
-        await fetchMyLedgers();
-        notifyListeners();
-        return true;
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception('HTTP ${res.statusCode}: ${res.body}');
       }
+      await fetchMyLedgers();
+      notifyListeners();
+      return true;
     } catch (e) {
       debugPrint('assignEmployeesToLedger error: $e');
+      rethrow;
     }
-    return false;
   }
 
   Future<bool> createSegmentInLedger(String ledgerId, String name, {String? description}) async {

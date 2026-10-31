@@ -66,7 +66,7 @@ export class LedgerController {
   @Put(':id/assign-employees')
   @Post(':id/assign')
   @Put(':id/assign')
-  @Roles('MANAGER', 'SUITE_ADMIN')
+  @Roles('MANAGER', 'SUITE_ADMIN', 'SUITE', 'ADMIN')
   async assignEmployees(
     @Param('id') ledgerId: string,
     @Body() body: any,

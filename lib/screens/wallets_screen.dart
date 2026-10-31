@@ -956,7 +956,18 @@ class _WalletsScreenState extends State<WalletsScreen> {
       {'id': 'ayaz-id', 'name': 'Ayaz Mustaqeem', 'handle': 'ayaz.taskgroup'},
     ];
 
-    List<String> selectedEmployeeIds = List<String>.from(ledger['assignedEmployeeIds'] ?? []);
+    final Set<String> selectedEmployeeIds = {};
+    if (ledger['assignedEmployeeIds'] is List) {
+      for (var id in ledger['assignedEmployeeIds']) {
+        selectedEmployeeIds.add(id.toString());
+      }
+    }
+    if (ledger['assignments'] is List) {
+      for (var a in ledger['assignments']) {
+        final uid = a is Map ? (a['userId'] ?? a['id']) : null;
+        if (uid != null) selectedEmployeeIds.add(uid.toString());
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -1028,16 +1039,24 @@ class _WalletsScreenState extends State<WalletsScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       onPressed: () async {
-                        final app = context.read<AppState>();
-                        await app.assignEmployeesToLedger(ledger['id']?.toString() ?? '', selectedEmployeeIds);
-                        setState(() {
-                          ledger['assignedEmployeeIds'] = selectedEmployeeIds;
-                        });
-                        if (context.mounted) {
-                          Navigator.pop(modalCtx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Team assignments updated successfully!'), backgroundColor: Color(0xFF059669)),
-                          );
+                        try {
+                          final app = context.read<AppState>();
+                          await app.assignEmployeesToLedger(ledger['id']?.toString() ?? '', selectedEmployeeIds.toList());
+                          setState(() {
+                            ledger['assignedEmployeeIds'] = selectedEmployeeIds.toList();
+                          });
+                          if (context.mounted) {
+                            Navigator.pop(modalCtx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Team assignments updated successfully!'), backgroundColor: Colors.green),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+                            );
+                          }
                         }
                       },
                       child: const Text('Save Assignments', style: TextStyle(fontWeight: FontWeight.bold)),
