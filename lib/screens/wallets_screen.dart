@@ -952,9 +952,13 @@ class _WalletsScreenState extends State<WalletsScreen> {
 
   void _showManageTeamModal(BuildContext context, Map<String, dynamic> ledger) {
     final List<Map<String, String>> employees = [
-      {'id': 'shafin-id', 'name': 'Shafin Ahmed', 'handle': 'shafin.taskgroup'},
-      {'id': 'ayaz-id', 'name': 'Ayaz Mustaqeem', 'handle': 'ayaz.taskgroup'},
+      {'id': '2104ecd7-279f-4726-8417-923c4b10d81b', 'name': 'Shafin Ahmed', 'handle': 'shafin.taskgroup'},
+      {'id': '29e9f977-51b4-491c-bfa2-1598e4f19010', 'name': 'Ayaz Mustaqeem', 'handle': 'ayaz.taskgroup'},
     ];
+
+    final isDefaultLedger = ledger['isDefault'] == true ||
+        ledger['code'] == 'GEN-OPS' ||
+        (ledger['name'] ?? '').toString().toLowerCase().contains('general');
 
     final Set<String> selectedEmployeeIds = {};
     if (ledger['assignedEmployeeIds'] is List) {
@@ -966,6 +970,13 @@ class _WalletsScreenState extends State<WalletsScreen> {
       for (var a in ledger['assignments']) {
         final uid = a is Map ? (a['userId'] ?? a['id']) : null;
         if (uid != null) selectedEmployeeIds.add(uid.toString());
+      }
+    }
+
+    // Default ledger (General Operations) has all company employees ticked by default
+    if (isDefaultLedger && selectedEmployeeIds.isEmpty) {
+      for (var emp in employees) {
+        selectedEmployeeIds.add(emp['id']!);
       }
     }
 
