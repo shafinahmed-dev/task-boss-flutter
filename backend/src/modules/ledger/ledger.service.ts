@@ -653,12 +653,33 @@ export class LedgerService {
             : []),
         ],
       },
-      include: { segments: true },
+      include: { segments: true, assignments: true },
       orderBy: { createdAt: 'desc' },
     });
 
+    const allEmployees = await this.prisma.user.findMany({
+      where: { role: 'EMPLOYEE' },
+      select: { id: true },
+    });
+    const allEmployeeIds = allEmployees.map((e) => e.id);
+
+    const formatLedger = (l: any) => {
+      const isDefault =
+        l.isDefault === true ||
+        l.code === 'GEN-OPS' ||
+        (l.name && l.name.toLowerCase().includes('general'));
+
+      const assignedEmployeeIds = isDefault
+        ? allEmployeeIds
+        : (l.assignments || [])
+            .filter((a: any) => a.role === 'EMPLOYEE')
+            .map((a: any) => a.userId);
+
+      return { ...l, assignedEmployeeIds };
+    };
+
     const allLedgers = defaultLedger ? [defaultLedger, ...assignedLedgers] : assignedLedgers;
-    return { success: true, ledgers: allLedgers };
+    return { success: true, ledgers: allLedgers.map(formatLedger) };
   }
   async getLedgersForUser(userId: string, user?: any) {
     const uid = user?.id || user?.userId || user?.sub || userId;
