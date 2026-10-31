@@ -661,113 +661,49 @@ export class LedgerService {
     return { success: true, ledgers: allLedgers };
   }
   async getLedgersForUser(userId: string, user?: any) {
-    const uid = userId || user?.id || user?.userId || user?.sub;
+    const uid = user?.id || user?.userId || user?.sub || userId;
     const role = (user?.role || '').toUpperCase();
     const companyId = user?.companyId;
 
-    // 1. If Manager or Suite Admin, return all company ledgers
+    let whereClause: any = {};
+
     if (role === 'SUITE_ADMIN' || role === 'SUITE' || role === 'MANAGER') {
-      const ledgers = await this.prisma.ledger.findMany({
-        where: companyId ? { companyId } : {},
-        include: { segments: true, categories: true, assignments: true, movements: true },
-      });
-      return ledgers.map((l) => {
-        let inflow = 0;
-        let outflow = 0;
-        for (const m of l.movements || []) {
-          const amt = Number(m.amount) || 0;
-          if (m.direction === 'in' || m.type === 'INFLOW') {
-            inflow += amt;
-          } else {
-            outflow += amt;
-          }
-        }
-        const assignedEmployeeIds = l.assignments
-          ?.filter((a) => a.role === 'EMPLOYEE')
-          ?.map((a) => a.userId) || [];
-        return {
-          ...l,
-          assignedEmployeeIds,
-          netBalance: inflow - outflow,
-          totalInflow: inflow,
-          totalOutflow: outflow,
-        };
-      });
-    }
-
-    // 2. If Employee: Find which ledgers this user is assigned to via LedgerMember table directly!
-    let assignedLedgerIds: string[] = [];
-    try {
-      const memberships = await this.prisma.ledgerMember.findMany({
-        where: { userId: uid },
-        select: { ledgerId: true },
-      });
-      assignedLedgerIds = memberships.map((m: any) => m.ledgerId);
-    } catch (err) {
-      console.warn('[LedgerService] Failed to query ledgerMember:', err);
-    }
-
-    // 3. Query assigned ledgers + General Operations fallback
-    const ledgers = await this.prisma.ledger.findMany({
-      where: {
-        AND: [
-          ...(companyId ? [{ companyId }] : []),
-          {
-            OR: [
-              ...(assignedLedgerIds.length > 0 ? [{ id: { in: assignedLedgerIds } }] : []),
-              { name: { contains: 'General', mode: 'insensitive' } },
-              { code: 'GEN-OPS' },
-              { isDefault: true },
-            ],
-          },
+      whereClause = companyId ? { companyId } : {};
+    } else {
+      // EMPLOYEE: Return assigned ledgers OR General Operations default
+      whereClause = {
+        OR: [
+          { assignments: { some: { userId: uid } } },
+          { name: { contains: 'General', mode: 'insensitive' } },
+          { code: 'GEN-OPS' },
         ],
-      },
+      };
+    }
+
+    const ledgers = await this.prisma.ledger.findMany({
+      where: whereClause,
       include: {
         segments: true,
-        categories: true,
+        movements: true,
         assignments: true,
-        movements: {
-          select: {
-            id: true,
-            amount: true,
-            direction: true,
-            type: true,
-            categoryId: true,
-            createdAt: true,
-          },
-        },
       },
     });
 
-    let finalLedgers = ledgers;
-    // 4. Safe fallback: If still empty, return at least 1 default company ledger so the dropdown NEVER breaks!
-    if (!finalLedgers || finalLedgers.length === 0) {
-      finalLedgers = await this.prisma.ledger.findMany({
-        where: companyId ? { companyId } : {},
-        take: 1,
-        include: {
-          segments: true,
-          categories: true,
-          assignments: true,
-          movements: true,
-        },
-      });
-    }
-
-    return finalLedgers.map((l) => {
+    return ledgers.map((l: any) => {
       let inflow = 0;
       let outflow = 0;
-      for (const m of l.movements || []) {
+      for (const m of (l.movements || [])) {
         const amt = Number(m.amount) || 0;
-        if (m.direction === 'in' || m.type === 'INFLOW') {
+        if (m.direction === 'in') {
           inflow += amt;
         } else {
           outflow += amt;
         }
       }
-      const assignedEmployeeIds = l.assignments
-        ?.filter((a) => a.role === 'EMPLOYEE')
-        ?.map((a) => a.userId) || [];
+
+      const assignedEmployeeIds = (l.assignments || [])
+        .filter((a: any) => a.role === 'EMPLOYEE')
+        .map((a: any) => a.userId);
 
       return {
         ...l,
@@ -780,32 +716,29 @@ export class LedgerService {
   }
 
   async assignEmployeesToLedger(ledgerId: string, employeeUserIds: string[], userId: string, user?: any) {
-    try {
-      await this.prisma.ledgerMember.deleteMany({
-        where: { ledgerId },
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Remove existing employee members for this ledger
+      await tx.ledgerMember.deleteMany({
+        where: {
+          ledgerId,
+          role: 'EMPLOYEE',
+        },
       });
-    } catch (_) {}
 
-    for (const empId of (Array.isArray(employeeUserIds) ? employeeUserIds : [])) {
-      try {
-        await this.prisma.ledgerMember.create({
-          data: {
+      // 2. Add the newly assigned employees
+      if (employeeUserIds && employeeUserIds.length > 0) {
+        await tx.ledgerMember.createMany({
+          data: employeeUserIds.map((empId) => ({
             ledgerId,
             userId: empId,
             role: 'EMPLOYEE',
-          },
+          })),
+          skipDuplicates: true,
         });
-      } catch (e) {
-        console.error('Failed to create ledgerMember:', e);
       }
-    }
-
-    const updated = await this.prisma.ledger.findUnique({
-      where: { id: ledgerId },
-      include: { assignments: true },
     });
 
-    return { success: true, ledgerId, employeeUserIds, ledger: updated };
+    return { success: true, ledgerId, employeeUserIds };
   }
 
   async getSuiteLedgers(reqUser: any, search?: string, status?: string) {
