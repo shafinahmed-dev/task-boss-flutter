@@ -716,14 +716,40 @@ export class LedgerService {
   }
 
   async assignEmployeesToLedger(ledgerId: string, employeeUserIds: string[], userId: string, user?: any) {
-    const ids = Array.isArray(employeeUserIds) ? employeeUserIds : [];
+    const rawIds = Array.isArray(employeeUserIds) ? employeeUserIds : [];
+    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    
+    // Resolve all provided IDs to valid database UUIDs
+    const resolvedUserIds: string[] = [];
+    for (const rawId of rawIds) {
+      if (uuidRegex.test(rawId)) {
+        resolvedUserIds.push(rawId);
+      } else {
+        // Find user by slug, handle, or name
+        const dbUser = await this.prisma.user.findFirst({
+          where: {
+            OR: [
+              { email: { contains: rawId.replace('-id', ''), mode: 'insensitive' } },
+              { name: { contains: rawId.replace('-id', ''), mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (dbUser) resolvedUserIds.push(dbUser.id);
+      }
+    }
+
+    const uniqueIds = Array.from(new Set(resolvedUserIds));
+    console.log('[DEBUG] Resolved UUIDs for persistence:', uniqueIds);
 
     await this.prisma.$transaction(async (tx) => {
+      // 1. Delete previous employee assignments
       await tx.ledgerMember.deleteMany({
         where: { ledgerId, role: 'EMPLOYEE' },
       });
 
-      for (const empId of ids) {
+      // 2. Insert valid UUID records
+      for (const empId of uniqueIds) {
         await tx.ledgerMember.create({
           data: {
             ledgerId,
@@ -734,7 +760,7 @@ export class LedgerService {
       }
     });
 
-    return { success: true, ledgerId, employeeUserIds: ids };
+    return { success: true, ledgerId, employeeUserIds: uniqueIds };
   }
 
   async getSuiteLedgers(reqUser: any, search?: string, status?: string) {
