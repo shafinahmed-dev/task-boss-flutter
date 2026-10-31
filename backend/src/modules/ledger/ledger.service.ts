@@ -717,21 +717,23 @@ export class LedgerService {
 
   async assignEmployeesToLedger(ledgerId: string, employeeUserIds: string[], userId: string, user?: any) {
     const ids = Array.isArray(employeeUserIds) ? employeeUserIds : [];
+
     await this.prisma.$transaction(async (tx) => {
       await tx.ledgerMember.deleteMany({
         where: { ledgerId, role: 'EMPLOYEE' },
       });
-      if (ids.length > 0) {
-        await tx.ledgerMember.createMany({
-          data: ids.map((empId) => ({
+
+      for (const empId of ids) {
+        await tx.ledgerMember.create({
+          data: {
             ledgerId,
             userId: empId,
             role: 'EMPLOYEE',
-          })),
-          skipDuplicates: true,
+          },
         });
       }
     });
+
     return { success: true, ledgerId, employeeUserIds: ids };
   }
 
