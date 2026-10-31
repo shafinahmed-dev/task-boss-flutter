@@ -564,11 +564,15 @@ class AppState extends ChangeNotifier {
 
   Future<bool> assignEmployeesToLedger(String ledgerId, List<String> employeeUserIds) async {
     try {
+      final body = jsonEncode({
+        'employeeUserIds': employeeUserIds,
+        'userIds': employeeUserIds,
+      });
       final res = await authRequest(
         'PATCH',
         Uri.parse('$apiBaseUrl/ledgers/$ledgerId/assign-employees'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'employeeUserIds': employeeUserIds}),
+        body: body,
       );
       if (res.statusCode == 200) {
         await fetchMyLedgers();

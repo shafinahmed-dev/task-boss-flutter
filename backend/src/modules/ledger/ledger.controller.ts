@@ -62,14 +62,21 @@ export class LedgerController {
   }
 
   @Patch(':id/assign-employees')
+  @Post(':id/assign-employees')
+  @Put(':id/assign-employees')
+  @Post(':id/assign')
+  @Put(':id/assign')
   @Roles('MANAGER', 'SUITE_ADMIN')
   async assignEmployees(
     @Param('id') ledgerId: string,
-    @Body() body: { employeeUserIds: string[] },
+    @Body() body: any,
     @Req() req: any,
   ) {
-    const userId = req.user.id || req.user.userId;
-    return this.ledgerService.assignEmployeesToLedger(ledgerId, body.employeeUserIds, userId, req.user);
+    console.log('[DEBUG] assignEmployees called with ledgerId:', ledgerId, 'body:', body);
+    const employeeUserIds: string[] = 
+      body?.employeeUserIds || body?.userIds || body?.assignedEmployeeIds || (Array.isArray(body) ? body : []);
+    const userId = req.user?.id || req.user?.userId;
+    return this.ledgerService.assignEmployeesToLedger(ledgerId, employeeUserIds, userId, req.user);
   }
 
   @Get('manager')

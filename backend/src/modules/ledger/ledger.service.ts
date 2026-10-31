@@ -716,8 +716,10 @@ export class LedgerService {
   }
 
   async assignEmployeesToLedger(ledgerId: string, employeeUserIds: string[], userId: string, user?: any) {
+    const ids = Array.isArray(employeeUserIds) ? employeeUserIds : [];
+    console.log('[DEBUG] Writing assignments to DB for ledger:', ledgerId, 'users:', ids);
+    
     await this.prisma.$transaction(async (tx) => {
-      // 1. Remove existing employee members for this ledger
       await tx.ledgerMember.deleteMany({
         where: {
           ledgerId,
@@ -725,20 +727,25 @@ export class LedgerService {
         },
       });
 
-      // 2. Add the newly assigned employees
-      if (employeeUserIds && employeeUserIds.length > 0) {
-        await tx.ledgerMember.createMany({
-          data: employeeUserIds.map((empId) => ({
+      for (const empId of ids) {
+        await tx.ledgerMember.upsert({
+          where: {
+            ledgerId_userId: {
+              ledgerId,
+              userId: empId,
+            },
+          },
+          update: { role: 'EMPLOYEE' },
+          create: {
             ledgerId,
             userId: empId,
             role: 'EMPLOYEE',
-          })),
-          skipDuplicates: true,
+          },
         });
       }
     });
 
-    return { success: true, ledgerId, employeeUserIds };
+    return { success: true, ledgerId, employeeUserIds: ids };
   }
 
   async getSuiteLedgers(reqUser: any, search?: string, status?: string) {
