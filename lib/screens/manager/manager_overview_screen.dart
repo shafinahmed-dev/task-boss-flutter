@@ -249,171 +249,245 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  // INFLOW CARD (Deep Forest Green)
+                  // INFLOW CARD (Deep Forest Green Gradient)
                   Expanded(
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          _showManagerVelocityBreakdown(
-                            context,
-                            companyId: activeCompanyId,
-                            direction: 'in',
-                            totalAmount: inflowAmt,
-                            rangeLabel: selectedPeriodLabel,
-                          );
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            height: 108,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF042D22),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Positioned(
-                                  right: -10,
-                                  bottom: -16,
-                                  child: Icon(
-                                    Icons.arrow_downward,
-                                    size: 80,
-                                    color: const Color(0xFF10B981).withValues(alpha: 0.13),
+                    child: Container(
+                      height: 108,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF04130C), Color(0xFF06281B), Color(0xFF064E3B)],
+                          stops: [0.0, 0.55, 1.0],
+                        ),
+                        border: Border.all(
+                          color: const Color(0xFF10B981).withOpacity(0.2),
+                          width: 1.0,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF064E3B).withOpacity(0.3),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: 1,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.white.withOpacity(0.0),
+                                      Colors.white.withOpacity(0.2),
+                                      Colors.white.withOpacity(0.0),
+                                    ],
                                   ),
                                 ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Icon(
-                                      Icons.arrow_downward,
-                                      color: Color(0xFF34D399),
-                                      size: 18,
-                                    ),
-                                    Text(
-                                      '৳ ${_formatAmount(inflowAmt)}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: -0.4,
+                              ),
+                            ),
+                            Positioned(
+                              right: -15,
+                              bottom: -20,
+                              child: IgnorePointer(
+                                child: Opacity(
+                                  opacity: 0.06,
+                                  child: const Icon(
+                                    Icons.arrow_downward_rounded,
+                                    size: 95,
+                                    color: Color(0xFF34D399),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  _showManagerVelocityBreakdown(
+                                    context,
+                                    companyId: activeCompanyId,
+                                    direction: 'in',
+                                    totalAmount: inflowAmt,
+                                    rangeLabel: selectedPeriodLabel,
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(16),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Icon(
+                                        Icons.arrow_downward_rounded,
+                                        color: Color(0xFF34D399),
+                                        size: 18,
                                       ),
-                                    ),
-                                    Align(
-                                      alignment: Alignment.bottomRight,
-                                      child: Text(
-                                        'INFLOW',
-                                        style: TextStyle(
-                                          color: const Color(0xFF34D399).withValues(alpha: 0.9),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 1.2,
+                                      Text(
+                                        '৳ ${_formatAmount(inflowAmt)}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: -0.4,
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      Align(
+                                        alignment: Alignment.bottomRight,
+                                        child: Text(
+                                          'INFLOW',
+                                          style: TextStyle(
+                                            color: const Color(0xFF34D399).withOpacity(0.9),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 14),
-                  // OUTFLOW CARD (Deep Burgundy Wine)
+                  // OUTFLOW CARD (Deep Burgundy Red Gradient)
                   Expanded(
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          _showManagerVelocityBreakdown(
-                            context,
-                            companyId: activeCompanyId,
-                            direction: 'out',
-                            totalAmount: outflowAmt,
-                            rangeLabel: selectedPeriodLabel,
-                          );
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            height: 108,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3B0B17),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Positioned(
-                                  right: -10,
-                                  bottom: -16,
-                                  child: Icon(
-                                    Icons.arrow_upward,
-                                    size: 80,
-                                    color: const Color(0xFFF43F5E).withValues(alpha: 0.13),
+                    child: Container(
+                      height: 108,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF140306), Color(0xFF26070E), Color(0xFF4C0519)],
+                          stops: [0.0, 0.55, 1.0],
+                        ),
+                        border: Border.all(
+                          color: const Color(0xFFEF4444).withOpacity(0.2),
+                          width: 1.0,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4C0519).withOpacity(0.3),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: 1,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.white.withOpacity(0.0),
+                                      Colors.white.withOpacity(0.2),
+                                      Colors.white.withOpacity(0.0),
+                                    ],
                                   ),
                                 ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Icon(
-                                      Icons.arrow_upward,
-                                      color: Color(0xFFFB7185),
-                                      size: 18,
-                                    ),
-                                    Text(
-                                      '৳ ${_formatAmount(outflowAmt)}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: -0.4,
+                              ),
+                            ),
+                            Positioned(
+                              right: -15,
+                              bottom: -20,
+                              child: IgnorePointer(
+                                child: Opacity(
+                                  opacity: 0.06,
+                                  child: const Icon(
+                                    Icons.arrow_upward_rounded,
+                                    size: 95,
+                                    color: Color(0xFFF87171),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  _showManagerVelocityBreakdown(
+                                    context,
+                                    companyId: activeCompanyId,
+                                    direction: 'out',
+                                    totalAmount: outflowAmt,
+                                    rangeLabel: selectedPeriodLabel,
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(16),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Icon(
+                                        Icons.arrow_upward_rounded,
+                                        color: Color(0xFFF87171),
+                                        size: 18,
                                       ),
-                                    ),
-                                    Align(
-                                      alignment: Alignment.bottomRight,
-                                      child: Text(
-                                        'OUTFLOW',
-                                        style: TextStyle(
-                                          color: const Color(0xFFFB7185).withValues(alpha: 0.9),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 1.2,
+                                      Text(
+                                        '৳ ${_formatAmount(outflowAmt)}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: -0.4,
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      Align(
+                                        alignment: Alignment.bottomRight,
+                                        child: Text(
+                                          'OUTFLOW',
+                                          style: TextStyle(
+                                            color: const Color(0xFFF87171).withOpacity(0.9),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                     ),
