@@ -249,6 +249,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
               const SizedBox(height: 12),
               Row(
                 children: [
+                  // INFLOW CARD (Deep Forest Green)
                   Expanded(
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
@@ -263,36 +264,77 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                             rangeLabel: selectedPeriodLabel,
                           );
                         },
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: borderColor),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), shape: BoxShape.circle),
-                                child: const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 18),
-                              ),
-                              const SizedBox(width: 10),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Inflow', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                                  const SizedBox(height: 2),
-                                  Text('৳ ${_formatAmount(inflowAmt)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ],
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            height: 108,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF042D22),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Positioned(
+                                  right: -10,
+                                  bottom: -16,
+                                  child: Icon(
+                                    Icons.arrow_downward,
+                                    size: 80,
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.13),
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Icon(
+                                      Icons.arrow_downward,
+                                      color: Color(0xFF34D399),
+                                      size: 18,
+                                    ),
+                                    Text(
+                                      '৳ ${_formatAmount(inflowAmt)}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.4,
+                                      ),
+                                    ),
+                                    Align(
+                                      alignment: Alignment.bottomRight,
+                                      child: Text(
+                                        'INFLOW',
+                                        style: TextStyle(
+                                          color: const Color(0xFF34D399).withValues(alpha: 0.9),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
+                  // OUTFLOW CARD (Deep Burgundy Wine)
                   Expanded(
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
@@ -307,30 +349,70 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                             rangeLabel: selectedPeriodLabel,
                           );
                         },
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: borderColor),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.1), shape: BoxShape.circle),
-                                child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFFEF4444), size: 18),
-                              ),
-                              const SizedBox(width: 10),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Outflow', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                                  const SizedBox(height: 2),
-                                  Text('৳ ${_formatAmount(outflowAmt)}', style: const TextStyle(color: darkSlate, fontSize: 15, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ],
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            height: 108,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B0B17),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Positioned(
+                                  right: -10,
+                                  bottom: -16,
+                                  child: Icon(
+                                    Icons.arrow_upward,
+                                    size: 80,
+                                    color: const Color(0xFFF43F5E).withValues(alpha: 0.13),
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Icon(
+                                      Icons.arrow_upward,
+                                      color: Color(0xFFFB7185),
+                                      size: 18,
+                                    ),
+                                    Text(
+                                      '৳ ${_formatAmount(outflowAmt)}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.4,
+                                      ),
+                                    ),
+                                    Align(
+                                      alignment: Alignment.bottomRight,
+                                      child: Text(
+                                        'OUTFLOW',
+                                        style: TextStyle(
+                                          color: const Color(0xFFFB7185).withValues(alpha: 0.9),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
