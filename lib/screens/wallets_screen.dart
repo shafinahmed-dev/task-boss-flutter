@@ -830,6 +830,133 @@ class _WalletsScreenState extends State<WalletsScreen> {
         const SizedBox(height: 12),
         ...ledgers.map((ledger) {
           final name = ledger['name']?.toString() ?? 'Barakah Condominium Project';
+          final code = ledger['code']?.toString() ?? '';
+          final isDefault = ledger['isDefault'] == true;
+          final isDefaultLedger = code == 'GEN-OPS' || isDefault || name.toLowerCase().contains('general');
+          final assignedCount = (ledger['assignedEmployeeIds'] as List?)?.length ?? 0;
+
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0B111E),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LedgerDetailsScreen(
+                          ledgerId: ledger['id']?.toString() ?? '',
+                          initialName: name,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      name,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                        letterSpacing: -0.2,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isDefaultLedger) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        'DEFAULT',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (!isDefaultLedger) ...[
+                                  Material(
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () => _showManageTeamModal(context, ledger),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(7),
+                                        child: Icon(Icons.group_outlined, size: 16, color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                const Icon(Icons.chevron_right_rounded, color: Colors.white38, size: 20),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          isDefaultLedger
+                              ? 'Default company-wide operations'
+                              : '$assignedCount members assigned • Tap for details',
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+        //
+
+        ...ledgers.map((ledger) {
+          final name = ledger['name']?.toString() ?? 'Barakah Condominium Project';
           final status = ledger['status']?.toString().toUpperCase() ?? 'ACTIVE';
 
           return Container(
