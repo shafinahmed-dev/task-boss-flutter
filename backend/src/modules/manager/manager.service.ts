@@ -564,8 +564,26 @@ export class ManagerService {
     direction?: string,
     range?: string,
   ) {
-    const tenantId = reqUser.tenantId;
+    let targetCompanyId: string | undefined = companyId;
+    if (!targetCompanyId || targetCompanyId === 'all') {
+      const authorizedCompanyIds = reqUser?.companyIds || [];
+      targetCompanyId = authorizedCompanyIds[0];
+      if (!targetCompanyId && reqUser?.tenantId) {
+        const firstCompany = await this.prisma.company.findFirst({
+          where: { tenantId: reqUser.tenantId },
+          select: { id: true },
+        });
+        if (firstCompany?.id) {
+          targetCompanyId = firstCompany.id;
+        }
+      }
+    }
 
+    if (!targetCompanyId) {
+      return { success: true, movements: [] };
+    }
+
+    // 1. Build date range filter
     let dateFilter: any = {};
     const now = new Date();
     if (range === 'today') {
@@ -582,19 +600,22 @@ export class ManagerService {
       dateFilter = { gte: start };
     }
 
-    const companyMembers = await this.prisma.userCompany.findMany({
-      where: { companyId },
-      select: { userId: true },
-    });
-    const memberUserIds = companyMembers.map((m) => m.userId);
-
+    // 2. Build where clause matching getConcernTransactions
     const where: any = {
-      tenantId,
-      userId: { in: memberUserIds },
+      OR: [
+        { wallet: { companyId: targetCompanyId } },
+        { category: { companyId: targetCompanyId } },
+      ],
     };
 
-    if (direction === 'in' || direction === 'out') {
-      where.direction = direction;
+    // 3. Direction filter (handle both 'in'/'out', 'IN'/'OUT', 'INFLOW'/'OUTFLOW')
+    if (direction) {
+      const norm = direction.toLowerCase();
+      if (norm === 'in' || norm === 'inflow') {
+        where.direction = { in: ['in', 'IN', 'INFLOW', 'inflow'] };
+      } else if (norm === 'out' || norm === 'outflow') {
+        where.direction = { in: ['out', 'OUT', 'OUTFLOW', 'outflow'] };
+      }
     }
 
     if (dateFilter.gte) {
@@ -604,20 +625,25 @@ export class ManagerService {
     const movements = await this.prisma.moneyMovement.findMany({
       where,
       include: {
+        category: { select: { id: true, name: true, type: true } },
         collector: { select: { id: true, name: true, handle: true, role: true } },
+        custodian: { select: { id: true, name: true, type: true } },
         wallet: { select: { id: true, name: true, type: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 100,
     });
 
     const serialized = movements.map((m: any) => {
       const meta = (m.metadata as any) || {};
+      const normDir = (m.direction || '').toLowerCase();
+      const isOut = normDir === 'out' || normDir === 'outflow';
+
       return {
         id: m.id,
         amount: Number(m.amount || 0),
-        direction: m.direction,
-        movementType: m.movementType || meta.movementType || (m.direction === 'in' ? 'Inflow' : 'Outflow'),
+        direction: isOut ? 'out' : 'in',
+        movementType: m.category?.name || m.movementType || meta.movementType || (isOut ? 'Outflow' : 'Inflow'),
         note: m.notes || meta.note || '',
         voucherNumber: m.voucherNumber || meta.voucherNumber || '',
         userName: m.collector?.name || meta.actorName || 'Staff',
