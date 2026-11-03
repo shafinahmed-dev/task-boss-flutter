@@ -979,23 +979,26 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
             builder: (context, app, _) {
               final role = app.user!.role.toUpperCase();
               if (role == 'SUITE_ADMIN' || role == 'SUITE') {
-                return IconButton(
-                  icon: const Icon(Icons.tune_rounded, color: Color(0xFF0F172A)),
-                  onPressed: _openEditModal,
-                  tooltip: 'Edit Ledger',
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF0F172A)),
+                      tooltip: 'Add Segment',
+                      onPressed: _showAddSegmentModal,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.tune_rounded, color: Color(0xFF0F172A)),
+                      onPressed: _openEditModal,
+                      tooltip: 'Edit Ledger',
+                    ),
+                  ],
                 );
               }
               return const SizedBox.shrink();
             },
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddSegmentModal,
-        backgroundColor: const Color(0xFF0F172A),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Segment', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF1E2638)))
@@ -1241,7 +1244,7 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.3,
-                          color: Color(0xFFF43F5E),
+                          color: Color(0xFFEF4444),
                         ),
                       ),
                     ],
