@@ -6,6 +6,7 @@ class TransactionReceiptTicket extends StatelessWidget {
   final String receiptNo, type, categoryOrRecipient, wallet, method, note;
   final DateTime date;
   final double amount, fee;
+  final String? companyName;
 
   const TransactionReceiptTicket({
     super.key,
@@ -18,6 +19,7 @@ class TransactionReceiptTicket extends StatelessWidget {
     required this.note,
     required this.amount,
     required this.fee,
+    this.companyName,
   });
 
   @override
@@ -38,10 +40,10 @@ class TransactionReceiptTicket extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'TASK DESIGN & CONSULTANCY',
+          Text(
+            (companyName ?? 'ORGANIZATION RECEIPT').toString().toUpperCase(),
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 2),
           const Text(

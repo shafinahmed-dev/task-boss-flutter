@@ -369,7 +369,20 @@ class _CaptureState extends State<CaptureMovementScreen> {
                   if (name.isEmpty) return;
                   final messenger = ScaffoldMessenger.of(this.context);
                   final nav = Navigator.of(ctx);
-                  final targetLedgerId = _selectedLedgerId ?? 'bd4bf36e-be9c-4bc2-b3dc-805c360b2164';
+                  final targetLedgerId = _selectedLedgerId ??
+                      (app.myLedgers.isNotEmpty
+                          ? (app.myLedgers.firstWhere(
+                              (l) => l['code'] == 'GEN-OPS',
+                              orElse: () => app.myLedgers.first,
+                            )['id']?.toString())
+                          : null);
+
+                  if (targetLedgerId == null || targetLedgerId.isEmpty) {
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Please select or assign a ledger first.')),
+                    );
+                    return;
+                  }
                   final res = await app.authRequest(
                     'POST',
                     Uri.parse('${app.apiBaseUrl}/ledger/$targetLedgerId/segments'),

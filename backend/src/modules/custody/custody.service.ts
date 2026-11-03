@@ -654,11 +654,18 @@ export class CustodyService {
     });
 
     const userId = user ? user.id : userIdOrCustodianId;
-    const userName = user ? user.name : 'Shovon Ahmed';
-    const targetCompanyId =
-      companyId ||
-      user?.companies[0]?.companyId ||
-      '8e077157-51d7-4bfb-b288-274a9c87e583';
+    const userName = user ? (user.name || user.handle) : 'Staff Custodian';
+    let targetCompanyId = companyId || user?.companies?.[0]?.companyId;
+    if (!targetCompanyId && user?.tenantId) {
+      const firstCompany = await this.prisma.company.findFirst({
+        where: { tenantId: user.tenantId },
+        select: { id: true },
+      });
+      targetCompanyId = firstCompany?.id;
+    }
+    if (!targetCompanyId) {
+      throw new BadRequestException('Target company context is required for custody initialization');
+    }
 
     // 2. Find or establish primary CustodianAccount
     let custodian = await this.prisma.custodianAccount.findFirst({

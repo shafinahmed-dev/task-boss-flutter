@@ -780,16 +780,16 @@ class _WalletsScreenState extends State<WalletsScreen> {
     if (role != 'MANAGER' && role != 'SUITE_ADMIN' && role != 'SUITE') {
       return const SizedBox.shrink();
     }
-    final ledgers = app.myLedgers.isNotEmpty
-        ? app.myLedgers
-        : [
-            {
-              'id': 'bd4bf36e-be9c-4bc2-b3dc-805c360b2164',
-              'name': 'Barakah Condominium Project',
-              'status': 'ACTIVE',
-              'description': 'Our ongoing project at Priyanka Runway City',
-            }
-          ];
+    final ledgers = app.myLedgers;
+    if (ledgers.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Text(
+          'No project ledgers assigned yet.',
+          style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -958,10 +958,21 @@ class _WalletsScreenState extends State<WalletsScreen> {
   }
 
   void _showManageTeamModal(BuildContext context, Map<String, dynamic> ledger) {
-    final List<Map<String, String>> employees = [
-      {'id': '2104ecd7-279f-4726-8417-923c4b10d81b', 'name': 'Shafin Ahmed', 'handle': 'shafin.taskgroup'},
-      {'id': '29e9f977-51b4-491c-bfa2-1598e4f19010', 'name': 'Ayaz Mustaqeem', 'handle': 'ayaz.taskgroup'},
-    ];
+    final app = Provider.of<AppState>(context, listen: false);
+    if (app.managerConcernEmployees.isEmpty) {
+      app.fetchManagerConcernEmployees();
+    }
+    final rawEmployees = app.managerConcernEmployees.isNotEmpty
+        ? app.managerConcernEmployees
+        : (app.suiteEmployees.isNotEmpty ? app.suiteEmployees : <dynamic>[]);
+
+    final List<Map<String, String>> employees = rawEmployees.map((e) {
+      return {
+        'id': e['id']?.toString() ?? '',
+        'name': e['name']?.toString() ?? (e['handle']?.toString() ?? 'Staff'),
+        'handle': e['handle']?.toString() ?? '',
+      };
+    }).where((e) => e['id']!.isNotEmpty).toList();
 
     final isDefaultLedger = ledger['isDefault'] == true ||
         ledger['code'] == 'GEN-OPS' ||

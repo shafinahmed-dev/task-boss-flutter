@@ -795,7 +795,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
     final overview = app.managerOverviewData;
     final assignedConcerns = (overview['assignedConcerns'] as List?) ?? [];
     final currentCompany = overview['company'] as Map? ?? {};
-    final currentCompanyName = currentCompany['name']?.toString() ?? 'Task Design & Consultlancy';
+    final currentCompanyName = currentCompany['name']?.toString() ?? 'Company Overview';
     final currentCompanyId = currentCompany['id']?.toString() ?? '';
 
     if (assignedConcerns.length <= 1) {
