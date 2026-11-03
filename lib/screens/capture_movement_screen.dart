@@ -790,6 +790,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                     onChanged: (v) => setState(() {
                       _selectedLedgerId = v;
                       _selectedCategory = null;
+                      _categorySearchCtrl.clear();
                       final l = app.myLedgers.firstWhere((item) => item['id'].toString() == v, orElse: () => {});
                       if (l['segments'] is List) {
                         _visibleSegments = List<dynamic>.from(l['segments']);
@@ -1298,10 +1299,13 @@ class _CaptureState extends State<CaptureMovementScreen> {
     }
 
     List<dynamic> categories = [];
-    if (selectedLedger != null &&
-        selectedLedger['segments'] is List &&
-        (selectedLedger['segments'] as List).isNotEmpty) {
-      categories = (selectedLedger['segments'] as List).where((s) {
+    if (selectedLedger != null) {
+      // Strictly isolate segments to the selected ledger — never leak global
+      // concern categories into a ledger that simply has 0 segments yet.
+      final rawSegments = selectedLedger['segments'] is List
+          ? (selectedLedger['segments'] as List)
+          : [];
+      categories = rawSegments.where((s) {
         final matchesSearch = query.isEmpty ||
             (s['name']?.toString().toLowerCase().contains(query) ?? false);
         return matchesSearch;
