@@ -501,38 +501,78 @@ export class ManagerService {
     search?: string,
     direction?: string,
   ) {
-    const tenantId = reqUser.tenantId;
+    // Resolve target company ID cleanly
+    let targetCompanyId = companyId;
+    if (!targetCompanyId || targetCompanyId === 'all') {
+      const authorizedCompanyIds = reqUser?.companyIds || [];
+      targetCompanyId = authorizedCompanyIds[0];
+      if (!targetCompanyId && reqUser?.tenantId) {
+        const firstCompany = await this.prisma.company.findFirst({
+          where: { tenantId: reqUser.tenantId },
+          select: { id: true },
+        });
+        targetCompanyId = firstCompany?.id;
+      }
+    }
+
+    if (!targetCompanyId) {
+      return { success: true, transactions: [] };
+    }
 
     // Resolve members belonging to this company
     const companyMembers = await this.prisma.userCompany.findMany({
-      where: { companyId },
+      where: { companyId: targetCompanyId },
       select: { userId: true },
     });
     const memberUserIds = companyMembers.map((m) => m.userId);
 
-    const where: any = {
-      tenantId,
-      userId: { in: memberUserIds },
-    };
-
-    if (direction === 'in' || direction === 'out') {
-      where.direction = direction;
+    // 1. Base company boundary filter
+    const baseCompanyConditions: any[] = [
+      { wallet: { companyId: targetCompanyId } },
+      { category: { companyId: targetCompanyId } },
+      { ledger: { companyId: targetCompanyId } },
+    ];
+    if (memberUserIds && memberUserIds.length > 0) {
+      baseCompanyConditions.push({ collectorId: { in: memberUserIds } });
     }
 
+    const where: any = {
+      OR: baseCompanyConditions,
+    };
+
+    // 2. Direction filter (case-insensitive & variant safe)
+    if (direction) {
+      const norm = direction.toLowerCase();
+      if (norm === 'in' || norm === 'inflow') {
+        where.direction = { in: ['in', 'IN', 'INFLOW', 'inflow'] };
+      } else if (norm === 'out' || norm === 'outflow') {
+        where.direction = { in: ['out', 'OUT', 'OUTFLOW', 'outflow'] };
+      }
+    }
+
+    // 3. Search filter using schema-valid fields
     if (search && search.trim().length > 0) {
       const q = search.trim();
-      where.OR = [
-        { note: { contains: q, mode: 'insensitive' } },
-        { voucherNumber: { contains: q, mode: 'insensitive' } },
-        { movementType: { contains: q, mode: 'insensitive' } },
-        { user: { name: { contains: q, mode: 'insensitive' } } },
+      where.AND = [
+        {
+          OR: [
+            { notes: { contains: q, mode: 'insensitive' } },
+            { receiptNo: { contains: q, mode: 'insensitive' } },
+            { collector: { name: { contains: q, mode: 'insensitive' } } },
+            { category: { name: { contains: q, mode: 'insensitive' } } },
+            { segment: { name: { contains: q, mode: 'insensitive' } } },
+          ],
+        },
       ];
     }
 
     const movements = await this.prisma.moneyMovement.findMany({
       where,
       include: {
+        category: { select: { id: true, name: true, type: true } },
+        segment: { select: { id: true, name: true } },
         collector: { select: { id: true, name: true, handle: true, role: true } },
+        custodian: { select: { id: true, name: true, type: true } },
         wallet: { select: { id: true, name: true, type: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -541,13 +581,14 @@ export class ManagerService {
 
     const serialized = movements.map((m: any) => {
       const meta = (m.metadata as any) || {};
+      const isOut = (m.direction || '').toString().toLowerCase().includes('out');
       return {
         id: m.id,
         amount: Number(m.amount || 0),
         direction: m.direction,
-        movementType: m.movementType || meta.movementType || (m.direction === 'in' ? 'Inflow' : 'Outflow'),
+        movementType: m.segment?.name || m.category?.name || m.movementType || meta.movementType || (isOut ? 'Outflow' : 'Inflow'),
         note: m.notes || meta.note || '',
-        voucherNumber: m.voucherNumber || meta.voucherNumber || '',
+        voucherNumber: m.receiptNo || m.voucherNumber || meta.voucherNumber || '',
         userName: m.collector?.name || meta.actorName || 'Staff',
         userRole: m.collector?.role || 'EMPLOYEE',
         walletName: m.wallet?.name || meta.channel || '',
