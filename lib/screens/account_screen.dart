@@ -60,8 +60,6 @@ class _AccountScreenState extends State<AccountScreen> {
     final d = _toDouble(val);
     return d % 1 == 0 ? d.toStringAsFixed(0) : d.toStringAsFixed(2);
   }
-  List<dynamic> _inflowItems = [];
-  List<dynamic> _outflowItems = [];
 
   @override
   void initState() {
@@ -86,15 +84,12 @@ class _AccountScreenState extends State<AccountScreen> {
       ]);
 
       double i = 0, o = 0;
-      final List<dynamic> infs = [];
-      final List<dynamic> outfs = [];
 
       // 1. Process Movements
       if (results[0].statusCode == 200) {
         final data = jsonDecode(results[0].body);
         final items = data['items'] as List? ?? [];
         for (var m in items) {
-          m['uiType'] = 'movement';
           m['date'] = DateTime.tryParse(m['occurredAt'] ?? m['createdAt'] ?? '') ?? DateTime.now();
 
           final amt = _toDouble(m['amount']);
@@ -105,14 +100,6 @@ class _AccountScreenState extends State<AccountScreen> {
           if (tag == 'internal_transfer') {
             if (fee > 0 && dir == 'out') {
               o += fee;
-              outfs.add({
-                'uiType': 'fee',
-                'title': 'Transfer Fee',
-                'amount': fee,
-                'date': m['date'],
-                'notes': m['notes'] ?? m['note'] ?? m['metadata']?['note'] ?? m['metadata']?['notes'],
-                'channel': m['channel'] ?? m['metadata']?['channel'],
-              });
             }
             continue;
           }
@@ -120,60 +107,31 @@ class _AccountScreenState extends State<AccountScreen> {
           // ── Explicit Handover KPI handling ──
           if (tag == 'handover_in') {
             i += amt;
-            infs.add(m);
             continue;
           }
           if (tag == 'handover_out') {
             o += amt;
-            outfs.add(m);
             if (fee > 0) {
               o += fee;
-              outfs.add({
-                'uiType': 'fee',
-                'title': 'Handover Fee',
-                'amount': fee,
-                'date': m['date'],
-                'notes': m['notes'] ?? m['note'] ?? m['metadata']?['note'] ?? m['metadata']?['notes'],
-                'channel': m['channel'] ?? m['metadata']?['channel'],
-              });
             }
             continue;
           }
 
           final dirTab = (m['metadata']?['directionTab'] ?? '').toString().toLowerCase();
           final movementType = (m['metadata']?['movementType'] ?? '').toString().toLowerCase();
-          final categoryStr = (m['metadata']?['category'] ?? '').toString();
 
           final bool isCashIn = dir == 'in' || dirTab == 'in' || movementType == 'cash in' || tag == 'inflow';
           final bool isCashOut = !isCashIn;
 
           if (isCashIn) {
             i += amt;
-            infs.add(m);
             if (fee > 0) {
               o += fee;
-              outfs.add({
-                'uiType': 'fee',
-                'title': 'Movement Fee (${categoryStr.isNotEmpty ? categoryStr : (tag.isNotEmpty ? tag : "Cash In")})',
-                'amount': fee,
-                'date': m['date'],
-                'notes': m['notes'] ?? m['note'] ?? m['metadata']?['note'] ?? m['metadata']?['notes'],
-                'channel': m['channel'] ?? m['metadata']?['channel'],
-              });
             }
           } else if (isCashOut) {
             o += amt;
-            outfs.add(m);
             if (fee > 0) {
               o += fee;
-              outfs.add({
-                'uiType': 'fee',
-                'title': 'Movement Fee (${categoryStr.isNotEmpty ? categoryStr : (tag.isNotEmpty ? tag : "Cash Out")})',
-                'amount': fee,
-                'date': m['date'],
-                'notes': m['notes'] ?? m['note'] ?? m['metadata']?['note'] ?? m['metadata']?['notes'],
-                'channel': m['channel'] ?? m['metadata']?['channel'],
-              });
             }
           }
         }
@@ -190,22 +148,14 @@ class _AccountScreenState extends State<AccountScreen> {
         }
         for (var t in transfers) {
           final status = (t['status'] ?? '').toString().toLowerCase();
-          // Confirmed transfers are already tracked via generated MoneyMovement records (handover_out / handover_in)
           if (status == 'confirmed') continue;
-          t['uiType'] = 'transfer';
-          t['date'] = DateTime.tryParse(t['requestedAt'] ?? t['createdAt'] ?? '') ?? DateTime.now();
         }
       }
-
-      infs.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
-      outfs.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
 
       if (mounted) {
         setState(() {
           _inf = i;
           _outf = o;
-          _inflowItems = infs;
-          _outflowItems = outfs;
         });
       }
     } catch (_) {
