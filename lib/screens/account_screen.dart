@@ -361,29 +361,36 @@ class _AccountScreenState extends State<AccountScreen> {
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Colors.white.withValues(alpha: 0.15),
-                  child: Text(
-                    u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(u.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                      Text(
+                        u.name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(u.email, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13)),
+                      Text(
+                        (u.designation != null && u.designation.toString().trim().isNotEmpty)
+                            ? u.designation.toString().trim()
+                            : (u.role == 'MANAGER' ? 'Manager' : (u.role == 'SUITE_ADMIN' ? 'Suite Admin' : 'Staff Member')),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 InkWell(
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                    MaterialPageRoute(builder: (_) => const HistoryScreen(initialFilter: 'ALL')),
                   ),
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
@@ -426,7 +433,10 @@ class _AccountScreenState extends State<AccountScreen> {
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () => _showDetailsModal('Inflow Transactions', _inflowItems, AppTheme.inflowText),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HistoryScreen(initialFilter: 'INFLOW')),
+                  ),
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -461,7 +471,10 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
               Expanded(
                 child: InkWell(
-                  onTap: () => _showDetailsModal('Outflow Transactions', _outflowItems, AppTheme.pendingAccent),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HistoryScreen(initialFilter: 'OUTFLOW')),
+                  ),
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),

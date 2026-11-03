@@ -14,7 +14,8 @@ double _toDouble(dynamic val) {
 }
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  final String initialFilter;
+  const HistoryScreen({super.key, this.initialFilter = 'ALL'});
 
   @override
   State<HistoryScreen> createState() => _HistoryState();
@@ -23,11 +24,56 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryState extends State<HistoryScreen> {
   bool _loading = true;
   List<dynamic> _items = [];
+  late String _activeFilter;
 
   @override
   void initState() {
     super.initState();
+    _activeFilter = widget.initialFilter.toUpperCase();
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetch());
+  }
+
+  List<dynamic> get _filteredItems {
+    if (_activeFilter == 'INFLOW') {
+      return _items.where((it) {
+        final dir = (it['direction'] ?? '').toString().toLowerCase();
+        final isTransferIn = it['uiType'] == 'transfer' && it['isReceiver'] == true;
+        return dir == 'in' || dir == 'inflow' || isTransferIn;
+      }).toList();
+    } else if (_activeFilter == 'OUTFLOW') {
+      return _items.where((it) {
+        final dir = (it['direction'] ?? '').toString().toLowerCase();
+        final isTransferOut = it['uiType'] == 'transfer' && it['isReceiver'] != true;
+        return dir == 'out' || dir == 'outflow' || isTransferOut;
+      }).toList();
+    } else if (_activeFilter == 'HANDOVER') {
+      return _items.where((it) => it['uiType'] == 'transfer').toList();
+    }
+    return _items;
+  }
+
+  double get _totalInflow {
+    double sum = 0.0;
+    for (var it in _items) {
+      final dir = (it['direction'] ?? '').toString().toLowerCase();
+      final isTransferIn = it['uiType'] == 'transfer' && it['isReceiver'] == true;
+      if (dir == 'in' || dir == 'inflow' || isTransferIn) {
+        sum += _toDouble(it['amount']);
+      }
+    }
+    return sum;
+  }
+
+  double get _totalOutflow {
+    double sum = 0.0;
+    for (var it in _items) {
+      final dir = (it['direction'] ?? '').toString().toLowerCase();
+      final isTransferOut = it['uiType'] == 'transfer' && it['isReceiver'] != true;
+      if (dir == 'out' || dir == 'outflow' || isTransferOut) {
+        sum += _toDouble(it['amount']);
+      }
+    }
+    return sum;
   }
 
   String _formatTag(String? tag) {
@@ -145,6 +191,7 @@ class _HistoryState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredItems;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -153,31 +200,131 @@ class _HistoryState extends State<HistoryScreen> {
         foregroundColor: AppTheme.primaryText,
         elevation: 0,
       ),
-      body: RefreshIndicator(
-        onRefresh: _fetch,
-        child: _loading && _items.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : _items.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No transaction history found.',
-                      style: TextStyle(color: AppTheme.secondaryText),
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: _items.length,
-                    separatorBuilder: (context, index) =>
-                        Divider(height: 1, color: Colors.grey.shade200),
-                    itemBuilder: (context, index) {
-                      final it = _items[index];
-                      return _HistoryTransactionRow(
-                        item: it,
-                        formatTag: _formatTag,
-                        parseNote: _parseNote,
-                      );
-                    },
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: Colors.white,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip('ALL', 'All'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('INFLOW', 'Inflows'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('OUTFLOW', 'Outflows'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('HANDOVER', 'Handovers'),
+                    ],
                   ),
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _fetch,
+                  child: _loading && _items.isEmpty
+                      ? const Center(child: CircularProgressIndicator())
+                      : filtered.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No transaction history found.',
+                                style: TextStyle(color: AppTheme.secondaryText),
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.only(top: 8, bottom: 95),
+                              itemCount: filtered.length,
+                              separatorBuilder: (context, index) =>
+                                  Divider(height: 1, color: Colors.grey.shade200),
+                              itemBuilder: (context, index) {
+                                final it = filtered[index];
+                                return _HistoryTransactionRow(
+                                  item: it,
+                                  formatTag: _formatTag,
+                                  parseNote: _parseNote,
+                                );
+                              },
+                            ),
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 20,
+            child: Container(
+              height: 60,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('TOTAL INFLOW', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF10B981), letterSpacing: 0.5)),
+                        const SizedBox(height: 2),
+                        Text('+৳ ${_totalInflow.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+                      ],
+                    ),
+                  ),
+                  Container(width: 1, height: 28, color: Colors.white.withValues(alpha: 0.15)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text('TOTAL OUTFLOW', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFEF4444), letterSpacing: 0.5)),
+                        const SizedBox(height: 2),
+                        Text('-৳ ${_totalOutflow.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String key, String label) {
+    final isActive = _activeFilter == key;
+    return InkWell(
+      onTap: () => setState(() => _activeFilter = key),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: isActive ? Colors.white : const Color(0xFF64748B),
+          ),
+        ),
       ),
     );
   }
