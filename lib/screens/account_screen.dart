@@ -15,27 +15,7 @@ double _toDouble(dynamic val) {
   if (val is String) return double.tryParse(val) ?? 0.0;
   return 0.0;
 }
-String? _parseNote(dynamic item) {
-  if (item == null) return null;
-  dynamic raw = item['notes'] ?? item['note'] ?? item['description'] ?? item['metadata']?['note'] ?? item['metadata']?['notes'];
-  if (raw == null) return null;
-  final str = raw.toString().trim();
-  if (str.isEmpty) return null;
-  
-  if (str.startsWith('{') && str.endsWith('}')) {
-    try {
-      final decoded = jsonDecode(str);
-      if (decoded is Map) {
-        final inner = decoded['note'] ?? decoded['notes'] ?? decoded['description'];
-        if (inner != null && inner.toString().trim().isNotEmpty) {
-          return inner.toString().trim();
-        }
-        return null;
-      }
-    } catch (_) {}
-  }
-  return str;
-}
+
 
 
 class ProfileScreen extends StatelessWidget {
