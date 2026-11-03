@@ -502,7 +502,7 @@ export class ManagerService {
     direction?: string,
   ) {
     // Resolve target company ID cleanly
-    let targetCompanyId = companyId;
+    let targetCompanyId: string | undefined = companyId;
     if (!targetCompanyId || targetCompanyId === 'all') {
       const authorizedCompanyIds = reqUser?.companyIds || [];
       targetCompanyId = authorizedCompanyIds[0];
