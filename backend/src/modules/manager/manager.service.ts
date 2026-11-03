@@ -626,6 +626,7 @@ export class ManagerService {
       where,
       include: {
         category: { select: { id: true, name: true, type: true } },
+        segment: { select: { id: true, name: true } },
         collector: { select: { id: true, name: true, handle: true, role: true } },
         custodian: { select: { id: true, name: true, type: true } },
         wallet: { select: { id: true, name: true, type: true } },
@@ -639,12 +640,15 @@ export class ManagerService {
       const normDir = (m.direction || '').toLowerCase();
       const isOut = normDir === 'out' || normDir === 'outflow';
 
+      const title = m.segment?.name || m.category?.name || m.movementType || meta.movementType || (isOut ? 'Outflow' : 'Inflow');
+      const noteText = m.notes || meta.note || null;
+
       return {
         id: m.id,
         amount: Number(m.amount || 0),
         direction: isOut ? 'out' : 'in',
-        movementType: m.category?.name || m.movementType || meta.movementType || (isOut ? 'Outflow' : 'Inflow'),
-        note: m.notes || meta.note || '',
+        movementType: title,
+        note: noteText,
         voucherNumber: m.voucherNumber || meta.voucherNumber || '',
         userName: m.collector?.name || meta.actorName || 'Staff',
         userRole: m.collector?.role || 'EMPLOYEE',

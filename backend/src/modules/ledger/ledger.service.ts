@@ -769,15 +769,27 @@ export class LedgerService {
         where: { ledgerId, role: 'EMPLOYEE' },
       });
 
-      // 2. Insert valid UUID records
+      // 2. Insert or upsert valid UUID records for EMPLOYEE role only
       for (const empId of uniqueIds) {
-        await tx.ledgerMember.create({
-          data: {
-            ledgerId,
-            userId: empId,
-            role: 'EMPLOYEE',
-          },
+        // Verify user is actually an EMPLOYEE
+        const userRec = await tx.user.findUnique({
+          where: { id: empId },
+          select: { role: true },
         });
+
+        if (userRec && userRec.role === 'EMPLOYEE') {
+          await tx.ledgerMember.upsert({
+            where: {
+              ledgerId_userId: { ledgerId, userId: empId },
+            },
+            update: { role: 'EMPLOYEE' },
+            create: {
+              ledgerId,
+              userId: empId,
+              role: 'EMPLOYEE',
+            },
+          });
+        }
       }
     });
 

@@ -910,29 +910,68 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                                 itemBuilder: (context, index) {
                                   final m = movements[index];
                                   final amt = _toDouble(m['amount']);
-                                  final note = m['note'] ?? m['movementType'] ?? 'Transaction';
+
+                                  // Resolve title cleanly: movementType (segment/category) -> note -> fallback
+                                  final mType = m['movementType']?.toString().trim() ?? '';
+                                  final mNote = m['note']?.toString().trim() ?? '';
+                                  final displayTitle = mType.isNotEmpty
+                                      ? mType
+                                      : (mNote.isNotEmpty ? mNote : (isOut ? 'Outflow' : 'Inflow'));
+
                                   final userName = m['userName'] ?? 'Staff';
                                   final timeStr = m['createdAt']?.toString().substring(0, 10) ?? '';
 
                                   return Container(
                                     padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: borderColor)),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: borderColor),
+                                    ),
                                     child: Row(
                                       children: [
-                                        Icon(isOut ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: isOut ? const Color(0xFFEF4444) : const Color(0xFF10B981), size: 16),
+                                        Icon(
+                                          isOut ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                                          color: isOut ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                          size: 16,
+                                        ),
                                         const SizedBox(width: 10),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                 children: [
-                                                  Text(note, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: darkSlate)),
-                                                  Text(isOut ? '-৳ ${_formatAmount(amt)}' : '+৳ ${_formatAmount(amt)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isOut ? const Color(0xFFEF4444) : const Color(0xFF10B981))),
+                                                  Expanded(
+                                                    child: Text(
+                                                      displayTitle,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: darkSlate,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    isOut ? '-৳ ${_formatAmount(amt)}' : '+৳ ${_formatAmount(amt)}',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: isOut ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
-                                              Text('$timeStr • By: $userName', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                '$timeStr • By: $userName',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                              ),
                                             ],
                                           ),
                                         ),
