@@ -26,6 +26,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
       final app = context.read<AppState>();
       app.fetchManagerOverview(range: _selectedFilter);
       app.fetchManagerConcernEmployees();
+      app.fetchPendingMovements();
     });
   }
 
@@ -40,6 +41,103 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
     if (!forceShow && _isCashMasked) return '••••••';
     final d = _toDouble(val);
     return d.toStringAsFixed(2);
+  }
+
+  void _showPendingApprovalsModal(BuildContext context, AppState app) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: const EdgeInsets.all(20),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.between,
+                children: [
+                  const Text('Pending Approvals', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: navyColor)),
+                  IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(context)),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: app.pendingMovements.isEmpty
+                    ? const Center(child: Text('No pending transactions to review.'))
+                    : ListView.separated(
+                        itemCount: app.pendingMovements.length,
+                        separatorBuilder: (_, __) => const Divider(height: 16),
+                        itemBuilder: (context, index) {
+                          final tx = app.pendingMovements[index];
+                          final amt = _toDouble(tx['amount']);
+                          final isOut = (tx['direction'] ?? '').toString().toLowerCase() == 'out';
+                          final collector = tx['collector']?['name'] ?? 'Employee';
+                          final cat = tx['category']?['name'] ?? tx['entryTag'] ?? 'Movement';
+                          final txId = tx['id']?.toString() ?? '';
+
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.between,
+                                  children: [
+                                    Text(cat, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                    Text('${isOut ? '-' : '+'}৳${amt.toStringAsFixed(2)}',
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: isOut ? Colors.red : Colors.green)),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text('By: $collector', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    OutlinedButton(
+                                      style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                                      onPressed: () async {
+                                        await app.rejectMovement(txId);
+                                        setModalState(() {});
+                                      },
+                                      child: const Text('Reject'),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                                      onPressed: () async {
+                                        await app.approveMovement(txId);
+                                        setModalState(() {});
+                                        await app.fetchManagerOverview(range: _selectedFilter);
+                                      },
+                                      child: const Text('Approve'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -83,6 +181,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
           onRefresh: () async {
             await app.fetchManagerOverview(range: _selectedFilter);
             await app.fetchManagerConcernEmployees();
+            await app.fetchPendingMovements();
           },
           color: navyColor,
           child: ListView(
@@ -101,7 +200,10 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                       final c = concerns[index];
                       final isSelected = c['id'] == (app.selectedManagerCompanyId ?? (concerns.isNotEmpty ? concerns.first['id'] : ''));
                       return GestureDetector(
-                        onTap: () => app.selectManagerCompany(c['id']),
+                        onTap: () {
+                          app.selectManagerCompany(c['id']);
+                          app.fetchPendingMovements(companyId: c['id']);
+                        },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           margin: EdgeInsets.only(left: index == 0 ? 16 : 8, right: index == concerns.length - 1 ? 16 : 0),
@@ -122,6 +224,33 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+              ],
+              if (app.pendingMovements.isNotEmpty) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF9C3),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF59E0B)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.pending_actions_rounded, color: Color(0xFFD97706), size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '${app.pendingMovements.length} pending employee approvals',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF92400E), fontSize: 13),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => _showPendingApprovalsModal(context, app),
+                        child: const Text('Review', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
+                      ),
+                    ],
+                  ),
+                ),
               ],
               MouseRegion(
                 cursor: SystemMouseCursors.click,

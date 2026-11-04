@@ -162,6 +162,7 @@ export class LedgerService {
         custodianId,
         direction: 'in',
         id: { notIn: Array.from(supersededIds) },
+        approvalStatus: 'approved',
       },
       _sum: { amount: true, fee: true },
     });
@@ -172,6 +173,7 @@ export class LedgerService {
         custodianId,
         direction: 'out',
         id: { notIn: Array.from(supersededIds) },
+        approvalStatus: 'approved',
       },
       _sum: { amount: true, fee: true },
     });
@@ -422,6 +424,16 @@ export class LedgerService {
         }
       }
 
+      // ── Determine approval status based on collector role ──────────────
+      let approvalStatus = 'approved'; // MANAGER/SUITE_ADMIN movements auto-approved
+      const collectorUser = await this.prisma.user.findUnique({
+        where: { id: dto.collectorId },
+        select: { role: true },
+      });
+      if (collectorUser && collectorUser.role === 'EMPLOYEE') {
+        approvalStatus = 'pending';
+      }
+
       const movement = await this.prisma.moneyMovement.create({
         data: {
           fee: feeVal > 0 ? new Decimal(feeVal) : null,
@@ -448,6 +460,7 @@ export class LedgerService {
           editedFromId: null,
           occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : new Date(),
           syncStatus: dto.syncStatus ?? 'synced',
+          approvalStatus,
         },
       });
 
@@ -1408,5 +1421,143 @@ export class LedgerService {
     return typeof (val as any).toNumber === 'function'
       ? (val as { toNumber(): number }).toNumber()
       : new Decimal(val as unknown as string).toNumber();
+  }
+
+  // ── Maker-Checker Approval Methods ──────────────────────────────────────
+
+  /**
+   * Get all movements pending approval for a given company.
+   * Only MANAGER / SUITE_ADMIN may call this.
+   */
+  async getPendingMovements(companyId?: string) {
+    const where: any = { approvalStatus: 'pending' };
+    if (companyId) {
+      where.custodian = { companyId };
+    }
+
+    const movements = await this.prisma.moneyMovement.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        collector: { select: { id: true, name: true, handle: true } },
+        custodian: { select: { id: true, name: true, companyId: true } },
+        category: { select: { id: true, name: true } },
+      },
+    });
+
+    return { movements };
+  }
+
+  /**
+   * Approve a pending movement.
+   * Sets approvalStatus = 'approved', approvedById, approvedAt.
+   */
+  async approveMovement(movementId: string, approverId: string) {
+    const movement = await this.prisma.moneyMovement.findUnique({
+      where: { id: movementId },
+    });
+    if (!movement) {
+      throw new NotFoundException(`Movement ${movementId} not found`);
+    }
+    if (movement.approvalStatus !== 'pending') {
+      throw new BadRequestException(
+        `Movement is already ${movement.approvalStatus}`,
+      );
+    }
+
+    const updated = await this.prisma.moneyMovement.update({
+      where: { id: movementId },
+      data: {
+        approvalStatus: 'approved',
+        approvedById: approverId,
+        approvedAt: new Date(),
+        rejectionReason: null,
+      },
+    });
+
+    return { success: true, movement: updated };
+  }
+
+  /**
+   * Reject a pending movement.
+   * Sets approvalStatus = 'rejected', reason captured.
+   */
+  async rejectMovement(movementId: string, approverId: string, reason?: string) {
+    const movement = await this.prisma.moneyMovement.findUnique({
+      where: { id: movementId },
+    });
+    if (!movement) {
+      throw new NotFoundException(`Movement ${movementId} not found`);
+    }
+    if (movement.approvalStatus !== 'pending') {
+      throw new BadRequestException(
+        `Movement is already ${movement.approvalStatus}`,
+      );
+    }
+
+    const updated = await this.prisma.moneyMovement.update({
+      where: { id: movementId },
+      data: {
+        approvalStatus: 'rejected',
+        approvedById: approverId,
+        approvedAt: new Date(),
+        rejectionReason: reason ?? null,
+      },
+    });
+
+    return { success: true, movement: updated };
+  }
+
+  /**
+   * Get all movements for a company (for manager transactions screen).
+   */
+  async fetchManagerTransactions(companyId: string, search?: string) {
+    const where: any = {
+      custodian: { companyId },
+    };
+
+    const movements = await this.prisma.moneyMovement.findMany({
+      where,
+      orderBy: { occurredAt: 'desc' },
+      take: 200,
+      include: {
+        collector: { select: { id: true, name: true, handle: true } },
+        category: { select: { id: true, name: true } },
+        segment: { select: { id: true, name: true } },
+        custodian: { select: { id: true, name: true } },
+      },
+    });
+
+    const mapped = movements
+      .filter((m) => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        const note = (m.notes || '').toLowerCase();
+        const cat = (m.category?.name || '').toLowerCase();
+        const seg = (m.segment?.name || '').toLowerCase();
+        const col = (m.collector?.name || '').toLowerCase();
+        return note.includes(q) || cat.includes(q) || seg.includes(q) || col.includes(q);
+      })
+      .map((m) => ({
+        id: m.id,
+        amount: Number(m.amount),
+        direction: m.direction,
+        entryTag: m.entryTag,
+        notes: m.notes,
+        receiptNo: m.receiptNo,
+        occurredAt: m.occurredAt?.toISOString(),
+        createdAt: m.createdAt?.toISOString(),
+        approvalStatus: m.approvalStatus,
+        actorName: m.collector?.name || 'Staff',
+        collectorHandle: m.collector?.handle || '',
+        category: m.category,
+        segmentName: m.segment?.name || null,
+        custodianName: m.custodian?.name || '',
+        channel: m.channel,
+        paymentMethod: (m.metadata as any)?.paymentMethod || m.channel,
+        type: m.direction === 'in' ? 'Cash In' : 'Cash Out',
+      }));
+
+    return { transactions: mapped };
   }
 }

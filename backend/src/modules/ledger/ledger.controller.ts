@@ -174,4 +174,49 @@ export class LedgerController {
       direction,
     });
   }
+
+  // ── Maker-Checker Approval Endpoints ──────────────────────────────────
+
+  @Get('movements/pending')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  async getPendingMovements(
+    @Req() req: any,
+    @Query('companyId') companyId?: string,
+  ) {
+    const cid = companyId ?? req.user?.companyId ?? undefined;
+    return this.ledgerService.getPendingMovements(cid);
+  }
+
+  @Post('movements/:id/approve')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  async approveMovement(@Param('id') id: string, @Req() req: any) {
+    const approverId = req.user?.id || req.user?.userId;
+    return this.ledgerService.approveMovement(id, approverId);
+  }
+
+  @Post('movements/:id/reject')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  async rejectMovement(
+    @Param('id') id: string,
+    @Body('reason') reason: string,
+    @Req() req: any,
+  ) {
+    const approverId = req.user?.id || req.user?.userId;
+    return this.ledgerService.rejectMovement(id, approverId, reason);
+  }
+
+  // ── Manager Transactions Endpoint ────────────────────────────────────
+
+  @Get('manager/transactions')
+  @Roles('MANAGER', 'SUITE_ADMIN')
+  async getManagerTransactions(
+    @Req() req: any,
+    @Query('companyId') companyId?: string,
+    @Query('search') search?: string,
+  ) {
+    const cid = companyId ?? req.user?.companyId ?? '';
+    return this.ledgerService.fetchManagerTransactions(cid, search);
+  }
 }

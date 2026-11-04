@@ -126,6 +126,7 @@ model User {
   companies         UserCompany[]
   custodianAccounts CustodianAccount[]
   collectedMovements MoneyMovement[]     @relation("CollectorMovements")
+  approvedMovements  MoneyMovement[]     @relation("ApprovedMovements")
   assignedBlocks    ReceiptNumberBlock[]
   ledgerAssignments LedgerMember[]
 
@@ -270,10 +271,17 @@ model MoneyMovement {
   occurredAt       DateTime @map("occurred_at")
   syncStatus       String  @default("synced") @map("sync_status") @db.Text
 
+  // ── Maker-Checker Approval ───────────────────────────────────────────────
+  approvalStatus   String  @default("approved") @map("approval_status") @db.Text // approved | pending | rejected
+  approvedById     String? @map("approved_by_id") @db.Uuid
+  approvedAt       DateTime? @map("approved_at")
+  rejectionReason  String? @map("rejection_reason") @db.Text
+
   // Self-referential for append-only edit chain
   editedFrom       MoneyMovement?  @relation("EditChain", fields: [editedFromId], references: [id])
   editedVersions   MoneyMovement[] @relation("EditChain")
 
+  approver         User?           @relation("ApprovedMovements", fields: [approvedById], references: [id])
   collector        User            @relation("CollectorMovements", fields: [collectorId], references: [id])
   custodian        CustodianAccount @relation(fields: [custodianId], references: [id])
   wallet           Wallet?         @relation(fields: [walletId], references: [id], onDelete: SetNull)

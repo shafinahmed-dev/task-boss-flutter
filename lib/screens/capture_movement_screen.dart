@@ -684,6 +684,10 @@ class _CaptureState extends State<CaptureMovementScreen> {
         final resData = jsonDecode(res.body);
         final returnedNo = resData['receiptNo'] ?? resData['metadata']?['voucherNumber'] ?? receiptNo;
 
+        // Determine if submission went to pending approval
+        final isPending = (resData['approvalStatus'] ?? '').toString() == 'pending' ||
+            app.user?.role == 'EMPLOYEE';
+
         setState(() {
           _lastSavedReceipt = {
             'receiptNo': returnedNo,
@@ -702,9 +706,15 @@ class _CaptureState extends State<CaptureMovementScreen> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Transaction saved successfully!'),
-              backgroundColor: AppTheme.confirmedText,
+            SnackBar(
+              content: Text(
+                isPending
+                    ? 'Transaction submitted — awaiting manager approval'
+                    : 'Transaction saved successfully!',
+              ),
+              backgroundColor: isPending
+                  ? const Color(0xFFD97706)
+                  : AppTheme.confirmedText,
             ),
           );
         }

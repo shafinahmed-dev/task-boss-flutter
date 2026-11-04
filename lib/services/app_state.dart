@@ -102,6 +102,72 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> _managerTransactions = [];
   List<Map<String, dynamic>> get managerTransactions => _managerTransactions;
 
+  // ── Maker-Checker: Pending Movements ───────────────────────────────────
+  List<Map<String, dynamic>> _pendingMovements = [];
+  List<Map<String, dynamic>> get pendingMovements => _pendingMovements;
+
+  Future<void> fetchPendingMovements({String? companyId}) async {
+    try {
+      final cid = (companyId != null && companyId.isNotEmpty)
+          ? companyId
+          : effectiveCompanyId;
+      final url = Uri.parse('$apiBaseUrl/ledger/movements/pending?companyId=$cid');
+      final response = await authRequest('GET', url);
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['movements'] is List) {
+          _pendingMovements = (decoded['movements'] as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        } else if (decoded is List) {
+          _pendingMovements = decoded
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchPendingMovements error: $e');
+    }
+  }
+
+  Future<bool> approveMovement(String movementId) async {
+    try {
+      final response = await authRequest(
+        'POST',
+        Uri.parse('$apiBaseUrl/ledger/movements/$movementId/approve'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await fetchPendingMovements();
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('approveMovement error: $e');
+    }
+    return false;
+  }
+
+  Future<bool> rejectMovement(String movementId, {String? reason}) async {
+    try {
+      final response = await authRequest(
+        'POST',
+        Uri.parse('$apiBaseUrl/ledger/movements/$movementId/reject'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'reason': reason ?? ''}),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await fetchPendingMovements();
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('rejectMovement error: $e');
+    }
+    return false;
+  }
+
   Future<List<Map<String, dynamic>>> fetchManagerTransactions({
     String? companyId,
     String? search,

@@ -510,6 +510,55 @@ class _HistoryTransactionRowState extends State<_HistoryTransactionRow> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if (!isTransfer) ...[
+                          Builder(builder: (context) {
+                            final apStatus = (it['approvalStatus'] ?? 'approved').toString().toLowerCase();
+                            if (apStatus == 'pending') {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF9C3),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFFF59E0B)),
+                                  ),
+                                  child: const Text(
+                                    'PENDING APPROVAL',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFD97706),
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            } else if (apStatus == 'rejected') {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEE2E2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFFDC2626)),
+                                  ),
+                                  child: const Text(
+                                    'REJECTED',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFDC2626),
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          }),
+                        ],
                         const SizedBox(height: 3),
                         Text(
                           metaSubtitle,
