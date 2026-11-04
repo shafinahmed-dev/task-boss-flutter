@@ -62,7 +62,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.between,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Pending Approvals', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: navyColor)),
                   IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(context)),
@@ -94,7 +94,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.between,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(cat, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                     Text('${isOut ? '-' : '+'}৳${amt.toStringAsFixed(2)}',
