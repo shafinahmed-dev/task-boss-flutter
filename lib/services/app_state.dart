@@ -386,8 +386,8 @@ class AppState extends ChangeNotifier {
 
     // 2. Authenticated user's companyId
     final u = user;
-    if (u != null && u.companyId != null && u.companyId!.isNotEmpty) {
-      return u.companyId!;
+    if (u != null && u.companyId.isNotEmpty) {
+      return u.companyId;
     }
 
     // 3. Cached company ID from manager overview
@@ -502,6 +502,11 @@ class AppState extends ChangeNotifier {
         body: jsonEncode(data),
       );
       if (res.statusCode == 200) {
+        await Future.wait([
+          fetchMyLedgers(),
+          fetchSuiteLedgers(),
+          fetchConcerns(),
+        ]);
         notifyListeners();
         return true;
       }

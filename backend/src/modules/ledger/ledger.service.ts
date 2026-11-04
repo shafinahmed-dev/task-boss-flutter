@@ -1,3 +1,18 @@
+declare global {
+  interface String {
+    isNotEmpty?: boolean;
+  }
+}
+if (!('isNotEmpty' in String.prototype)) {
+  Object.defineProperty(String.prototype, 'isNotEmpty', {
+    get() {
+      return this.length > 0;
+    },
+    configurable: true,
+  });
+}
+
+
 import {
   Injectable,
   ConflictException,
@@ -964,17 +979,22 @@ export class LedgerService {
     if (dto.startDate !== undefined) updateData.startDate = dto.startDate ? new Date(dto.startDate) : null;
     if (dto.endDate !== undefined) updateData.endDate = dto.endDate ? new Date(dto.endDate) : null;
     if (dto.companyId !== undefined) {
-      if (dto.companyId) {
-        updateData.company = { connect: { id: dto.companyId } };
-      } else {
-        updateData.company = { disconnect: true };
-      }
+      updateData.companyId = dto.companyId && dto.companyId.toString().trim().isNotEmpty
+        ? dto.companyId.toString().trim()
+        : null;
     }
 
     const rawManagerIds = dto.managerUserIds || dto.managerIds;
     if (Array.isArray(rawManagerIds)) {
+      // Clear previous manager roles AND any collision records for these user IDs
       await this.prisma.ledgerMember.deleteMany({
-        where: { ledgerId, role: 'MANAGER' },
+        where: {
+          ledgerId,
+          OR: [
+            { role: 'MANAGER' },
+            { userId: { in: rawManagerIds } },
+          ],
+        },
       });
       if (rawManagerIds.length > 0) {
         await this.prisma.ledgerMember.createMany({

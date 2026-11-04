@@ -43,7 +43,7 @@ export class LedgerController {
   }
 
   @Put(':id')
-  @Roles('SUITE_ADMIN')
+  @Roles('SUITE_ADMIN', 'MANAGER', 'SUITE', 'ADMIN')
   async updateLedger(@Req() req: any, @Param('id') id: string, @Body() dto: any) {
     return this.ledgerService.updateLedger(req.user, id, dto);
   }

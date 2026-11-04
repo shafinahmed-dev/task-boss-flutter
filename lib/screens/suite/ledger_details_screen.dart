@@ -363,6 +363,7 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (modalCtx) {
+        bool isSaving = false;
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             final app = context.read<AppState>();
@@ -567,7 +568,7 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                         Expanded(
                           flex: isDefault ? 1 : 2,
                           child: ElevatedButton(
-                            onPressed: () async {
+                            onPressed: isSaving ? null : () async {
                               final name = nameCtrl.text.trim();
                               if (name.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -585,10 +586,26 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                                 'companyId': selectedCompanyId,
                               };
 
+                              setSheetState(() => isSaving = true);
                               final success = await app.updateLedger(ledger['id'], payload);
+                              setSheetState(() => isSaving = false);
+
                               if (success && context.mounted) {
                                 Navigator.of(ctx).pop();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Ledger updated successfully.'),
+                                    backgroundColor: Color(0xFF10B981),
+                                  ),
+                                );
                                 _loadDetails();
+                              } else if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(app.errorMessage ?? 'Failed to update ledger.'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
                               }
                             },
                             style: ElevatedButton.styleFrom(
@@ -597,7 +614,13 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
-                            child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+                            child: isSaving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  )
+                                : const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ],
@@ -952,6 +975,19 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
     final status = _ledger?['status']?.toString() ?? 'ACTIVE';
     final segments = (_ledger?['segments'] as List?) ?? [];
 
+    final companyObj = _ledger?['company'];
+    final companyId = _ledger?['companyId']?.toString() ?? companyObj?['id']?.toString();
+    String? concernName = companyObj?['name']?.toString() ?? companyObj?['code']?.toString();
+    if ((concernName == null || concernName.isEmpty) && companyId != null && companyId.isNotEmpty) {
+      final app = context.read<AppState>();
+      for (final c in app.concerns) {
+        if (c['id']?.toString() == companyId) {
+          concernName = c['name']?.toString() ?? c['code']?.toString();
+          break;
+        }
+      }
+    }
+
     final filteredSegments = segments.where((s) {
       if (_searchQuery.isEmpty) return true;
       final name = s['name']?.toString().toLowerCase() ?? '';
@@ -1008,6 +1044,36 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                 ),
               ),
             ),
+            if (concernName != null && concernName.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.business_rounded, size: 10, color: Color(0xFF475569)),
+                    const SizedBox(width: 4),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 100),
+                      child: Text(
+                        concernName,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF334155),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
         actions: [
