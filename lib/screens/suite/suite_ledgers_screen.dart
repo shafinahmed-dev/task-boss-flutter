@@ -36,6 +36,8 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
     setState(() => _isLoading = true);
     final app = context.read<AppState>();
     try {
+      if (app.concerns.isEmpty) app.fetchConcerns();
+      if (app.managers.isEmpty) app.fetchManagers();
       final results = await app.fetchSuiteLedgers(search: _searchQuery.isNotEmpty ? _searchQuery : null);
       results.sort((a, b) {
         if (a['code'] == 'GEN-OPS') return -1;
@@ -55,6 +57,7 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
     DateTime? startDate;
     DateTime? endDate;
     final selectedManagerIds = <String>{};
+    String? selectedCompanyId;
 
     showModalBottomSheet(
       context: context,
@@ -66,6 +69,7 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
           builder: (ctx, setSheetState) {
             final app = context.read<AppState>();
             final managers = app.managers;
+            final concerns = app.concerns;
 
             return Container(
               padding: EdgeInsets.only(
@@ -172,6 +176,33 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                     ],
 
                     const SizedBox(height: 16),
+                    const Text('Assigned Concern (Optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String?>(
+                      value: selectedCompanyId,
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('None (Main Company)'),
+                        ),
+                        ...concerns.map((c) {
+                          final cId = c['id']?.toString();
+                          final cName = c['name']?.toString() ?? 'Concern';
+                          final cCode = c['code']?.toString() ?? '';
+                          return DropdownMenuItem<String?>(
+                            value: cId,
+                            child: Text(cCode.isNotEmpty ? '$cName [$cCode]' : cName),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) => setSheetState(() => selectedCompanyId = val),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     const Text('Assign Responsible Managers', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
                     const SizedBox(height: 8),
                     if (managers.isEmpty)
@@ -222,6 +253,7 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                             if (!isPerpetual && startDate != null) 'startDate': startDate!.toIso8601String(),
                             if (!isPerpetual && endDate != null) 'endDate': endDate!.toIso8601String(),
                             'managerUserIds': selectedManagerIds.toList(),
+                            if (selectedCompanyId != null) 'companyId': selectedCompanyId,
                           };
 
                           final success = await app.createLedger(payload);
@@ -380,6 +412,11 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
     final outflow = (ledger['outflow'] as num? ?? ledger['totalOutflow'] as num? ?? 0).toDouble();
     final isSpecial = name.toLowerCase().contains('general') || ledger['code'] == 'GEN-OPS';
 
+    final company = ledger['company'] as Map<String, dynamic>?;
+    final companyCode = company?['code']?.toString();
+    final companyName = (company != null ? (company['name'] ?? companyCode) : ledger['companyName'])?.toString();
+    final displayConcern = (companyCode != null && companyCode.isNotEmpty) ? companyCode : companyName;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
       decoration: BoxDecoration(
@@ -464,14 +501,48 @@ class _SuiteLedgersScreenState extends State<SuiteLedgersScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: -0.2,
-                            ),
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              if (displayConcern != null && displayConcern.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.business_rounded, size: 10, color: Color(0xFFFBBF24)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        displayConcern,
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFFFDE68A),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
                           if (description.isNotEmpty) ...[
                             const SizedBox(height: 4),

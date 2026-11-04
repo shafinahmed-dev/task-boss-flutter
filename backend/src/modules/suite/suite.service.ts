@@ -34,6 +34,13 @@ export class SuiteService {
             },
           },
         },
+        ledgers: {
+          include: {
+            movements: {
+              select: { id: true, amount: true, direction: true },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -68,6 +75,28 @@ export class SuiteService {
           }
         }
       }
+
+      const mappedLedgers = (c.ledgers || []).map((ledger: any) => {
+        let totalInflow = 0;
+        let totalOutflow = 0;
+        for (const m of (ledger.movements || [])) {
+          if (supersededIds.has(m.id)) continue;
+          const amt = Number(m.amount) || 0;
+          const dir = (m.direction || '').toUpperCase();
+          if (dir === 'IN') totalInflow += amt;
+          else if (dir === 'OUT') totalOutflow += amt;
+        }
+        return {
+          id: ledger.id,
+          name: ledger.name,
+          code: ledger.code,
+          status: ledger.status,
+          inflow: totalInflow,
+          outflow: totalOutflow,
+          net: totalInflow - totalOutflow,
+        };
+      });
+
       return {
         id: c.id,
         name: c.name,
@@ -76,6 +105,8 @@ export class SuiteService {
         createdAt: c.createdAt,
         totalMembers: assignedMembers.length,
         totalBalance,
+        ledgersCount: mappedLedgers.length,
+        ledgers: mappedLedgers,
       };
     });
   }
@@ -759,6 +790,13 @@ export class SuiteService {
             },
           },
         },
+        ledgers: {
+          include: {
+            movements: {
+              select: { id: true, amount: true, direction: true },
+            },
+          },
+        },
       },
     });
 
@@ -806,14 +844,38 @@ export class SuiteService {
       });
     }
 
+    const mappedLedgers = (company.ledgers || []).map((ledger: any) => {
+      let totalInflow = 0;
+      let totalOutflow = 0;
+      for (const m of (ledger.movements || [])) {
+        if (supersededIds.has(m.id)) continue;
+        const amt = Number(m.amount) || 0;
+        const dir = (m.direction || '').toUpperCase();
+        if (dir === 'IN') totalInflow += amt;
+        else if (dir === 'OUT') totalOutflow += amt;
+      }
+      return {
+        id: ledger.id,
+        name: ledger.name,
+        code: ledger.code,
+        status: ledger.status,
+        inflow: totalInflow,
+        outflow: totalOutflow,
+        net: totalInflow - totalOutflow,
+      };
+    });
+
     return {
       concern: {
         id: company.id,
         name: company.name,
         code: company.code,
         totalBalance,
+        ledgersCount: mappedLedgers.length,
+        ledgers: mappedLedgers,
       },
       members,
+      ledgers: mappedLedgers,
     };
   }
 

@@ -1,5 +1,4 @@
 import 'dart:ui';
-import 'dart:convert';
 import 'dart:typed_data';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
@@ -105,6 +104,9 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
       final app = context.read<AppState>();
       if (app.managers.isEmpty) {
         await app.fetchManagers();
+      }
+      if (app.concerns.isEmpty) {
+        await app.fetchConcerns();
       }
       final data = await app.fetchLedgerDetails(widget.ledgerId);
       if (mounted) {
@@ -349,6 +351,9 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
     bool isPerpetual = ledger['isPerpetual'] ?? true;
     final isDefault = ledger['code'] == 'GEN-OPS';
     
+    final initialCompanyId = ledger['companyId']?.toString() ?? ledger['company']?['id']?.toString();
+    String? selectedCompanyId = initialCompanyId;
+
     final managersRaw = ledger['managers'] as List? ?? [];
     Set<String> selectedManagerIds = managersRaw.map((m) => m['id'].toString()).toSet();
 
@@ -430,6 +435,36 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                       ],
                       onChanged: (val) {
                         if (val != null) setSheetState(() => status = val);
+                      },
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    const Text('Assigned Concern', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String?>(
+                      initialValue: app.concerns.any((c) => c['id']?.toString() == selectedCompanyId) ? selectedCompanyId : null,
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('None (Main Company)'),
+                        ),
+                        ...app.concerns.map((c) {
+                          final cId = c['id']?.toString();
+                          final cName = c['name']?.toString() ?? 'Concern';
+                          final cCode = c['code']?.toString() ?? '';
+                          return DropdownMenuItem<String?>(
+                            value: cId,
+                            child: Text(cCode.isNotEmpty ? '$cName [$cCode]' : cName),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) {
+                        setSheetState(() => selectedCompanyId = val);
                       },
                       decoration: InputDecoration(
                         filled: true,
@@ -547,6 +582,7 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
                                 'status': status,
                                 'isPerpetual': isPerpetual,
                                 'managerUserIds': selectedManagerIds.toList(),
+                                'companyId': selectedCompanyId,
                               };
 
                               final success = await app.updateLedger(ledger['id'], payload);

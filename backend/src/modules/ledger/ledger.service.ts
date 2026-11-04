@@ -608,7 +608,10 @@ export class LedgerService {
   async ensureDefaultLedger(tenantId: string) {
     let defaultLedger = await this.prisma.ledger.findFirst({
       where: { tenantId, code: 'GEN-OPS' },
-      include: { segments: true },
+      include: {
+        segments: true,
+        company: { select: { id: true, name: true, code: true } },
+      },
     });
     if (!defaultLedger) {
       defaultLedger = await this.prisma.ledger.create({
@@ -620,7 +623,10 @@ export class LedgerService {
           isPerpetual: true,
           status: 'ACTIVE',
         },
-        include: { segments: true },
+        include: {
+          segments: true,
+          company: { select: { id: true, name: true, code: true } },
+        },
       });
     }
     return defaultLedger;
@@ -653,7 +659,11 @@ export class LedgerService {
             : []),
         ],
       },
-      include: { segments: true, assignments: true },
+      include: {
+        segments: true,
+        assignments: true,
+        company: { select: { id: true, name: true, code: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -707,6 +717,7 @@ export class LedgerService {
         segments: true,
         movements: true,
         assignments: true,
+        company: { select: { id: true, name: true, code: true } },
       },
     });
 
@@ -818,6 +829,7 @@ export class LedgerService {
     const ledgers = await this.prisma.ledger.findMany({
       where,
       include: {
+        company: { select: { id: true, name: true, code: true } },
         assignments: {
           include: { user: { select: { id: true, name: true, handle: true } } },
         },
@@ -853,6 +865,9 @@ export class LedgerService {
         startDate: l.startDate?.toISOString() || null,
         endDate: l.endDate?.toISOString() || null,
         status: l.status,
+        companyId: l.companyId,
+        company: l.company,
+        companyName: l.company?.name || null,
         segmentsCount: l.segments.length,
         managersCount: managers.length,
         managers: managers,
@@ -899,25 +914,30 @@ export class LedgerService {
       ? rawManagerIds.filter(Boolean)
       : [];
 
-    const ledger = await this.prisma.ledger.create({
-      data: {
-        tenantId,
-        companyId: dto.companyId || null,
-        name,
-        code,
-        description: dto.description || null,
-        isPerpetual: dto.isPerpetual ?? true,
-        startDate: dto.startDate ? new Date(dto.startDate) : null,
-        endDate: dto.endDate ? new Date(dto.endDate) : null,
-        status: dto.status || 'ACTIVE',
-        assignments: {
-          create: managerUserIds.map((userId) => ({
-            userId,
-            role: 'MANAGER',
-          })),
-        },
+    const ledgerData: any = {
+      tenantId,
+      name,
+      code,
+      description: dto.description || null,
+      isPerpetual: dto.isPerpetual ?? true,
+      startDate: dto.startDate ? new Date(dto.startDate) : null,
+      endDate: dto.endDate ? new Date(dto.endDate) : null,
+      status: dto.status || 'ACTIVE',
+      assignments: {
+        create: managerUserIds.map((userId) => ({
+          userId,
+          role: 'MANAGER',
+        })),
       },
+    };
+    if (dto.companyId) {
+      ledgerData.company = { connect: { id: dto.companyId } };
+    }
+
+    const ledger = await this.prisma.ledger.create({
+      data: ledgerData,
       include: {
+        company: { select: { id: true, name: true, code: true } },
         assignments: {
           include: { user: { select: { id: true, name: true, handle: true } } },
         },
@@ -943,6 +963,13 @@ export class LedgerService {
     if (dto.isPerpetual !== undefined) updateData.isPerpetual = dto.isPerpetual;
     if (dto.startDate !== undefined) updateData.startDate = dto.startDate ? new Date(dto.startDate) : null;
     if (dto.endDate !== undefined) updateData.endDate = dto.endDate ? new Date(dto.endDate) : null;
+    if (dto.companyId !== undefined) {
+      if (dto.companyId) {
+        updateData.company = { connect: { id: dto.companyId } };
+      } else {
+        updateData.company = { disconnect: true };
+      }
+    }
 
     const rawManagerIds = dto.managerUserIds || dto.managerIds;
     if (Array.isArray(rawManagerIds)) {
@@ -964,6 +991,7 @@ export class LedgerService {
       where: { id: ledgerId },
       data: updateData,
       include: {
+        company: { select: { id: true, name: true, code: true } },
         assignments: {
           include: { user: { select: { id: true, name: true, handle: true } } },
         },
@@ -1007,9 +1035,14 @@ export class LedgerService {
   }
 
   async getLedgerDetails(reqUser: any, ledgerId: string) {
+    const tenantId = reqUser?.tenantId || reqUser?.tenant_id;
+    const where: any = { id: ledgerId };
+    if (tenantId) where.tenantId = tenantId;
+
     const ledger = await this.prisma.ledger.findFirst({
-      where: { id: ledgerId },
+      where,
       include: {
+        company: { select: { id: true, name: true, code: true } },
         assignments: {
           include: { user: { select: { id: true, name: true, handle: true } } },
         },
@@ -1152,12 +1185,23 @@ export class LedgerService {
         isPerpetual: ledger.isPerpetual,
         startDate: ledger.startDate?.toISOString() || null,
         endDate: ledger.endDate?.toISOString() || null,
+        companyId: ledger.companyId,
+        company: ledger.company,
+        companyName: ledger.company?.name || null,
         totalInflow,
         totalOutflow,
         managers,
         segments: segmentsData,
       },
     };
+  }
+
+  async getLedgers(reqUser: any, search?: string, status?: string) {
+    return this.getSuiteLedgers(reqUser, search, status);
+  }
+
+  async getLedgerById(reqUser: any, ledgerId: string) {
+    return this.getLedgerDetails(reqUser, ledgerId);
   }
 
   async assignEmployeeToLedger(reqUser: any, ledgerId: string, employeeUserId: string) {

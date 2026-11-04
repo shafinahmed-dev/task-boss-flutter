@@ -7,6 +7,7 @@ import '../login_screen.dart';
 import '../../services/app_state.dart';
 import 'suite_transactions_screen.dart';
 import 'suite_ledgers_screen.dart';
+import 'ledger_details_screen.dart';
 
 
 class SuiteGovernanceScreen extends StatefulWidget {
@@ -912,7 +913,7 @@ class _SuiteGovernanceScreenState extends State<SuiteGovernanceScreen> {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 2.1,
+              childAspectRatio: 1.85,
             ),
             itemCount: concernsList.length,
             itemBuilder: (context, index) => _buildDashboardConcernCard(context, concernsList[index]),
@@ -1539,6 +1540,7 @@ void _showAccountBottomSheet(BuildContext context) {
         ? c['code'].toString()
         : name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(3).join();
     final memberCount = (c['totalMembers'] as num? ?? c['memberCount'] as num? ?? c['userCount'] as num? ?? 0).toInt();
+    final ledgersCount = (c['ledgersCount'] as num? ?? (c['ledgers'] as List?)?.length ?? 0).toInt();
     final balance = (c['totalBalance'] as num? ?? c['balance'] as num? ?? 0).toDouble();
 
     return Container(
@@ -1583,12 +1585,12 @@ void _showAccountBottomSheet(BuildContext context) {
               onTap: () => _showConcernDetailsModal(context, c['id']?.toString() ?? '', name),
               borderRadius: BorderRadius.circular(16),
               child: Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Header Row: Full Concern Name (Left) | 👥 X Members (Right)
+                    // Header Row: Full Concern Name (Left) | Ledgers count (Right)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -1598,51 +1600,60 @@ void _showAccountBottomSheet(BuildContext context) {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 14,
+                              fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: Color(0xFF0F172A),
                               letterSpacing: -0.2,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.people_alt_outlined,
-                              size: 13,
-                              color: Color(0xFF64748B),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '$ledgersCount ${ledgersCount == 1 ? 'Ledger' : 'Ledgers'}',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF475569),
                             ),
-                            const SizedBox(width: 3),
-                            Text(
-                              memberCount == 1 ? '1 Member' : '$memberCount Members',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 8),
 
                     // Balance Section: Micro-label + Formatted BDT
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
-                          'TOTAL HOLDING',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                            color: Color(0xFF94A3B8),
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'CASH WITH TEAM',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                            Text(
+                              memberCount == 1 ? '1 member' : '$memberCount members',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 2),
                         FittedBox(
@@ -1651,7 +1662,7 @@ void _showAccountBottomSheet(BuildContext context) {
                           child: Text(
                             formatBdt(balance),
                             style: const TextStyle(
-                              fontSize: 16,
+                              fontSize: 15,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.3,
                               color: Color(0xFF0F172A),
@@ -1732,6 +1743,141 @@ void _showAccountBottomSheet(BuildContext context) {
     );
   }
 
+  Widget _buildConcernLedgerCard(BuildContext context, BuildContext modalCtx, Map<String, dynamic> ledger) {
+    final name = ledger['name']?.toString() ?? 'Ledger';
+    final code = ledger['code']?.toString() ?? '';
+    final status = (ledger['status']?.toString() ?? 'ACTIVE').toUpperCase();
+    final inflow = (ledger['inflow'] as num? ?? 0).toDouble();
+    final outflow = (ledger['outflow'] as num? ?? 0).toDouble();
+    final net = (ledger['net'] as num? ?? (inflow - outflow)).toDouble();
+    final isFrozen = status == 'FROZEN';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.pop(modalCtx);
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => LedgerDetailsScreen(
+                ledgerId: ledger['id'].toString(),
+                initialName: name,
+              ),
+            ),
+          ).then((_) => _loadData());
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Color(0xFF0F172A),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (code.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              code,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isFrozen ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isFrozen ? const Color(0xFFFECACA) : const Color(0xFFA7F3D0),
+                      ),
+                    ),
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isFrozen ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'In: ৳ ${_formatAmount(inflow)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Out: ৳ ${_formatAmount(outflow)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFEF4444),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Net: ৳ ${_formatAmount(net)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: net >= 0 ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showConcernDetailsModal(BuildContext context, String concernId, String concernName) async {
     showDialog(
       context: context,
@@ -1747,6 +1893,10 @@ void _showAccountBottomSheet(BuildContext context) {
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         final concern = data['concern'] ?? {};
+        final rawLedgers = (data['ledgers'] as List? ?? concern['ledgers'] as List? ?? []);
+        final ledgers = List<Map<String, dynamic>>.from(
+          rawLedgers.map((e) => Map<String, dynamic>.from(e as Map)),
+        );
         final sortedMembers = List<Map<String, dynamic>>.from(
           (data['members'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
         );
@@ -1769,14 +1919,14 @@ void _showAccountBottomSheet(BuildContext context) {
             backgroundColor: Colors.white,
             shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
             builder: (ctx) => DraggableScrollableSheet(
-              initialChildSize: 0.7,
+              initialChildSize: 0.8,
               minChildSize: 0.5,
               maxChildSize: 0.95,
               expand: false,
               builder: (_, controller) => Padding(
                 padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: ListView(
+                  controller: controller,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1786,7 +1936,8 @@ void _showAccountBottomSheet(BuildContext context) {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(concern['name'] ?? concernName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                              Text('Code: [${concern['code'] ?? ''}] • Balance: ৳ ${_formatAmount(concern['totalBalance'])}', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                              const SizedBox(height: 2),
+                              Text('Code: [${concern['code'] ?? ''}] • Cash with Team: ৳ ${_formatAmount(concern['totalBalance'])}', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                             ],
                           ),
                         ),
@@ -1794,27 +1945,92 @@ void _showAccountBottomSheet(BuildContext context) {
                       ],
                     ),
                     const Divider(height: 24),
-                    const Text('Assigned Members', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: sortedMembers.isEmpty
-                          ? const Center(child: Text('No assigned members.', style: TextStyle(color: Color(0xFF64748B))))
-                          : ListView.builder(
-                              controller: controller,
-                              itemCount: sortedMembers.length,
-                              itemBuilder: (_, i) {
-                                final item = sortedMembers[i];
-                                final roleStr = (item['role'] ?? item['designation'] ?? '').toString().toUpperCase();
-                                final isManager = roleStr.contains('MANAGER');
-                                final name = item['name']?.toString() ?? 'Member';
-                                final handle = item['handle']?.toString() ?? '';
-                                final designation = item['designation']?.toString() ?? (isManager ? 'Manager' : 'Team Member');
-                                final balance = double.tryParse(item['balance']?.toString() ?? '0') ?? 0.0;
 
-                                return _buildMemberCard(name, handle, designation, balance, isManager);
-                              },
-                            ),
+                    // SECTION 1: ASSIGNED LEDGERS
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('ASSIGNED LEDGERS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: Color(0xFF0F172A))),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${ledgers.length}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 10),
+                    if (ledgers.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.menu_book_outlined, size: 16, color: Color(0xFF94A3B8)),
+                            SizedBox(width: 8),
+                            Text('No ledgers assigned to this concern.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      )
+                    else
+                      ...ledgers.map((l) => _buildConcernLedgerCard(context, ctx, l)),
+
+                    const SizedBox(height: 24),
+                    // SECTION 2: ASSIGNED MEMBERS
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('ASSIGNED MEMBERS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: Color(0xFF0F172A))),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${sortedMembers.length}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    if (sortedMembers.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.people_outline_rounded, size: 16, color: Color(0xFF94A3B8)),
+                            SizedBox(width: 8),
+                            Text('No assigned members.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      )
+                    else
+                      ...sortedMembers.map((item) {
+                        final roleStr = (item['role'] ?? item['designation'] ?? '').toString().toUpperCase();
+                        final isManager = roleStr.contains('MANAGER');
+                        final name = item['name']?.toString() ?? 'Member';
+                        final handle = item['handle']?.toString() ?? '';
+                        final designation = item['designation']?.toString() ?? (isManager ? 'Manager' : 'Team Member');
+                        final balance = double.tryParse(item['balance']?.toString() ?? '0') ?? 0.0;
+
+                        return _buildMemberCard(name, handle, designation, balance, isManager);
+                      }),
                   ],
                 ),
               ),
