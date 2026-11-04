@@ -3,9 +3,13 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from './public.decorator.js';
+
+export const SKIP_COMPANY_SCOPE = 'skipCompanyScope';
+export const SkipCompanyScope = () => SetMetadata(SKIP_COMPANY_SCOPE, true);
 
 /**
  * CompanyScopeGuard
@@ -34,8 +38,21 @@ export class CompanyScopeGuard implements CanActivate {
       return true;
     }
 
+    const skipScope = this.reflector.getAllAndOverride<boolean>(SKIP_COMPANY_SCOPE, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (skipScope) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest();
     const user = request.user;
+
+    // Suite Admins oversee all concerns across the tenant organization
+    if (user?.role === 'SUITE_ADMIN' || user?.role === 'ADMIN' || user?.role === 'SUITE') {
+      return true;
+    }
 
     if (!user || !Array.isArray(user.companyIds)) {
       throw new ForbiddenException('No company authorization on request');

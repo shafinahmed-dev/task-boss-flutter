@@ -20,6 +20,7 @@ import type {
   InterCompanyAllocationDto,
 } from './ledger.service.js';
 import { Roles } from '../auth/roles.decorator.js';
+import { SkipCompanyScope } from '../auth/company-scope.guard.js';
 
 @Controller(['ledger', 'ledgers'])
 export class LedgerController {
@@ -37,6 +38,7 @@ export class LedgerController {
 
   @Post()
   @Roles('SUITE_ADMIN')
+  @SkipCompanyScope()
   @HttpCode(HttpStatus.CREATED)
   async createLedger(@Req() req: any, @Body() dto: any) {
     return this.ledgerService.createLedger(req.user, dto);
@@ -44,6 +46,7 @@ export class LedgerController {
 
   @Put(':id')
   @Roles('SUITE_ADMIN', 'MANAGER', 'SUITE', 'ADMIN')
+  @SkipCompanyScope()
   async updateLedger(@Req() req: any, @Param('id') id: string, @Body() dto: any) {
     return this.ledgerService.updateLedger(req.user, id, dto);
   }

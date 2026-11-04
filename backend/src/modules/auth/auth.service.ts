@@ -138,7 +138,7 @@ export class AuthService {
     );
 
     // If a specific company was requested, validate it
-    let authorizedCompanyIds: string[];
+    let authorizedCompanyIds: string[] = allCompanyIds;
     if (dto.companyId) {
       if (!allCompanyIds.includes(dto.companyId)) {
         throw new UnauthorizedException(
@@ -146,8 +146,14 @@ export class AuthService {
         );
       }
       authorizedCompanyIds = [dto.companyId];
-    } else {
-      authorizedCompanyIds = allCompanyIds;
+    } else if (user.role === 'SUITE_ADMIN' && user.tenantId) {
+      const tenantCompanies = await this.prisma.company.findMany({
+        where: { tenantId: user.tenantId },
+        select: { id: true },
+      });
+      authorizedCompanyIds = Array.from(
+        new Set([...allCompanyIds, ...tenantCompanies.map((c) => c.id)]),
+      );
     }
 
     // Sign JWT with handle & tenantId

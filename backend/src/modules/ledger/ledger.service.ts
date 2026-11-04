@@ -1,18 +1,3 @@
-declare global {
-  interface String {
-    isNotEmpty?: boolean;
-  }
-}
-if (!('isNotEmpty' in String.prototype)) {
-  Object.defineProperty(String.prototype, 'isNotEmpty', {
-    get() {
-      return this.length > 0;
-    },
-    configurable: true,
-  });
-}
-
-
 import {
   Injectable,
   ConflictException,
@@ -979,9 +964,19 @@ export class LedgerService {
     if (dto.startDate !== undefined) updateData.startDate = dto.startDate ? new Date(dto.startDate) : null;
     if (dto.endDate !== undefined) updateData.endDate = dto.endDate ? new Date(dto.endDate) : null;
     if (dto.companyId !== undefined) {
-      updateData.companyId = dto.companyId && dto.companyId.toString().trim().isNotEmpty
-        ? dto.companyId.toString().trim()
-        : null;
+      const rawCid = dto.companyId?.toString().trim();
+      if (rawCid && rawCid.length > 0) {
+        // Validate concern belongs to this tenant
+        const concern = await this.prisma.company.findFirst({
+          where: { id: rawCid, tenantId },
+        });
+        if (!concern) {
+          throw new BadRequestException('Selected concern not found in this organization.');
+        }
+        updateData.companyId = rawCid;
+      } else {
+        updateData.companyId = null;
+      }
     }
 
     const rawManagerIds = dto.managerUserIds || dto.managerIds;
