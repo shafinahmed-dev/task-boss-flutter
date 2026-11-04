@@ -6,9 +6,14 @@ class NotificationsSheet extends StatefulWidget {
   const NotificationsSheet({super.key});
 
   static void show(BuildContext context) {
-    // Clear badge upon opening
-    // Removed
-    context.read<AppState>().fetchPendingTransfers();
+    final app = context.read<AppState>();
+    app.fetchPendingTransfers();
+    final isManager = app.userRole == 'MANAGER' ||
+        app.userRole == 'SUITE_ADMIN' ||
+        app.userRole == 'ADMIN';
+    if (isManager) {
+      app.fetchPendingMovements();
+    }
 
     showModalBottomSheet(
       context: context,
@@ -35,7 +40,13 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Removed
+      final app = context.read<AppState>();
+      final isManager = app.userRole == 'MANAGER' ||
+          app.userRole == 'SUITE_ADMIN' ||
+          app.userRole == 'ADMIN';
+      if (isManager) {
+        app.fetchPendingMovements();
+      }
     });
   }
 
@@ -53,6 +64,191 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
+  }
+
+  Widget _buildPendingMovementCard(BuildContext context, Map<String, dynamic> m) {
+    final movementId = m['id']?.toString() ?? '';
+    final isOut = (m['direction'] ?? '').toString().toLowerCase() == 'out';
+    final amt = _formatAmount(m['amount']);
+    final segmentName = m['segment']?['name']?.toString() ??
+        m['category']?['name']?.toString() ??
+        m['entryTag']?.toString() ??
+        'Transaction';
+    final collectorName = m['collector']?['name']?.toString() ??
+        m['collector']?['handle']?.toString() ??
+        'Staff';
+    final ledgerName = m['ledger']?['name']?.toString() ??
+        m['ledger']?['code']?.toString() ??
+        'General Operations';
+
+    final notes = (m['notes'] ??
+            m['metadata']?['notes'] ??
+            m['metadata']?['note'] ??
+            '')
+        .toString()
+        .trim();
+    final receiptNo = (m['receiptNo'] ??
+            m['voucherNumber'] ??
+            m['metadata']?['voucherNumber'] ??
+            '')
+        .toString()
+        .trim();
+
+    final captionParts = <String>[];
+    if (receiptNo.isNotEmpty) captionParts.add('Receipt: #$receiptNo');
+    if (notes.isNotEmpty) captionParts.add(notes);
+    final captionText = captionParts.join(' • ');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF3C7).withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFFDE68A),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  segmentName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Color(0xFF0F172A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${isOut ? '-' : '+'}৳ $amt',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: isOut ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Submitted by $collectorName • $ledgerName',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (captionText.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              captionText,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFF64748B),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          _buildMovementActionButtons(movementId),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMovementActionButtons(String movementId) {
+    final app = context.read<AppState>();
+    if (_processingId == movementId) {
+      return const Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+      );
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFEF4444),
+            side: const BorderSide(color: Color(0xFFEF4444)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            visualDensity: VisualDensity.compact,
+          ),
+          onPressed: () async {
+            setState(() => _processingId = movementId);
+            final messenger = ScaffoldMessenger.of(context);
+            final success = await app.rejectMovement(movementId, 'Declined by manager');
+            if (mounted) {
+              setState(() => _processingId = null);
+              if (success) {
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Transaction declined'),
+                    backgroundColor: Color(0xFFEF4444),
+                  ),
+                );
+                app.fetchDashboardData();
+              } else {
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Failed to decline transaction')),
+                );
+              }
+            }
+          },
+          child: const Text(
+            'Decline',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          ),
+        ),
+        const SizedBox(width: 8),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0F172A),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            visualDensity: VisualDensity.compact,
+          ),
+          onPressed: () async {
+            setState(() => _processingId = movementId);
+            final messenger = ScaffoldMessenger.of(context);
+            final success = await app.approveMovement(movementId);
+            if (mounted) {
+              setState(() => _processingId = null);
+              if (success) {
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Transaction approved'),
+                    backgroundColor: Color(0xFF10B981),
+                  ),
+                );
+                app.fetchDashboardData();
+              } else {
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Failed to approve transaction')),
+                );
+              }
+            }
+          },
+          child: const Text(
+            'Approve',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildPendingTransferItem(BuildContext context, Map<String, dynamic> t) {
@@ -352,7 +548,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
           // Content List
           Expanded(
-            child: (pending.isEmpty && combinedActivity.isEmpty)
+            child: (app.pendingMovements.isEmpty && pending.isEmpty && combinedActivity.isEmpty)
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -374,6 +570,31 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                 : ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      // Pending Movements Section
+                      if (app.pendingMovements.isNotEmpty) ...[
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${app.pendingMovements.length} PENDING APPROVAL',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF92400E),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ...app.pendingMovements.map((m) => _buildPendingMovementCard(context, m)),
+                        const SizedBox(height: 16),
+                      ],
                       // Pending Handovers Section
                       if (pending.isNotEmpty) ...[
                         const Text(

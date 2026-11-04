@@ -1426,13 +1426,34 @@ export class LedgerService {
   // ── Maker-Checker Approval Methods ──────────────────────────────────────
 
   /**
-   * Get all movements pending approval for a given company.
-   * Only MANAGER / SUITE_ADMIN may call this.
+   * Get all movements pending approval.
+   * Scoped to manager ledgers or tenant.
    */
-  async getPendingMovements(companyId?: string) {
+  async getPendingMovements(reqUser: any, companyId?: string) {
+    const tenantId = reqUser?.tenantId;
     const where: any = { approvalStatus: 'pending' };
-    if (companyId) {
-      where.custodian = { companyId };
+
+    // Manager role scoping: only see pending movements for ledgers assigned to them
+    if (reqUser?.role === 'MANAGER') {
+      const userId = reqUser.id || reqUser.userId;
+      where.OR = [
+        { ledger: { assignments: { some: { userId, role: 'MANAGER' } } } },
+        { collector: { tenantId } },
+      ];
+    } else if (tenantId) {
+      where.collector = { tenantId };
+    }
+
+    // If companyId is specifically queried, match either the ledger's company or the custodian's company
+    if (companyId && companyId.trim() !== '') {
+      where.AND = [
+        {
+          OR: [
+            { ledger: { companyId } },
+            { custodian: { companyId } },
+          ],
+        },
+      ];
     }
 
     const movements = await this.prisma.moneyMovement.findMany({
@@ -1442,6 +1463,8 @@ export class LedgerService {
         collector: { select: { id: true, name: true, handle: true } },
         custodian: { select: { id: true, name: true, companyId: true } },
         category: { select: { id: true, name: true } },
+        ledger: { select: { id: true, name: true, code: true } },
+        segment: { select: { id: true, name: true } },
       },
     });
 

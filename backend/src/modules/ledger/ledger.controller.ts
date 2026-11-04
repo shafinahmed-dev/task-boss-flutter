@@ -178,17 +178,18 @@ export class LedgerController {
   // ── Maker-Checker Approval Endpoints ──────────────────────────────────
 
   @Get('movements/pending')
-  @Roles('MANAGER', 'SUITE_ADMIN')
+  @Roles('MANAGER', 'SUITE_ADMIN', 'ADMIN', 'SUITE')
+  @SkipCompanyScope()
   async getPendingMovements(
     @Req() req: any,
     @Query('companyId') companyId?: string,
   ) {
-    const cid = companyId ?? req.user?.companyId ?? undefined;
-    return this.ledgerService.getPendingMovements(cid);
+    return this.ledgerService.getPendingMovements(req.user, companyId);
   }
 
   @Post('movements/:id/approve')
-  @Roles('MANAGER', 'SUITE_ADMIN')
+  @Roles('MANAGER', 'SUITE_ADMIN', 'ADMIN', 'SUITE')
+  @SkipCompanyScope()
   @HttpCode(HttpStatus.OK)
   async approveMovement(@Param('id') id: string, @Req() req: any) {
     const approverId = req.user?.id || req.user?.userId;
@@ -196,7 +197,8 @@ export class LedgerController {
   }
 
   @Post('movements/:id/reject')
-  @Roles('MANAGER', 'SUITE_ADMIN')
+  @Roles('MANAGER', 'SUITE_ADMIN', 'ADMIN', 'SUITE')
+  @SkipCompanyScope()
   @HttpCode(HttpStatus.OK)
   async rejectMovement(
     @Param('id') id: string,

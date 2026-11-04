@@ -28,20 +28,48 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> get transactions => _employeeTransactions;
 
 
+  String get userRole => user?.role.toUpperCase() ?? '';
+
   int get notificationCount {
-    return _pendingTransfers
+    final pendingHandovers = _pendingTransfers
         .where((t) => t['isIncoming'] == true && t['status'] == 'pending')
         .length;
+    final isManagerOrAdmin = userRole == 'MANAGER' ||
+        userRole == 'SUITE_ADMIN' ||
+        userRole == 'ADMIN' ||
+        userRole == 'SUITE';
+    final pendingApprovals = isManagerOrAdmin ? _pendingMovements.length : 0;
+    return pendingHandovers + pendingApprovals;
   }
 
   Future<void> initialize() async {
     await fetchPendingTransfers();
+    if (userRole != 'EMPLOYEE') {
+      await fetchPendingMovements();
+    }
   }
 
   Future<void> refreshUserData() async {
     await _fetchBalanceData();
     await fetchPendingTransfers();
+    if (userRole != 'EMPLOYEE') {
+      await fetchPendingMovements();
+    }
     notifyListeners();
+  }
+
+  Future<void> refreshAll() async {
+    await refreshUserData();
+    if (userRole != 'EMPLOYEE') {
+      await fetchPendingMovements();
+    }
+  }
+
+  Future<void> fetchDashboardData() async {
+    await refreshUserData();
+    if (userRole != 'EMPLOYEE') {
+      await fetchPendingMovements();
+    }
   }
 
   Future<void> fetchPendingTransfers() async {
@@ -108,10 +136,9 @@ class AppState extends ChangeNotifier {
 
   Future<void> fetchPendingMovements({String? companyId}) async {
     try {
-      final cid = (companyId != null && companyId.isNotEmpty)
-          ? companyId
-          : effectiveCompanyId;
-      final url = Uri.parse('$apiBaseUrl/ledger/movements/pending?companyId=$cid');
+      final url = (companyId != null && companyId.trim().isNotEmpty)
+          ? Uri.parse('$apiBaseUrl/ledger/movements/pending?companyId=${companyId.trim()}')
+          : Uri.parse('$apiBaseUrl/ledger/movements/pending');
       final response = await authRequest('GET', url);
       if (response.statusCode == 200 && response.body.isNotEmpty) {
         final decoded = jsonDecode(response.body);
@@ -149,7 +176,7 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> rejectMovement(String movementId, {String? reason}) async {
+  Future<bool> rejectMovement(String movementId, [String? reason]) async {
     try {
       final response = await authRequest(
         'POST',
@@ -321,7 +348,7 @@ class AppState extends ChangeNotifier {
   List<Wallet> wallets = [];
 
   String? _selectedCompanyId;
-  List<Map<String, dynamic>> _suiteConcerns = [];
+  final List<Map<String, dynamic>> _suiteConcerns = [];
   List<Map<String, dynamic>> get suiteConcerns => _suiteConcerns;
 
   List<Map<String, dynamic>> _concerns = [];
@@ -722,6 +749,9 @@ class AppState extends ChangeNotifier {
         );
         await _fetchBalanceData();
         await fetchPendingTransfers();
+        if (userRole != 'EMPLOYEE') {
+          await fetchPendingMovements();
+        }
 
       } catch (e) {
         // failed to parse
@@ -852,6 +882,9 @@ class AppState extends ChangeNotifier {
       await fetchPendingTransfers();
 
       debugPrint('Error fetching balance data on login: $e');
+    }
+    if (userRole != 'EMPLOYEE') {
+      await fetchPendingMovements();
     }
     notifyListeners();
   }
@@ -1336,7 +1369,9 @@ class AppState extends ChangeNotifier {
         _managerConcernEmployees = list.map((item) => Map<String, dynamic>.from(item)).toList();
         notifyListeners();
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('fetchManagerConcernEmployees error: $e');
+    }
   }
 
   Future<bool> provisionEmployee(Map<String, dynamic> payload) async {
@@ -1355,10 +1390,10 @@ class AppState extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        print('Provision employee error: ${resp.statusCode} - ${resp.body}');
+        debugPrint('Provision employee error: ${resp.statusCode} - ${resp.body}');
       }
     } catch (e) {
-      print('Provision employee exception: $e');
+      debugPrint('Provision employee exception: $e');
     }
     return false;
   }
@@ -1374,11 +1409,11 @@ class AppState extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        print('Update employee error: ${resp.statusCode} - ${resp.body}');
+        debugPrint('Update employee error: ${resp.statusCode} - ${resp.body}');
         return false;
       }
     } catch (e) {
-      print('Update employee exception: $e');
+      debugPrint('Update employee exception: $e');
       return false;
     }
   }
