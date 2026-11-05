@@ -232,9 +232,12 @@ export class ManagerService {
 
     const movements = await this.prisma.moneyMovement.findMany({
       where: {
+        approvalStatus: 'approved',
         OR: [
           { wallet: { companyId: targetCompanyId } },
           { category: { companyId: targetCompanyId } },
+          { custodian: { companyId: targetCompanyId } },
+          { ledger: { companyId: targetCompanyId } },
         ],
       },
       orderBy: { createdAt: 'desc' },
@@ -243,6 +246,9 @@ export class ManagerService {
         collector: { select: { id: true, name: true, role: true } },
         custodian: { select: { id: true, name: true, type: true } },
         wallet: { select: { id: true, name: true } },
+        segment: { select: { id: true, name: true } },
+        ledger: { select: { id: true, name: true, code: true } },
+        approver: { select: { id: true, name: true } },
       },
     });
 

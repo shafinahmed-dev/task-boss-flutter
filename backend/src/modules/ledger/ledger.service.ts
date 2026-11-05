@@ -1468,7 +1468,49 @@ export class LedgerService {
       },
     });
 
-    return { movements };
+    // ── Fetch last 20 reviewed (approved/rejected) movements ──
+    const reviewedWhere: any = {
+      approvalStatus: { in: ['approved', 'rejected'] },
+      approvedById: { not: null },
+    };
+
+    if (reqUser?.role === 'MANAGER') {
+      const userId = reqUser.id || reqUser.userId;
+      reviewedWhere.OR = [
+        { approvedById: userId },
+        { ledger: { assignments: { some: { userId, role: 'MANAGER' } } } },
+        { collector: { tenantId: reqUser.tenantId } },
+      ];
+    } else if (reqUser?.tenantId) {
+      reviewedWhere.collector = { tenantId: reqUser.tenantId };
+    }
+
+    if (companyId && companyId.trim() !== '') {
+      reviewedWhere.AND = [
+        {
+          OR: [
+            { ledger: { companyId } },
+            { custodian: { companyId } },
+          ],
+        },
+      ];
+    }
+
+    const reviewedMovements = await this.prisma.moneyMovement.findMany({
+      where: reviewedWhere,
+      orderBy: { approvedAt: 'desc' },
+      take: 20,
+      include: {
+        collector: { select: { id: true, name: true, handle: true } },
+        approver: { select: { id: true, name: true, handle: true } },
+        custodian: { select: { id: true, name: true, companyId: true } },
+        category: { select: { id: true, name: true } },
+        ledger: { select: { id: true, name: true, code: true } },
+        segment: { select: { id: true, name: true } },
+      },
+    });
+
+    return { movements, reviewedMovements };
   }
 
   /**

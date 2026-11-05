@@ -479,10 +479,21 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
       combinedActivity.add(item);
     }
 
+    // Add reviewed (approved/rejected) audit entries from manager review trail
+    for (final m in app.reviewedMovements) {
+      final item = Map<String, dynamic>.from(m);
+      item['_isReviewedAudit'] = true;
+      // Avoid duplicates by receipt or ID
+      final v = item['receiptNo']?.toString() ?? item['id']?.toString() ?? '';
+      if (v.isNotEmpty && seenVouchers.contains(v)) continue;
+      if (v.isNotEmpty) seenVouchers.add(v);
+      combinedActivity.add(item);
+    }
+
     // Sort newest first
     combinedActivity.sort((a, b) {
-      final da = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(1970);
-      final db = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(1970);
+      final da = DateTime.tryParse(a['approvedAt']?.toString() ?? a['createdAt']?.toString() ?? '') ?? DateTime(1970);
+      final db = DateTime.tryParse(b['approvedAt']?.toString() ?? b['createdAt']?.toString() ?? '') ?? DateTime(1970);
       return db.compareTo(da);
     });
 
@@ -721,6 +732,92 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                             );
                           }
 
+
+                          // 2b. REVIEWED AUDIT ENTRY (Approved/Rejected by manager)
+                          final isReviewedAudit = item['_isReviewedAudit'] == true ||
+                              (item['approvalStatus'] != null && item['approvalStatus'] != 'pending' && item['approvedById'] != null);
+                          if (isReviewedAudit) {
+                            final isApproved = item['approvalStatus'] == 'approved';
+                            final auditTitle = item['segment']?['name']?.toString() ??
+                                item['category']?['name']?.toString() ??
+                                item['note']?.toString() ??
+                                'Transaction';
+                            final employee = item['collector']?['name']?.toString() ?? item['actorName']?.toString() ?? 'Staff';
+                            final approver = item['approver']?['name']?.toString() ?? 'Manager';
+                            final ledgerName = item['ledger']?['name']?.toString() ?? '';
+                            final auditTime = _timeAgo(item['approvedAt']?.toString() ?? item['createdAt']?.toString());
+                            final ref = item['receiptNo'] != null ? 'Ref: #${item['receiptNo']}' : '';
+                            final isAuditOut = item['direction'] == 'out' || item['type'] == 'CASH_OUT';
+                            final rejectionReason = item['rejectionReason']?.toString() ?? '';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: isApproved ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      isApproved ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                      color: isApproved ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${isApproved ? "Transaction Approved" : "Transaction Rejected"}: ${isAuditOut ? '-' : '+'}৳ $amt',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: isApproved ? const Color(0xFF166534) : const Color(0xFF991B1B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '$auditTitle • By $employee • ${isApproved ? "Approved" : "Rejected"} by $approver${ledgerName.isNotEmpty ? " • $ledgerName" : ""} • $auditTime',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                        ),
+                                        if (ref.isNotEmpty || (!isApproved && rejectionReason.isNotEmpty)) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            [
+                                              if (ref.isNotEmpty) ref,
+                                              if (!isApproved && rejectionReason.isNotEmpty) 'Reason: $rejectionReason',
+                                            ].join(' • '),
+                                            style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: isApproved ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      isApproved ? 'Approved' : 'Rejected',
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
 
                           // 3. REGULAR LEDGER MOVEMENT (INFLOW / OUTFLOW)
                           final isOut = item['direction'] == 'out' || item['type'] == 'CASH_OUT';

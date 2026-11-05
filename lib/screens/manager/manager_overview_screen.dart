@@ -79,9 +79,13 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                           final tx = app.pendingMovements[index];
                           final amt = _toDouble(tx['amount']);
                           final isOut = (tx['direction'] ?? '').toString().toLowerCase() == 'out';
-                          final collector = tx['collector']?['name'] ?? 'Employee';
-                          final cat = tx['category']?['name'] ?? tx['entryTag'] ?? 'Movement';
+                          final collector = tx['collector']?['name'] ?? tx['collectorHandle'] ?? 'Employee';
+                          final title = tx['segment']?['name']?.toString() ??
+                              tx['category']?['name']?.toString() ??
+                              tx['entryTag']?.toString() ??
+                              'Transaction';
                           final txId = tx['id']?.toString() ?? '';
+                          final ledgerLabel = tx['ledger']?['name']?.toString();
 
                           return Container(
                             padding: const EdgeInsets.all(12),
@@ -96,13 +100,16 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(cat, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                    Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                     Text('${isOut ? '-' : '+'}৳${amt.toStringAsFixed(2)}',
                                       style: TextStyle(fontWeight: FontWeight.bold, color: isOut ? Colors.red : Colors.green)),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
-                                Text('By: $collector', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                Text(
+                                  'By: $collector${ledgerLabel != null ? " • $ledgerLabel" : ""}',
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
                                 const SizedBox(height: 10),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.end,

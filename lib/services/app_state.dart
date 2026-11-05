@@ -134,6 +134,9 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> _pendingMovements = [];
   List<Map<String, dynamic>> get pendingMovements => _pendingMovements;
 
+  List<Map<String, dynamic>> _reviewedMovements = [];
+  List<Map<String, dynamic>> get reviewedMovements => _reviewedMovements;
+
   Future<void> fetchPendingMovements({String? companyId}) async {
     try {
       final url = (companyId != null && companyId.trim().isNotEmpty)
@@ -148,6 +151,11 @@ class AppState extends ChangeNotifier {
               .toList();
         } else if (decoded is List) {
           _pendingMovements = decoded
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        }
+        if (decoded is Map && decoded['reviewedMovements'] is List) {
+          _reviewedMovements = (decoded['reviewedMovements'] as List)
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList();
         }
