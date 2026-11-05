@@ -16,6 +16,8 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
   static const Color darkSlate = Color(0xFF0F172A);
   static const Color borderColor = Color(0xFFE2E8F0);
 
+  final RegExp _uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+
   bool _isCashMasked = false;
   String _selectedFilter = 'this_month';
 
@@ -41,6 +43,28 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
     if (!forceShow && _isCashMasked) return '••••••';
     final d = _toDouble(val);
     return d.toStringAsFixed(2);
+  }
+
+  String _resolveTitle(Map<String, dynamic> item) {
+    final candidates = [
+      item['title'],
+      item['note'],
+      item['notes'],
+      item['segmentName'],
+      item['segment']?['name'],
+      item['description'],
+      item['memo'],
+      item['movementType'],
+    ];
+    for (final cand in candidates) {
+      if (cand != null) {
+        final s = cand.toString().trim();
+        if (s.isNotEmpty && !_uuidRegex.hasMatch(s)) {
+          return s;
+        }
+      }
+    }
+    return item['direction'] == 'out' ? 'Outflow' : 'Inflow';
   }
 
   void _showPendingApprovalsModal(BuildContext context, AppState app) {
@@ -680,7 +704,7 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                           final arrowIcon = isOutflow ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded;
                           final arrowBg = isOutflow ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4);
                           
-                          final desc = tx['description'] ?? tx['memo'] ?? tx['segmentName'] ?? 'Transaction';
+                          final desc = _resolveTitle(tx);
                           
                           DateTime? d = DateTime.tryParse(tx['createdAt']?.toString() ?? '');
                           String formattedDateTime = '';
@@ -690,8 +714,8 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                             formattedDateTime = tx['createdAt'] != null ? tx['createdAt'].toString().substring(0, 10) : '';
                           }
                           
-                          final actor = tx['actorName'] ?? tx['user']?['name'] ?? 'System';
-                          final role = tx['actorRole'] ?? tx['user']?['role'] ?? 'Staff';
+                          final actor = tx['actorName'] ?? tx['userName'] ?? tx['user']?['name'] ?? 'Staff';
+                          final role = tx['actorRole'] ?? tx['userRole'] ?? tx['user']?['role'] ?? 'Staff';
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),

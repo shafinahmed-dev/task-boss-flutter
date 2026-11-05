@@ -252,7 +252,10 @@ export class ManagerService {
       },
     });
 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     const transactions = movements.map((tx: any) => {
+      const meta = (tx.metadata as any) || {};
       const isOut =
         tx.direction === 'out' ||
         tx.direction === 'OUT' ||
@@ -261,6 +264,22 @@ export class ManagerService {
         tx.movementType === 'Cash Out' ||
         tx.movementType === 'Expense';
 
+      // Resolve segment / category name safely
+      let resolvedSegment = tx.segment?.name || meta.category;
+      if (!resolvedSegment && tx.category?.name && !uuidRegex.test(tx.category.name)) {
+        resolvedSegment = tx.category.name;
+      }
+      if (!resolvedSegment) {
+        resolvedSegment = tx.ledger?.name || 'General';
+      }
+
+      // Resolve note / title
+      const rawNote = (tx.notes || tx.note || meta.note || meta.notes || '').toString().trim();
+      const title = rawNote.length > 0 && !uuidRegex.test(rawNote) ? rawNote : resolvedSegment;
+
+      const actor = tx.collector?.name || tx.custodian?.name || meta.actorName || 'Staff';
+      const role = tx.collector?.role || 'STAFF';
+
       return {
         id: tx.id,
         amount: Number(tx.amount || 0),
@@ -268,12 +287,15 @@ export class ManagerService {
         direction: isOut ? 'out' : 'in',
         type: isOut ? 'Cash Out' : 'Cash In',
         movementType: tx.movementType || (isOut ? 'Cash Out' : 'Cash In'),
-        note: tx.notes || tx.note || tx.movementType || 'Transaction',
-        segmentName: tx.category?.name || 'General',
+        title,
+        note: rawNote.length > 0 ? rawNote : resolvedSegment,
+        segmentName: resolvedSegment,
         categoryId: tx.categoryId,
-        actorName: tx.collector?.name || tx.custodian?.name || tx.user?.name || 'System',
-        actorRole: tx.collector?.role || tx.user?.role || 'STAFF',
-        walletName: tx.wallet?.name || 'Cash in Hand',
+        actorName: actor,
+        actorRole: role,
+        userName: actor,
+        userRole: role,
+        walletName: tx.wallet?.name || meta.channel || 'Cash in Hand',
         createdAt: tx.createdAt.toISOString(),
       };
     });
@@ -682,23 +704,41 @@ export class ManagerService {
       take: 100,
     });
 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     const serialized = movements.map((m: any) => {
       const meta = (m.metadata as any) || {};
       const normDir = (m.direction || '').toLowerCase();
       const isOut = normDir === 'out' || normDir === 'outflow';
 
-      const title = m.segment?.name || m.category?.name || m.movementType || meta.movementType || (isOut ? 'Outflow' : 'Inflow');
-      const noteText = m.notes || meta.note || null;
+      let resolvedSegment = m.segment?.name || meta.category;
+      if (!resolvedSegment && m.category?.name && !uuidRegex.test(m.category.name)) {
+        resolvedSegment = m.category.name;
+      }
+      if (!resolvedSegment) {
+        resolvedSegment = m.ledger?.name || 'General';
+      }
+
+      const rawNote = (m.notes || meta.note || meta.notes || '').toString().trim();
+      const title = rawNote.length > 0 && !uuidRegex.test(rawNote) ? rawNote : resolvedSegment;
+
+      const actor = m.collector?.name || m.custodian?.name || meta.actorName || 'Staff';
+      const role = m.collector?.role || 'STAFF';
 
       return {
         id: m.id,
         amount: Number(m.amount || 0),
+        fee: Number(m.fee || 0),
         direction: isOut ? 'out' : 'in',
-        movementType: title,
-        note: noteText,
-        voucherNumber: m.voucherNumber || meta.voucherNumber || '',
-        userName: m.collector?.name || meta.actorName || 'Staff',
-        userRole: m.collector?.role || 'EMPLOYEE',
+        movementType: m.movementType || (isOut ? 'Outflow' : 'Inflow'),
+        title,
+        note: rawNote.length > 0 ? rawNote : resolvedSegment,
+        segmentName: resolvedSegment,
+        voucherNumber: m.receiptNo || m.voucherNumber || meta.voucherNumber || '',
+        actorName: actor,
+        actorRole: role,
+        userName: actor,
+        userRole: role,
         walletName: m.wallet?.name || meta.channel || '',
         createdAt: m.createdAt.toISOString(),
       };

@@ -14,6 +14,7 @@ class ManagerTransactionsScreen extends StatefulWidget {
 class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
   final TextEditingController _searchCtl = TextEditingController();
   String _searchQuery = '';
+  final RegExp _uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
 
   @override
   void initState() {
@@ -264,10 +265,31 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
         tx['movementType'] == 'Cash Out' ||
         tx['type'] == 'EXPENSE';
 
-    final segment = tx['segmentName'] ?? tx['category']?['name'] ?? 'General';
-    final note = tx['note'] ?? tx['movementType'] ?? 'Transaction';
-    final actor = tx['actorName'] ?? tx['user']?['name'] ?? 'System';
-    final role = tx['actorRole'] ?? tx['user']?['role'] ?? 'Staff';
+    // Segment Pill Resolution
+    String segment = 'General';
+    final rawSegment = tx['segmentName'] ?? tx['segment']?['name'] ?? tx['category']?['name'];
+    if (rawSegment != null) {
+      final s = rawSegment.toString().trim();
+      if (s.isNotEmpty && !_uuidRegex.hasMatch(s)) {
+        segment = s;
+      }
+    }
+
+    // Title Resolution
+    String displayTitle = segment;
+    final rawNote = (tx['title'] ?? tx['note'] ?? tx['notes'] ?? '').toString().trim();
+    if (rawNote.isNotEmpty && !_uuidRegex.hasMatch(rawNote)) {
+      displayTitle = rawNote;
+    } else if (displayTitle == 'General' && tx['movementType'] != null) {
+      final mType = tx['movementType'].toString().trim();
+      if (mType.isNotEmpty && !_uuidRegex.hasMatch(mType)) {
+        displayTitle = mType;
+      }
+    }
+
+    // Actor and Role Resolution
+    final actor = tx['actorName'] ?? tx['userName'] ?? tx['collector']?['name'] ?? tx['user']?['name'] ?? 'Staff';
+    final role = tx['actorRole'] ?? tx['userRole'] ?? tx['collector']?['role'] ?? tx['user']?['role'] ?? 'Staff';
     final formattedDate = _formatDateTime(tx['createdAt']);
 
     return Container(
@@ -302,7 +324,7 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        note.toString(),
+                        displayTitle,
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                         overflow: TextOverflow.ellipsis,
                       ),
