@@ -129,6 +129,8 @@ class _SuiteAdvanceFilterModalState extends State<SuiteAdvanceFilterModal> {
         .toList();
   }
 
+  List<String> get availableSegments => _getAvailableSegments();
+
   @override
   Widget build(BuildContext context) {
     const navyColor = Color(0xFF0F172A);
