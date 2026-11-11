@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/app_state.dart';
+import '../suite/suite_transaction_filter_modal.dart';
 
 class ManagerTransactionsScreen extends StatefulWidget {
   final String? companyId;
@@ -13,7 +14,7 @@ class ManagerTransactionsScreen extends StatefulWidget {
 
 class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
   final TextEditingController _searchCtl = TextEditingController();
-  String _searchQuery = '';
+  SuiteFilterState _filter = SuiteFilterState();
   final RegExp _uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
 
   @override
@@ -22,7 +23,7 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final app = context.read<AppState>();
       final cid = widget.companyId ?? app.effectiveCompanyId;
-      app.fetchManagerTransactions(companyId: cid, search: _searchQuery);
+      app.fetchManagerTransactions(companyId: cid, search: _filter.searchQuery);
     });
   }
 
@@ -33,10 +34,89 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
   }
 
   Future<void> _onSearchChanged(String query) async {
-    setState(() => _searchQuery = query);
+    setState(() => _filter.searchQuery = query);
     final app = context.read<AppState>();
     final cid = widget.companyId ?? app.effectiveCompanyId;
     await app.fetchManagerTransactions(companyId: cid, search: query);
+  }
+
+  List<Map<String, dynamic>> _applyFilters(List<Map<String, dynamic>> rawList) {
+    final now = DateTime.now();
+
+    return rawList.where((tx) {
+      // 1. Text Query (Search across segment, note/description, ledger, user/actor, voucher)
+      final q = _filter.searchQuery.trim().toLowerCase();
+      if (q.isNotEmpty) {
+        final title = (tx['title'] ?? '').toString().toLowerCase();
+        final notes = (tx['notes'] ?? tx['note'] ?? tx['description'] ?? '').toString().toLowerCase();
+        final segment = (tx['segmentName'] ?? tx['segment']?['name'] ?? tx['segment'] ?? '').toString().toLowerCase();
+        final ledger = (tx['ledgerName'] ?? tx['ledger']?['name'] ?? '').toString().toLowerCase();
+        final actor = (tx['userName'] ?? tx['actorName'] ?? tx['collector']?['name'] ?? tx['user']?['name'] ?? '').toString().toLowerCase();
+        final voucher = (tx['voucherNumber'] ?? tx['reference'] ?? '').toString().toLowerCase();
+
+        final match = title.contains(q) ||
+            notes.contains(q) ||
+            segment.contains(q) ||
+            ledger.contains(q) ||
+            actor.contains(q) ||
+            voucher.contains(q);
+
+        if (!match) return false;
+      }
+
+      // 2. Flow Direction (in / out)
+      if (_filter.direction != null && _filter.direction != 'all') {
+        final dir = (tx['direction'] ?? '').toString().toLowerCase();
+        if (dir != _filter.direction!.toLowerCase()) return false;
+      }
+
+      // 3. Ledger (Only ledgers in this concern)
+      if (_filter.ledgerName != null && _filter.ledgerName != 'all') {
+        final lName = (tx['ledgerName'] ?? tx['ledger']?['name'] ?? '').toString().trim();
+        if (lName != _filter.ledgerName) return false;
+      }
+
+      // 4. Segment
+      if (_filter.segmentName != null && _filter.segmentName != 'all') {
+        final seg = (tx['segmentName'] ?? tx['segment']?['name'] ?? tx['segment'] ?? '').toString().trim();
+        if (seg != _filter.segmentName) return false;
+      }
+
+      // 5. Member / Actor
+      if (_filter.memberName != null && _filter.memberName != 'all') {
+        final actor = (tx['userName'] ?? tx['actorName'] ?? tx['collector']?['name'] ?? tx['user']?['name'] ?? '').toString().trim();
+        if (actor != _filter.memberName) return false;
+      }
+
+      // 6. Payment Method
+      if (_filter.paymentMethod != null && _filter.paymentMethod != 'all') {
+        final method = (tx['paymentMethod'] ?? tx['wallet']?['type'] ?? '').toString().toUpperCase();
+        if (!method.contains(_filter.paymentMethod!.toUpperCase())) return false;
+      }
+
+      // 7. Date / Duration Presets
+      if (tx['createdAt'] != null) {
+        final txDate = DateTime.tryParse(tx['createdAt'].toString());
+        if (txDate != null) {
+          if (_filter.datePreset == 'today') {
+            if (txDate.year != now.year || txDate.month != now.month || txDate.day != now.day) return false;
+          } else if (_filter.datePreset == 'yesterday') {
+            final yesterday = now.subtract(const Duration(days: 1));
+            if (txDate.year != yesterday.year || txDate.month != yesterday.month || txDate.day != yesterday.day) return false;
+          } else if (_filter.datePreset == 'this_week') {
+            if (now.difference(txDate).inDays > 7) return false;
+          } else if (_filter.datePreset == 'this_month') {
+            if (txDate.year != now.year || txDate.month != now.month) return false;
+          } else if (_filter.datePreset == 'custom' && _filter.customRange != null) {
+            final start = DateTime(_filter.customRange!.start.year, _filter.customRange!.start.month, _filter.customRange!.start.day);
+            final end = DateTime(_filter.customRange!.end.year, _filter.customRange!.end.month, _filter.customRange!.end.day, 23, 59, 59);
+            if (txDate.isBefore(start) || txDate.isAfter(end)) return false;
+          }
+        }
+      }
+
+      return true;
+    }).toList();
   }
 
   double _toDouble(dynamic val) {
@@ -69,33 +149,32 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
       final recent = app.managerOverviewData['recentTransactions'] as List;
       rawList = recent.map((item) => Map<String, dynamic>.from(item as Map)).toList();
     }
-    
-    final query = _searchQuery.trim().toLowerCase();
 
-    final filtered = rawList.where((tx) {
-      if (query.isEmpty) return true;
-      final seg = (tx['segmentName'] ?? tx['category']?['name'] ?? '').toString().toLowerCase();
-      final note = (tx['note'] ?? tx['movementType'] ?? '').toString().toLowerCase();
-      final actor = (tx['actorName'] ?? tx['user']?['name'] ?? '').toString().toLowerCase();
-      return seg.contains(query) || note.contains(query) || actor.contains(query);
-    }).toList();
+    final filtered = _applyFilters(rawList);
 
-    final isSegmentMatch = query.isNotEmpty && rawList.any((tx) {
-      final seg = (tx['segmentName'] ?? tx['category']?['name'] ?? '').toString().toLowerCase();
-      return seg == query;
-    });
+    final query = _filter.searchQuery.trim().toLowerCase();
+    final effectiveSegmentMatch = (_filter.segmentName != null && _filter.segmentName != 'all')
+        ? _filter.segmentName!
+        : (query.isNotEmpty && rawList.any((tx) {
+            final seg = (tx['segmentName'] ?? tx['segment']?['name'] ?? tx['category']?['name'] ?? '').toString().trim();
+            return seg.toLowerCase() == query;
+          }) ? query : '');
 
+    final isSegmentMatch = effectiveSegmentMatch.isNotEmpty;
     double segmentInflow = 0.0;
     double segmentOutflow = 0.0;
-    String matchedSegmentTitle = '';
+    String matchedSegmentTitle = effectiveSegmentMatch;
 
     if (isSegmentMatch) {
       for (final tx in rawList) {
-        final seg = (tx['segmentName'] ?? tx['category']?['name'] ?? '').toString().toLowerCase();
-        if (seg == query) {
-          matchedSegmentTitle = tx['segmentName'] ?? tx['category']?['name'] ?? query;
+        final seg = (tx['segmentName'] ?? tx['segment']?['name'] ?? tx['category']?['name'] ?? '').toString().trim();
+        if (seg.toLowerCase() == matchedSegmentTitle.toLowerCase()) {
+          matchedSegmentTitle = seg;
           final amt = _toDouble(tx['amount']);
-          final isOut = tx['direction'] == 'out' || tx['type'] == 'Cash Out' || tx['type'] == 'EXPENSE';
+          final isOut = tx['direction'] == 'out' ||
+              tx['type'] == 'Cash Out' ||
+              tx['movementType'] == 'Cash Out' ||
+              tx['type'] == 'EXPENSE';
           if (isOut) {
             segmentOutflow += amt;
           } else {
@@ -124,6 +203,7 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
       body: Column(
         children: [
           _buildSearchBar(),
+          if (_filter.hasActiveFilters) _buildActiveFilterChipsBar(),
           if (isSegmentMatch) _buildSegmentLedgerCard(matchedSegmentTitle, segmentInflow, segmentOutflow),
           Expanded(
             child: filtered.isEmpty
@@ -132,7 +212,7 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
                     onRefresh: () async {
                       final app = context.read<AppState>();
                       final cid = widget.companyId ?? app.effectiveCompanyId;
-                      await app.fetchManagerTransactions(companyId: cid, search: _searchQuery);
+                      await app.fetchManagerTransactions(companyId: cid, search: _filter.searchQuery);
                     },
                     child: ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -149,34 +229,184 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
 
   Widget _buildSearchBar() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       color: Colors.white,
-      child: TextField(
-        controller: _searchCtl,
-        onChanged: (val) => _onSearchChanged(val),
-        decoration: InputDecoration(
-          hintText: 'Search by segment, note, or actor...',
-          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-          prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF64748B)),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
-                  onPressed: () {
-                    _searchCtl.clear();
-                    _onSearchChanged('');
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchCtl,
+              onChanged: (val) => _onSearchChanged(val),
+              decoration: InputDecoration(
+                hintText: 'Search by segment, note, or actor...',
+                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF64748B)),
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: () {
+              final app = context.read<AppState>();
+              List<Map<String, dynamic>> rawList = app.managerTransactions;
+              if (rawList.isEmpty && app.managerOverviewData['recentTransactions'] is List) {
+                final recent = app.managerOverviewData['recentTransactions'] as List;
+                rawList = recent.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+              }
+
+              final uniqueLedgers = rawList
+                  .map((t) => (t['ledgerName'] ?? t['ledger']?['name'] ?? '').toString().trim())
+                  .where((l) => l.isNotEmpty)
+                  .toSet()
+                  .toList();
+
+              final uniqueMembers = rawList
+                  .map((t) => (t['userName'] ?? t['actorName'] ?? t['collector']?['name'] ?? t['user']?['name'] ?? '').toString().trim())
+                  .where((m) => m.isNotEmpty)
+                  .toSet()
+                  .toList();
+
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => SuiteAdvanceFilterModal(
+                  initialFilter: _filter,
+                  concerns: const [], // Empty list hides concern selector; screen is already scoped to this concern
+                  ledgers: uniqueLedgers,
+                  rawTransactions: rawList,
+                  members: uniqueMembers,
+                  onApply: (newFilter) {
+                    setState(() => _filter = newFilter);
                   },
-                )
-              : null,
-          filled: true,
-          fillColor: const Color(0xFFF1F5F9),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-        ),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: _filter.hasActiveFilters ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _filter.hasActiveFilters ? const Color(0xFF0F172A) : const Color(0xFFCBD5E1),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.tune_rounded,
+                    size: 20,
+                    color: _filter.hasActiveFilters ? Colors.white : const Color(0xFF334155),
+                  ),
+                  if (_filter.activeFilterCount > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '${_filter.activeFilterCount}',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
 
+
+  Widget _buildActiveFilterChipsBar() {
+    final chips = <Widget>[];
+
+    if (_filter.direction != null && _filter.direction != 'all') {
+      chips.add(_buildChipTag('Flow: ${_filter.direction}', () => setState(() => _filter.direction = 'all')));
+    }
+    if (_filter.ledgerName != null && _filter.ledgerName != 'all') {
+      chips.add(_buildChipTag('Ledger: ${_filter.ledgerName}', () => setState(() => _filter.ledgerName = 'all')));
+    }
+    if (_filter.segmentName != null && _filter.segmentName != 'all') {
+      chips.add(_buildChipTag('Segment: ${_filter.segmentName}', () => setState(() => _filter.segmentName = 'all')));
+    }
+    if (_filter.memberName != null && _filter.memberName != 'all') {
+      chips.add(_buildChipTag('Member: ${_filter.memberName}', () => setState(() => _filter.memberName = 'all')));
+    }
+    if (_filter.paymentMethod != null && _filter.paymentMethod != 'all') {
+      chips.add(_buildChipTag('Method: ${_filter.paymentMethod}', () => setState(() => _filter.paymentMethod = 'all')));
+    }
+    if (_filter.datePreset != 'all') {
+      chips.add(_buildChipTag('Date: ${_filter.datePreset}', () => setState(() {
+        _filter.datePreset = 'all';
+        _filter.customRange = null;
+      })));
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Active Filters:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+              GestureDetector(
+                onTap: () => setState(() => _filter.reset()),
+                child: const Text('Clear All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: chips.map((c) => Padding(padding: const EdgeInsets.only(right: 6), child: c)).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChipTag(String label, VoidCallback onRemove) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(Icons.close_rounded, size: 14, color: Colors.white70),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSegmentLedgerCard(String title, double inflow, double outflow) {
     return Container(
@@ -250,7 +480,7 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
           Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade400),
           const SizedBox(height: 8),
           Text(
-            _searchQuery.isNotEmpty ? 'No matching transactions found.' : 'No transactions recorded yet.',
+            _filter.searchQuery.isNotEmpty ? 'No matching transactions found.' : 'No transactions recorded yet.',
             style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
           ),
         ],
