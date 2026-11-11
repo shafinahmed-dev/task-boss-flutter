@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../services/app_state.dart';
+import 'suite_transaction_filter_modal.dart';
 
 String formatBdt(num value) {
   final formatter = NumberFormat.currency(
@@ -83,8 +84,40 @@ class SuiteTransactionsScreen extends StatefulWidget {
 
 class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-  String _selectedPeriod = 'all_time';
+  SuiteFilterState _filterState = SuiteFilterState();
+
+  List<Map<String, dynamic>> get _availableConcerns {
+    final app = context.read<AppState>();
+    final map = <String, String>{};
+    for (final t in app.suiteTransactions) {
+      final id = t['companyId']?.toString() ?? t['concernId']?.toString();
+      final name = t['companyCode']?.toString() ?? t['companyName']?.toString() ?? t['concernName']?.toString();
+      if (id != null && id.isNotEmpty && name != null && name.isNotEmpty) {
+        map[id] = name;
+      }
+    }
+    return map.entries.map((e) => {'id': e.key, 'name': e.value}).toList();
+  }
+
+  List<String> get _availableSegments {
+    final app = context.read<AppState>();
+    final set = <String>{};
+    for (final t in app.suiteTransactions) {
+      final seg = t['segmentName']?.toString();
+      if (seg != null && seg.isNotEmpty) set.add(seg);
+    }
+    return set.toList()..sort();
+  }
+
+  List<String> get _availableMembers {
+    final app = context.read<AppState>();
+    final set = <String>{};
+    for (final t in app.suiteTransactions) {
+      final mem = t['userName']?.toString();
+      if (mem != null && mem.isNotEmpty) set.add(mem);
+    }
+    return set.toList()..sort();
+  }
 
   @override
   void initState() {
@@ -101,9 +134,7 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
   }
 
   Future<void> _fetchTransactions() async {
-    await context.read<AppState>().fetchSuiteTransactions(
-          range: _selectedPeriod == 'all_time' ? null : _selectedPeriod,
-        );
+    await context.read<AppState>().fetchSuiteTransactions();
   }
 
   String _formatDateTime(String? dateStr) {
@@ -130,13 +161,23 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
   Future<void> _exportPdf(
       List<Map<String, dynamic>> items, double inflow, double outflow) async {
     try {
-      final labels = {
-        'all_time': 'All Time',
-        'today': 'Today',
-        'this_week': 'This Week',
-        'this_month': 'This Month',
-      };
-      final periodStr = labels[_selectedPeriod] ?? 'All Time';
+      String periodStr = 'All Time';
+      if (_filterState.datePreset == 'today') periodStr = 'Today';
+      else if (_filterState.datePreset == 'yesterday') periodStr = 'Yesterday';
+      else if (_filterState.datePreset == 'this_week') periodStr = 'This Week';
+      else if (_filterState.datePreset == 'this_month') periodStr = 'This Month';
+      else if (_filterState.datePreset == 'custom' && _filterState.customRange != null) {
+        periodStr = '${DateFormat('dd MMM yyyy').format(_filterState.customRange!.start)} - ${DateFormat('dd MMM yyyy').format(_filterState.customRange!.end)}';
+      }
+      if (_filterState.direction != null && _filterState.direction != 'all') {
+        periodStr += ' (${_filterState.direction == 'in' ? 'Inflow' : 'Outflow'})';
+      }
+      if (_filterState.concernId != null && _filterState.concernId != 'all') {
+        final c = _availableConcerns.firstWhere((x) => x['id'] == _filterState.concernId, orElse: () => {'name': ''});
+        if (c['name'] != null && (c['name'] as String).isNotEmpty) {
+          periodStr += ' [Concern: ${c['name']}]';
+        }
+      }
       final net = inflow - outflow;
       final pdf = pw.Document();
 
@@ -329,6 +370,127 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
     }
   }
 
+  Widget _buildActiveFilterChipsBar() {
+    if (!_filterState.hasActiveFilters) return const SizedBox.shrink();
+
+    final List<Widget> chips = [];
+
+    // Direction chip
+    if (_filterState.direction != null && _filterState.direction != 'all') {
+      final label = _filterState.direction == 'in' ? 'Inflow Only' : 'Outflow Only';
+      chips.add(_buildFilterChip(label, () {
+        setState(() => _filterState.direction = 'all');
+      }));
+    }
+
+    // Concern chip
+    if (_filterState.concernId != null && _filterState.concernId != 'all') {
+      final concern = _availableConcerns.firstWhere(
+        (c) => c['id']?.toString() == _filterState.concernId,
+        orElse: () => {'name': _filterState.concernId!},
+      );
+      chips.add(_buildFilterChip('Concern: ${concern['name'] ?? concern['companyName']}', () {
+        setState(() => _filterState.concernId = 'all');
+      }));
+    }
+
+    // Segment chip
+    if (_filterState.segmentName != null && _filterState.segmentName != 'all') {
+      chips.add(_buildFilterChip('Segment: ${_filterState.segmentName}', () {
+        setState(() => _filterState.segmentName = 'all');
+      }));
+    }
+
+    // Member chip
+    if (_filterState.memberName != null && _filterState.memberName != 'all') {
+      chips.add(_buildFilterChip('Member: ${_filterState.memberName}', () {
+        setState(() => _filterState.memberName = 'all');
+      }));
+    }
+
+    // Payment Method chip
+    if (_filterState.paymentMethod != null && _filterState.paymentMethod != 'all') {
+      chips.add(_buildFilterChip('Method: ${_filterState.paymentMethod}', () {
+        setState(() => _filterState.paymentMethod = 'all');
+      }));
+    }
+
+    // Date Preset / Custom chip
+    if (_filterState.datePreset != 'all_time') {
+      String dateLabel = 'Date: All Time';
+      if (_filterState.datePreset == 'today') dateLabel = 'Today';
+      else if (_filterState.datePreset == 'yesterday') dateLabel = 'Yesterday';
+      else if (_filterState.datePreset == 'this_week') dateLabel = 'This Week';
+      else if (_filterState.datePreset == 'this_month') dateLabel = 'This Month';
+      else if (_filterState.datePreset == 'custom' && _filterState.customRange != null) {
+        final start = '${_filterState.customRange!.start.day}/${_filterState.customRange!.start.month}/${_filterState.customRange!.start.year}';
+        final end = '${_filterState.customRange!.end.day}/${_filterState.customRange!.end.month}/${_filterState.customRange!.end.year}';
+        dateLabel = '$start - $end';
+      }
+      chips.add(_buildFilterChip(dateLabel, () {
+        setState(() {
+          _filterState.datePreset = 'all_time';
+          _filterState.customRange = null;
+        });
+      }));
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            ...chips,
+            const SizedBox(width: 8),
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _filterState.reset();
+                  _searchController.clear();
+                });
+              },
+              icon: const Icon(Icons.refresh_rounded, size: 14, color: Color(0xFFEF4444)),
+              label: const Text(
+                'Reset All',
+                style: TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, VoidCallback onDeleted) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      child: Chip(
+        label: Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A), fontWeight: FontWeight.w500)),
+        backgroundColor: const Color(0xFFF1F5F9),
+        deleteIcon: const Icon(Icons.close_rounded, size: 14, color: Color(0xFF64748B)),
+        onDeleted: onDeleted,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+      ),
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
@@ -342,22 +504,79 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
     }
 
     final rawList = app.suiteTransactions;
-    final q = _searchQuery.toLowerCase();
 
     final filteredTransactions = rawList.where((t) {
-      if (q.isEmpty) return true;
-      final l = (t['ledgerName'] ?? '').toString().toLowerCase();
-      final s = (t['segmentName'] ?? '').toString().toLowerCase();
-      final u = (t['userName'] ?? '').toString().toLowerCase();
-      final v = (t['voucherNumber'] ?? '').toString().toLowerCase();
-      final n = (t['notes'] ?? '').toString().toLowerCase();
-      final c = (t['companyCode'] ?? '').toString().toLowerCase();
-      return l.contains(q) ||
-          s.contains(q) ||
-          u.contains(q) ||
-          v.contains(q) ||
-          n.contains(q) ||
-          c.contains(q);
+      // 1. Search Query
+      final q = _filterState.searchQuery.toLowerCase();
+      if (q.isNotEmpty) {
+        final l = (t['ledgerName'] ?? t['title'] ?? '').toString().toLowerCase();
+        final s = (t['segmentName'] ?? '').toString().toLowerCase();
+        final u = (t['userName'] ?? '').toString().toLowerCase();
+        final v = (t['voucherNumber'] ?? '').toString().toLowerCase();
+        final n = (t['notes'] ?? t['description'] ?? '').toString().toLowerCase();
+        final c = (t['companyCode'] ?? t['companyName'] ?? '').toString().toLowerCase();
+        final match = l.contains(q) || s.contains(q) || u.contains(q) || v.contains(q) || n.contains(q) || c.contains(q);
+        if (!match) return false;
+      }
+
+      // 2. Direction
+      if (_filterState.direction != null && _filterState.direction != 'all') {
+        if (t['direction'] != _filterState.direction) return false;
+      }
+
+      // 3. Concern ID
+      if (_filterState.concernId != null && _filterState.concernId != 'all') {
+        final tConcernId = (t['companyId'] ?? t['concernId']?.toString());
+        if (tConcernId != _filterState.concernId) return false;
+      }
+
+      // 4. Segment
+      if (_filterState.segmentName != null && _filterState.segmentName != 'all') {
+        final tSeg = (t['segmentName'] ?? '').toString();
+        if (tSeg != _filterState.segmentName) return false;
+      }
+
+      // 5. Member
+      if (_filterState.memberName != null && _filterState.memberName != 'all') {
+        final tMem = (t['userName'] ?? '').toString();
+        if (tMem != _filterState.memberName) return false;
+      }
+
+      // 6. Payment Method
+      if (_filterState.paymentMethod != null && _filterState.paymentMethod != 'all') {
+        final tMethod = (t['paymentMethod'] ?? t['method'] ?? '').toString().toUpperCase();
+        if (!tMethod.contains(_filterState.paymentMethod!.toUpperCase())) return false;
+      }
+
+      // 7. Date Preset / Range
+      final dateStr = t['createdAt']?.toString() ?? t['date']?.toString();
+      if (dateStr != null && dateStr.isNotEmpty) {
+        try {
+          final dt = DateTime.parse(dateStr);
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+
+          if (_filterState.datePreset == 'today') {
+            final tDay = DateTime(dt.year, dt.month, dt.day);
+            if (tDay != today) return false;
+          } else if (_filterState.datePreset == 'yesterday') {
+            final yesterday = today.subtract(const Duration(days: 1));
+            final tDay = DateTime(dt.year, dt.month, dt.day);
+            if (tDay != yesterday) return false;
+          } else if (_filterState.datePreset == 'this_week') {
+            final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+            if (dt.isBefore(startOfWeek)) return false;
+          } else if (_filterState.datePreset == 'this_month') {
+            if (dt.year != now.year || dt.month != now.month) return false;
+          } else if (_filterState.datePreset == 'custom' && _filterState.customRange != null) {
+            final start = _filterState.customRange!.start;
+            final end = _filterState.customRange!.end.add(const Duration(days: 1));
+            if (dt.isBefore(start) || dt.isAfter(end)) return false;
+          }
+        } catch (_) {}
+      }
+
+      return true;
     }).toList();
 
     final liveInflow = filteredTransactions
@@ -369,12 +588,6 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
         .fold<double>(
             0.0, (sum, t) => sum + (t['amount'] as num).toDouble());
 
-    final periodLabels = {
-      'all_time': 'All Time',
-      'today': 'Today',
-      'this_week': 'This Week',
-      'this_month': 'This Month',
-    };
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -427,7 +640,7 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                       child: TextField(
                         controller: _searchController,
                         onChanged: (val) =>
-                            setState(() => _searchQuery = val.trim()),
+                            setState(() => _filterState.searchQuery = val),
                         decoration: InputDecoration(
                           hintText:
                               'Search transactions by ledger, segment, user, note, or voucher...',
@@ -435,13 +648,13 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                               fontSize: 13, color: Color(0xFF94A3B8)),
                           prefixIcon: const Icon(Icons.search_rounded,
                               size: 20, color: Color(0xFF64748B)),
-                          suffixIcon: _searchQuery.isNotEmpty
+                          suffixIcon: _filterState.searchQuery.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear_rounded,
                                       size: 18, color: Color(0xFF94A3B8)),
                                   onPressed: () {
                                     _searchController.clear();
-                                    setState(() => _searchQuery = '');
+                                    setState(() => _filterState.searchQuery = '');
                                   },
                                 )
                               : null,
@@ -457,51 +670,65 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: PopupMenuButton<String>(
-                        initialValue: _selectedPeriod,
-                        tooltip: 'Filter by date',
-                        icon: Row(
+                    InkWell(
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => SuiteAdvanceFilterModal(
+                            initialFilter: _filterState,
+                            concerns: _availableConcerns,
+                            segments: _availableSegments,
+                            members: _availableMembers,
+                            onApply: (newFilter) {
+                              setState(() {
+                                _filterState = newFilter;
+                              });
+                            },
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _filterState.hasActiveFilters ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _filterState.hasActiveFilters ? const Color(0xFF0F172A) : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.calendar_today_rounded,
-                                size: 16, color: Color(0xFF0F172A)),
-                            const SizedBox(width: 4),
-                            Text(
-                              periodLabels[_selectedPeriod] ?? 'All Time',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF0F172A)),
+                            Icon(
+                              Icons.tune_rounded,
+                              size: 18,
+                              color: _filterState.hasActiveFilters ? Colors.white : const Color(0xFF0F172A),
                             ),
-                            const SizedBox(width: 2),
+                            if (_filterState.activeFilterCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFEF4444),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '${_filterState.activeFilterCount}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 0),
-                        onSelected: (val) {
-                          setState(() => _selectedPeriod = val);
-                          _fetchTransactions();
-                        },
-                        itemBuilder: (ctx) => [
-                          const PopupMenuItem(
-                              value: 'all_time', child: Text('All Time')),
-                          const PopupMenuItem(
-                              value: 'today', child: Text('Today')),
-                          const PopupMenuItem(
-                              value: 'this_week', child: Text('This Week')),
-                          const PopupMenuItem(
-                              value: 'this_month', child: Text('This Month')),
-                        ],
                       ),
                     ),
                   ],
                 ),
               ),
+              _buildActiveFilterChipsBar(),
               Expanded(
                 child: filteredTransactions.isEmpty
                     ? Center(
