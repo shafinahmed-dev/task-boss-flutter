@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class SuiteFilterState {
+  String? ledgerName;
   String? concernId;
   String? segmentName;
   String? memberName;
@@ -12,6 +13,7 @@ class SuiteFilterState {
   String searchQuery;
 
   SuiteFilterState({
+    this.ledgerName,
     this.concernId,
     this.segmentName,
     this.memberName,
@@ -23,6 +25,7 @@ class SuiteFilterState {
   });
 
   bool get hasActiveFilters =>
+      (ledgerName != null && ledgerName != 'all') ||
       (concernId != null && concernId != 'all') ||
       (segmentName != null && segmentName != 'all') ||
       (memberName != null && memberName != 'all') ||
@@ -33,6 +36,7 @@ class SuiteFilterState {
 
   int get activeFilterCount {
     int count = 0;
+    if (ledgerName != null && ledgerName != 'all') count++;
     if (concernId != null && concernId != 'all') count++;
     if (segmentName != null && segmentName != 'all') count++;
     if (memberName != null && memberName != 'all') count++;
@@ -44,6 +48,7 @@ class SuiteFilterState {
   }
 
   void reset() {
+    ledgerName = null;
     concernId = null;
     segmentName = null;
     memberName = null;
@@ -56,6 +61,7 @@ class SuiteFilterState {
 
   SuiteFilterState copy() {
     return SuiteFilterState(
+      ledgerName: ledgerName,
       concernId: concernId,
       segmentName: segmentName,
       memberName: memberName,
@@ -71,7 +77,8 @@ class SuiteFilterState {
 class SuiteAdvanceFilterModal extends StatefulWidget {
   final SuiteFilterState initialFilter;
   final List<Map<String, dynamic>> concerns;
-  final List<String> segments;
+  final List<String> ledgers;
+  final List<Map<String, dynamic>> rawTransactions;
   final List<String> members;
   final Function(SuiteFilterState) onApply;
 
@@ -79,7 +86,8 @@ class SuiteAdvanceFilterModal extends StatefulWidget {
     super.key,
     required this.initialFilter,
     required this.concerns,
-    required this.segments,
+    required this.ledgers,
+    required this.rawTransactions,
     required this.members,
     required this.onApply,
   });
@@ -95,6 +103,30 @@ class _SuiteAdvanceFilterModalState extends State<SuiteAdvanceFilterModal> {
   void initState() {
     super.initState();
     _current = widget.initialFilter.copy();
+  }
+
+  List<String> _getAvailableSegments() {
+    var txs = widget.rawTransactions;
+
+    if (_current.concernId != null && _current.concernId != 'all') {
+      txs = txs.where((t) {
+        final compId = (t['companyId'] ?? t['company']?['id'] ?? t['wallet']?['companyId'] ?? '').toString();
+        return compId == _current.concernId;
+      }).toList();
+    }
+
+    if (_current.ledgerName != null && _current.ledgerName != 'all') {
+      txs = txs.where((t) {
+        final lName = (t['ledgerName'] ?? t['ledger']?['name'] ?? '').toString().trim();
+        return lName == _current.ledgerName;
+      }).toList();
+    }
+
+    return txs
+        .map((t) => (t['segmentName'] ?? t['segment']?['name'] ?? '').toString().trim())
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList();
   }
 
   @override
@@ -179,25 +211,73 @@ class _SuiteAdvanceFilterModalState extends State<SuiteAdvanceFilterModal> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildChip('All Concerns', _current.concernId == null || _current.concernId == 'all', () => setState(() => _current.concernId = 'all')),
+                      _buildChip('All Concerns', _current.concernId == null || _current.concernId == 'all', () {
+                        setState(() {
+                          _current.concernId = 'all';
+                          final validSegments = _getAvailableSegments();
+                          if (_current.segmentName != null && !validSegments.contains(_current.segmentName)) {
+                            _current.segmentName = null;
+                          }
+                        });
+                      }),
                       ...widget.concerns.map((c) {
                         final id = c['id']?.toString() ?? '';
                         final name = c['name']?.toString() ?? 'Concern';
-                        return _buildChip(name, _current.concernId == id, () => setState(() => _current.concernId = id));
+                        return _buildChip(name, _current.concernId == id, () {
+                          setState(() {
+                            _current.concernId = id;
+                            final validSegments = _getAvailableSegments();
+                            if (_current.segmentName != null && !validSegments.contains(_current.segmentName)) {
+                              _current.segmentName = null;
+                            }
+                          });
+                        });
                       }),
                     ],
                   ),
                   const SizedBox(height: 20),
                 ],
 
-                if (widget.segments.isNotEmpty) ...[
-                  _buildSectionHeader('Segment / Project'),
+                if (widget.ledgers.isNotEmpty) ...[
+                  _buildSectionHeader('Ledger'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildChip('All Ledgers', _current.ledgerName == null || _current.ledgerName == 'all', () {
+                        setState(() {
+                          _current.ledgerName = 'all';
+                          final validSegments = _getAvailableSegments();
+                          if (_current.segmentName != null && !validSegments.contains(_current.segmentName)) {
+                            _current.segmentName = null;
+                          }
+                        });
+                      }),
+                      ...widget.ledgers.map((lName) => _buildChip(
+                            lName,
+                            _current.ledgerName == lName,
+                            () {
+                              setState(() {
+                                _current.ledgerName = (_current.ledgerName == lName) ? 'all' : lName;
+                                final validSegments = _getAvailableSegments();
+                                if (_current.segmentName != null && !validSegments.contains(_current.segmentName)) {
+                                  _current.segmentName = null;
+                                }
+                              });
+                            },
+                          )),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                ],
+                if (availableSegments.isNotEmpty || (_current.segmentName != null && _current.segmentName != 'all')) ...[
+                  _buildSectionHeader('Segment'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
                       _buildChip('All Segments', _current.segmentName == null || _current.segmentName == 'all', () => setState(() => _current.segmentName = 'all')),
-                      ...widget.segments.map((seg) => _buildChip(seg, _current.segmentName == seg, () => setState(() => _current.segmentName = seg))),
+                      ...availableSegments.map((seg) => _buildChip(seg, _current.segmentName == seg, () => setState(() => _current.segmentName = seg))),
                     ],
                   ),
                   const SizedBox(height: 20),

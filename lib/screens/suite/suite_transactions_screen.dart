@@ -178,6 +178,9 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
           periodStr += ' [Concern: ${c['name']}]';
         }
       }
+      if (_filterState.ledgerName != null && _filterState.ledgerName != 'all') {
+        periodStr += ' [Ledger: ${_filterState.ledgerName}]';
+      }
       final net = inflow - outflow;
       final pdf = pw.Document();
 
@@ -394,6 +397,13 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
       }));
     }
 
+    // Ledger chip
+    if (_filterState.ledgerName != null && _filterState.ledgerName != 'all') {
+      chips.add(_buildFilterChip('Ledger: ${_filterState.ledgerName!}', () {
+        setState(() => _filterState.ledgerName = 'all');
+      }));
+    }
+
     // Segment chip
     if (_filterState.segmentName != null && _filterState.segmentName != 'all') {
       chips.add(_buildFilterChip('Segment: ${_filterState.segmentName}', () {
@@ -528,6 +538,12 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
       if (_filterState.concernId != null && _filterState.concernId != 'all') {
         final tConcernId = (t['companyId'] ?? t['concernId']?.toString());
         if (tConcernId != _filterState.concernId) return false;
+      }
+
+      // Ledger matching
+      if (_filterState.ledgerName != null && _filterState.ledgerName != 'all') {
+        final lName = (t['ledgerName'] ?? t['ledger']?['name'] ?? '').toString().trim();
+        if (lName != _filterState.ledgerName) return false;
       }
 
       // 4. Segment
@@ -672,14 +688,32 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                     const SizedBox(width: 8),
                     InkWell(
                       onTap: () {
+                        final allLedgers = rawList
+                            .map((t) => (t['ledgerName'] ?? t['ledger']?['name'] ?? '').toString().trim())
+                            .where((l) => l.isNotEmpty)
+                            .toSet()
+                            .toList();
+
+                        final concerns = app.suiteConcerns.isNotEmpty
+                            ? app.suiteConcerns
+                            : rawList
+                                .where((t) => t['company'] != null || t['companyName'] != null || t['companyId'] != null)
+                                .map((t) => {
+                                      'id': (t['companyId'] ?? t['company']?['id'] ?? '').toString(),
+                                      'name': (t['companyName'] ?? t['company']?['name'] ?? 'Concern').toString(),
+                                    })
+                                .toSet()
+                                .toList();
+
                         showModalBottomSheet(
                           context: context,
                           isScrollControlled: true,
                           backgroundColor: Colors.transparent,
                           builder: (_) => SuiteAdvanceFilterModal(
                             initialFilter: _filterState,
-                            concerns: _availableConcerns,
-                            segments: _availableSegments,
+                            concerns: concerns,
+                            ledgers: allLedgers,
+                            rawTransactions: rawList,
                             members: _availableMembers,
                             onApply: (newFilter) {
                               setState(() {
