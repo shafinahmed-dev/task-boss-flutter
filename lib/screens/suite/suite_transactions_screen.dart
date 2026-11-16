@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../services/app_state.dart';
+import '../../widgets/transaction_detail_sheet.dart';
 import 'suite_transaction_filter_modal.dart';
 
 String formatBdt(num value) {
@@ -816,7 +817,19 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                             final formattedDateTime =
                                 _formatDateTime(tx['createdAt']?.toString());
 
-                            return Container(
+                            final hasReceipt = (tx['receiptUrl'] ?? tx['photoUrl'] ?? tx['receiptNo'] ?? tx['digitalReceipt'] ?? '').toString().isNotEmpty;
+
+                            return InkWell(
+                              onTap: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (_) => TransactionDetailSheet(transaction: tx),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
                               margin: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 4),
                               padding: const EdgeInsets.symmetric(
@@ -846,15 +859,25 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                                           CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text(
-                                          "$ledgerName • $segmentName",
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                            color: Color(0xFF0F172A),
-                                          ),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                "$ledgerName • $segmentName",
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                  color: Color(0xFF0F172A),
+                                                ),
+                                              ),
+                                            ),
+                                            if (hasReceipt) ...[
+                                              const SizedBox(width: 6),
+                                              const Icon(Icons.receipt_long_rounded, size: 14, color: Color(0xFF64748B)),
+                                            ],
+                                          ],
                                         ),
                                         const SizedBox(height: 3),
                                         Text(

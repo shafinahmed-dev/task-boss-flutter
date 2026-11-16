@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -43,6 +46,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
   bool _saving = false;
   String? _error;
   String get _tab => _flowType == 'INFLOW' ? 'in' : 'out';
+
+  Uint8List? _selectedReceiptBytes;
+  String? _selectedReceiptName;
 
   Map<String, dynamic>? _lastSavedReceipt;
   List<dynamic> _eligibleUsers = [];
@@ -634,6 +640,11 @@ class _CaptureState extends State<CaptureMovementScreen> {
         effectiveLedgerId = genOps['id']?.toString();
       }
 
+      String? base64ReceiptUrl;
+      if (_selectedReceiptBytes != null) {
+        base64ReceiptUrl = 'data:image/png;base64,' + base64Encode(_selectedReceiptBytes!);
+      }
+
       final payload = {
         'idempotencyKey': const Uuid().v4(),
         'direction': _flowType == 'INFLOW' ? 'in' : 'out',
@@ -649,6 +660,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
         'categoryId': _selectedCategory?['id'],
         'ledgerId': effectiveLedgerId,
         'segmentId': _selectedCategory?['id'],
+        'photoUrl': base64ReceiptUrl,
         'occurredAt': DateTime.now().toIso8601String(),
         'notes': noteText.isNotEmpty ? noteText : null,
         'note': noteText.isNotEmpty ? noteText : null,
@@ -667,6 +679,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
           'walletName': selectedWallet.name,
           'directionTab': _flowType == 'INFLOW' ? 'in' : 'out',
           'voucherNumber': receiptNo,
+          'receiptUrl': base64ReceiptUrl,
         },
       };
 
@@ -702,7 +715,10 @@ class _CaptureState extends State<CaptureMovementScreen> {
           };
           _amtCtl.clear();
           _chgCtl.clear();
-          _noteCtl.clear(); _clearDraft();
+          _noteCtl.clear();
+          _selectedReceiptBytes = null;
+          _selectedReceiptName = null;
+          _clearDraft();
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1193,6 +1209,97 @@ class _CaptureState extends State<CaptureMovementScreen> {
               ),
               onChanged: (_) {
                 _saveDraft();
+            const SizedBox(height: 14),
+            const Text(
+              'Attach Receipt / Cash Memo',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 6),
+            _selectedReceiptBytes != null
+                ? Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            _selectedReceiptBytes!,
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _selectedReceiptName ?? 'receipt.png',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFFEF4444)),
+                          onPressed: () => setState(() {
+                            _selectedReceiptBytes = null;
+                            _selectedReceiptName = null;
+                          }),
+                        ),
+                      ],
+                    ),
+                  )
+                : InkWell(
+                    onTap: () async {
+                      if (kIsWeb) {
+                        final uploadInput = html.FileUploadInputElement();
+                        uploadInput.accept = 'image/*';
+                        uploadInput.click();
+                        uploadInput.onChange.listen((e) {
+                          final files = uploadInput.files;
+                          if (files != null && files.isNotEmpty) {
+                            final file = files[0];
+                            final reader = html.FileReader();
+                            reader.readAsArrayBuffer(file);
+                            reader.onLoadEnd.listen((e) {
+                              setState(() {
+                                _selectedReceiptBytes = reader.result as Uint8List?;
+                                _selectedReceiptName = file.name;
+                              });
+                            });
+                          }
+                        });
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.dashed),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_a_photo_outlined, size: 18, color: Color(0xFF64748B)),
+                          SizedBox(width: 8),
+                          Text(
+                            'Attach Receipt / Cash Memo',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF0F172A)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 setState(() {});
               },
             ),

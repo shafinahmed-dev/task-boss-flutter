@@ -245,10 +245,11 @@ export class ManagerService {
         category: { select: { id: true, name: true, type: true } },
         collector: { select: { id: true, name: true, role: true } },
         custodian: { select: { id: true, name: true, type: true } },
-        wallet: { select: { id: true, name: true } },
+        wallet: { select: { id: true, name: true, type: true } },
         segment: { select: { id: true, name: true } },
         ledger: { select: { id: true, name: true, code: true } },
         approver: { select: { id: true, name: true } },
+        digitalReceipt: { select: { id: true, receiptNumber: true } },
       },
     });
 
@@ -270,8 +271,10 @@ export class ManagerService {
         resolvedSegment = tx.category.name;
       }
       if (!resolvedSegment) {
-        resolvedSegment = tx.ledger?.name || 'General';
+        resolvedSegment = 'General';
       }
+
+      const resolvedLedger = tx.ledger?.name || meta.ledgerName || 'General Operations';
 
       // Resolve note / title
       const rawNote = (tx.notes || tx.note || meta.note || meta.notes || '').toString().trim();
@@ -290,12 +293,16 @@ export class ManagerService {
         title,
         note: rawNote.length > 0 ? rawNote : resolvedSegment,
         segmentName: resolvedSegment,
+        ledgerName: resolvedLedger,
         categoryId: tx.categoryId,
         actorName: actor,
         actorRole: role,
         userName: actor,
         userRole: role,
+        paymentMethod: tx.wallet?.type || meta.paymentMethod || meta.channel || 'CASH',
         walletName: tx.wallet?.name || meta.channel || 'Cash in Hand',
+        receiptUrl: tx.photoUrl || meta.receiptUrl || '',
+        receiptNo: tx.receiptNo || tx.digitalReceipt?.receiptNumber || meta.voucherNumber || '',
         createdAt: tx.createdAt.toISOString(),
       };
     });
