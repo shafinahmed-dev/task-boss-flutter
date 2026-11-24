@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'dart:html' as html;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:task_boss/theme.dart';
@@ -734,7 +736,11 @@ class _CaptureState extends State<CaptureMovementScreen> {
             ),
           );
         }
-        await app.refreshBalance();
+        await app.refreshUserData();
+        await app.fetchManagerTransactions();
+        if (app.userRole != 'EMPLOYEE') {
+          await app.fetchPendingMovements();
+        }
         await _loadWallets();
       } else {
         final err = jsonDecode(res.body)['message'];
@@ -1209,6 +1215,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
               ),
               onChanged: (_) {
                 _saveDraft();
+                setState(() {});
+              },
+            ),
             const SizedBox(height: 14),
             const Text(
               'Attach Receipt / Cash Memo',
@@ -1285,9 +1294,9 @@ class _CaptureState extends State<CaptureMovementScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.dashed),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.add_a_photo_outlined, size: 18, color: Color(0xFF64748B)),
@@ -1300,13 +1309,7 @@ class _CaptureState extends State<CaptureMovementScreen> {
                       ),
                     ),
                   ),
-                setState(() {});
-              },
-            ),
-          ],
-        ),
-      ),
-            const SizedBox(height: 14),
+
             if (amtVal > 0 || feeVal > 0) Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: AppTheme.cardBg, border: Border.all(color: AppTheme.cardBorder), borderRadius: BorderRadius.circular(10)),
@@ -1317,7 +1320,10 @@ class _CaptureState extends State<CaptureMovementScreen> {
                 _row(_tab == 'in' ? 'Total Inflow:' : 'Total Outflow:', _tab == 'in' ? '৳${amtVal.toStringAsFixed(2)}' : '৳${(amtVal + feeVal).toStringAsFixed(2)}', bold: true),
               ]),
             ),
-            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+      const SizedBox(height: 20),
             Center(
               child: SizedBox(
                 width: double.infinity,

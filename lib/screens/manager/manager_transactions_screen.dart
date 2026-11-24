@@ -3,6 +3,7 @@ import 'dart:convert';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -655,5 +656,182 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
       ),
     );
   }
+  Future<void> _exportPdf(List<dynamic> filtered, double inflow, double outflow) async {
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Company: ${widget.companyName ?? 'Manager Transactions'}', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+              pw.Text('Transactions Statement', style: pw.TextStyle(fontSize: 14)),
+              pw.SizedBox(height: 12),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total Inflow: ৳ ${inflow.toStringAsFixed(2)}', style: pw.TextStyle(color: PdfColors.green700, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('Total Outflow: ৳ ${outflow.toStringAsFixed(2)}', style: pw.TextStyle(color: PdfColors.red700, fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Table.fromTextArray(
+                headers: ['Date', 'Type', 'Ledger', 'Segment', 'Amount', 'Note'],
+                data: filtered.map((tx) {
+                  final dt = _formatDateTime(tx['createdAt']);
+                  final dir = (tx['direction'] ?? '').toString().toUpperCase();
+                  final ledger = (tx['ledgerName'] ?? tx['ledger']?['name'] ?? '').toString();
+                  final segmentName = (tx['segmentName'] ?? tx['segment']?['name'] ?? '').toString();
+                  final amt = _toDouble(tx['amount']).toStringAsFixed(2);
+                  final note = (tx['title'] ?? tx['note'] ?? tx['notes'] ?? '').toString();
+                  return [dt, dir, ledger, segmentName, amt, note];
+                }).toList(),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final bytes = await pdf.save();
+
+    if (kIsWeb) {
+      final blob = html.Blob([bytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', 'manager_transactions_statement.pdf')
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF Statement generated successfully')),
+        );
+      }
+    }
+  }
+
+  Widget _buildFloatingDock(List<dynamic> filtered) {
+    double inflow = 0.0;
+    double outflow = 0.0;
+    for (final tx in filtered) {
+      final amt = _toDouble(tx['amount']);
+      final isOut = tx['direction'] == 'out' ||
+          tx['type'] == 'Cash Out' ||
+          tx['movementType'] == 'Cash Out' ||
+          tx['type'] == 'EXPENSE';
+      if (isOut) {
+        outflow += amt;
+      } else {
+        inflow += amt;
+      }
+    }
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'INFLOW',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '+৳ ${_formatAmount(inflow)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF10B981),
+                      ),
+                    ),
+                  ],
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _exportPdf(filtered, inflow, outflow),
+                    borderRadius: BorderRadius.circular(22),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.download_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      'OUTFLOW',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '-৳ ${_formatAmount(outflow)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFEF4444),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 }
 

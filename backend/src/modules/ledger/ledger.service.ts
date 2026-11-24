@@ -445,7 +445,7 @@ export class LedgerService {
           amount: new Decimal(amountNum),
           currency: dto.currency ?? 'BDT',
           channel: channelVal,
-          photoUrl: dto.photoUrl ?? null,
+          photoUrl: dto.photoUrl ?? (dto as any).receiptUrl ?? metadata.receiptUrl ?? null,
           collectorId: dto.collectorId,
           custodianId: dto.custodianId,
           entryTag: dto.entryTag,
@@ -1589,6 +1589,7 @@ export class LedgerService {
         collector: { select: { id: true, name: true, handle: true } },
         category: { select: { id: true, name: true } },
         segment: { select: { id: true, name: true } },
+        ledger: { select: { id: true, name: true } },
         custodian: { select: { id: true, name: true } },
       },
     });
@@ -1601,7 +1602,8 @@ export class LedgerService {
         const cat = (m.category?.name || '').toLowerCase();
         const seg = (m.segment?.name || '').toLowerCase();
         const col = (m.collector?.name || '').toLowerCase();
-        return note.includes(q) || cat.includes(q) || seg.includes(q) || col.includes(q);
+        const led = (m.ledger?.name || '').toLowerCase();
+        return note.includes(q) || cat.includes(q) || seg.includes(q) || col.includes(q) || led.includes(q);
       })
       .map((m) => ({
         id: m.id,
@@ -1610,13 +1612,16 @@ export class LedgerService {
         entryTag: m.entryTag,
         notes: m.notes,
         receiptNo: m.receiptNo,
+        receiptUrl: m.photoUrl || (m.metadata as any)?.receiptUrl || '',
+        photoUrl: m.photoUrl || (m.metadata as any)?.receiptUrl || '',
         occurredAt: m.occurredAt?.toISOString(),
         createdAt: m.createdAt?.toISOString(),
         approvalStatus: m.approvalStatus,
         actorName: m.collector?.name || 'Staff',
         collectorHandle: m.collector?.handle || '',
         category: m.category,
-        segmentName: m.segment?.name || null,
+        segmentName: m.segment?.name || (m.category?.name) || 'General',
+        ledgerName: m.ledger?.name || (m.metadata as any)?.ledgerName || 'General Operations',
         custodianName: m.custodian?.name || '',
         channel: m.channel,
         paymentMethod: (m.metadata as any)?.paymentMethod || m.channel,

@@ -920,7 +920,8 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
                                   ),
                                 ],
                               ),
-                            );
+                            ),
+                          );
                           },
                         ),
                       ),

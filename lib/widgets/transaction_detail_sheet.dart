@@ -1,9 +1,24 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 class TransactionDetailSheet extends StatelessWidget {
   final Map<String, dynamic> transaction;
 
   const TransactionDetailSheet({super.key, required this.transaction});
+
+  Uint8List? _parseReceiptBytes(String url) {
+    if (url.startsWith('data:image')) {
+      try {
+        final commaIdx = url.indexOf(',');
+        if (commaIdx != -1) {
+          final base64Str = url.substring(commaIdx + 1);
+          return base64Decode(base64Str);
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +34,8 @@ class TransactionDetailSheet extends StatelessWidget {
     final dateTime = transaction['createdAt']?.toString() ?? transaction['date']?.toString() ?? '';
     final note = transaction['notes']?.toString() ?? transaction['note']?.toString() ?? transaction['description']?.toString() ?? '';
     final receiptUrl = transaction['receiptUrl']?.toString() ?? transaction['photoUrl']?.toString() ?? transaction['metadata']?['receiptUrl']?.toString() ?? '';
+
+    final receiptBytes = _parseReceiptBytes(receiptUrl);
 
     return Container(
       padding: EdgeInsets.only(
@@ -71,41 +88,60 @@ class TransactionDetailSheet extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isInflow ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    isInflow ? 'INFLOW' : 'OUTFLOW',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isInflow ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
-            const Divider(color: Color(0xFFE2E8F0)),
-            const SizedBox(height: 12),
-            _buildDetailRow(Icons.business_rounded, 'Concern', concern.isNotEmpty ? concern : 'Workspace Concern'),
-            _buildDetailRow(Icons.account_balance_rounded, 'Ledger', ledger),
-            _buildDetailRow(Icons.category_rounded, 'Segment', segment),
-            _buildDetailRow(Icons.person_rounded, 'Member / Actor', member),
+            const Divider(color: Color(0xFFE2E8F0), height: 1),
+            const SizedBox(height: 16),
+            _buildDetailRow(Icons.business_rounded, 'Concern', concern),
+            _buildDetailRow(Icons.account_balance_wallet_rounded, 'Ledger', ledger),
+            _buildDetailRow(Icons.folder_open_rounded, 'Segment', segment),
+            _buildDetailRow(Icons.person_rounded, 'Recorded By', member),
             _buildDetailRow(Icons.payment_rounded, 'Payment Method', paymentMethod),
             _buildDetailRow(Icons.calendar_today_rounded, 'Date & Time', dateTime),
             if (note.isNotEmpty) _buildDetailRow(Icons.note_rounded, 'Note', note),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             const Text(
               'Receipt / Cash Memo',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
+                color: Color(0xFF64748B),
               ),
             ),
             const SizedBox(height: 8),
             receiptUrl.isNotEmpty
-                ? GestureDetector(
+                ? InkWell(
                     onTap: () {
                       showDialog(
                         context: context,
-                        builder: (_) => Dialog(
-                          backgroundColor: Colors.black.withValues(alpha: 0.9),
+                        builder: (ctx) => Dialog(
+                          backgroundColor: Colors.black,
                           insetPadding: EdgeInsets.zero,
                           child: Stack(
                             children: [
                               Center(
                                 child: InteractiveViewer(
-                                  maxScale: 5.0,
-                                  child: receiptUrl.startsWith('data:')
-                                      ? Image.memory(Uri.parse(receiptUrl).data!.contentBytes)
+                                  minScale: 0.5,
+                                  maxScale: 4.0,
+                                  child: receiptBytes != null
+                                      ? Image.memory(receiptBytes)
                                       : Image.network(receiptUrl),
                                 ),
                               ),
@@ -113,8 +149,8 @@ class TransactionDetailSheet extends StatelessWidget {
                                 top: 40,
                                 right: 20,
                                 child: IconButton(
-                                  icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
-                                  onPressed: () => Navigator.pop(context),
+                                  icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                                  onPressed: () => Navigator.pop(ctx),
                                 ),
                               ),
                             ],
@@ -122,17 +158,17 @@ class TransactionDetailSheet extends StatelessWidget {
                         ),
                       );
                     },
+                    borderRadius: BorderRadius.circular(12),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         height: 160,
                         width: double.infinity,
-                        color: const Color(0xFFF1F5F9),
-                        child: receiptUrl.startsWith('data:')
-                            ? Image.memory(
-                                Uri.parse(receiptUrl).data!.contentBytes,
-                                fit: BoxFit.cover,
-                              )
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF1F5F9),
+                        ),
+                        child: receiptBytes != null
+                            ? Image.memory(receiptBytes, fit: BoxFit.cover)
                             : Image.network(
                                 receiptUrl,
                                 fit: BoxFit.cover,
@@ -191,22 +227,3 @@ class TransactionDetailSheet extends StatelessWidget {
     );
   }
 }
-
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isInflow ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    isInflow ? 'INFLOW' : 'OUTFLOW',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: isInflow ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                    ),
-                  ),
-                ),
-              ],
-            ),
