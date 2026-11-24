@@ -5,6 +5,7 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../services/app_state.dart';
@@ -116,9 +117,20 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
           } else if (_filter.datePreset == 'this_month') {
             if (txDate.year != now.year || txDate.month != now.month) return false;
           } else if (_filter.datePreset == 'custom' && _filter.customRange != null) {
-            final start = DateTime(_filter.customRange!.start.year, _filter.customRange!.start.month, _filter.customRange!.start.day);
-            final end = DateTime(_filter.customRange!.end.year, _filter.customRange!.end.month, _filter.customRange!.end.day, 23, 59, 59);
-            if (txDate.isBefore(start) || txDate.isAfter(end)) return false;
+            final localTx = txDate.toLocal();
+            final start = DateTime(
+              _filter.customRange!.start.year,
+              _filter.customRange!.start.month,
+              _filter.customRange!.start.day,
+              0, 0, 0,
+            );
+            final end = DateTime(
+              _filter.customRange!.end.year,
+              _filter.customRange!.end.month,
+              _filter.customRange!.end.day,
+              23, 59, 59, 999,
+            );
+            if (localTx.isBefore(start) || localTx.isAfter(end)) return false;
           }
         }
       }
@@ -390,9 +402,12 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
     if (_filter.paymentMethod != null && _filter.paymentMethod != 'all') {
       chips.add(_buildChipTag('Method: ${_filter.paymentMethod}', () => setState(() => _filter.paymentMethod = 'all')));
     }
-    if (_filter.datePreset != 'all') {
-      chips.add(_buildChipTag('Date: ${_filter.datePreset}', () => setState(() {
-        _filter.datePreset = 'all';
+    if (_filter.datePreset != 'all_time' && _filter.datePreset != 'all') {
+      final dateLabel = (_filter.datePreset == 'custom' && _filter.customRange != null)
+          ? '${DateFormat('dd MMM').format(_filter.customRange!.start)} - ${DateFormat('dd MMM yyyy').format(_filter.customRange!.end)}'
+          : _filter.datePreset.toUpperCase().replaceAll('_', ' ');
+      chips.add(_buildChipTag(dateLabel, () => setState(() {
+        _filter.datePreset = 'all_time';
         _filter.customRange = null;
       })));
     }
@@ -658,6 +673,17 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
   }
   Future<void> _exportPdf(List<dynamic> filtered, double inflow, double outflow) async {
     final pdf = pw.Document();
+    String periodStr = 'All Time';
+    if (_filter.datePreset == 'today') periodStr = 'Today';
+    else if (_filter.datePreset == 'yesterday') periodStr = 'Yesterday';
+    else if (_filter.datePreset == 'this_week') periodStr = 'This Week';
+    else if (_filter.datePreset == 'this_month') periodStr = 'This Month';
+    else if (_filter.datePreset == 'custom' && _filter.customRange != null) {
+      periodStr = '${DateFormat('dd MMM yyyy').format(_filter.customRange!.start)} - ${DateFormat('dd MMM yyyy').format(_filter.customRange!.end)}';
+    }
+    if (_filter.direction != null && _filter.direction != 'all') {
+      periodStr += ' (${_filter.direction == 'in' ? 'Inflow' : 'Outflow'})';
+    }
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -668,7 +694,9 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
               pw.Text('Company: ${widget.companyName ?? 'Manager Transactions'}', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 8),
               pw.Text('Transactions Statement', style: pw.TextStyle(fontSize: 14)),
-              pw.SizedBox(height: 12),
+              pw.SizedBox(height: 4),
+              pw.Text('Filter: $periodStr', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+              pw.SizedBox(height: 8),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [

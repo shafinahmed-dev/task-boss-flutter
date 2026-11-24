@@ -194,6 +194,49 @@ class _SuiteAdvanceFilterModalState extends State<SuiteAdvanceFilterModal> {
                     _buildChip('Yesterday', _current.datePreset == 'yesterday', () => setState(() => _current.datePreset = 'yesterday')),
                     _buildChip('This Week', _current.datePreset == 'this_week', () => setState(() => _current.datePreset = 'this_week')),
                     _buildChip('This Month', _current.datePreset == 'this_month', () => setState(() => _current.datePreset = 'this_month')),
+                    Builder(
+                      builder: (ctx) {
+                        final isCustom = _current.datePreset == 'custom' && _current.customRange != null;
+                        final label = isCustom
+                            ? '📅 ${DateFormat('dd MMM yyyy').format(_current.customRange!.start)} - ${DateFormat('dd MMM yyyy').format(_current.customRange!.end)}'
+                            : '📅 Custom Date Range...';
+                        return _buildChip(
+                          label,
+                          isCustom,
+                          () async {
+                            final picked = await showDateRangePicker(
+                              context: ctx,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2035),
+                              initialDateRange: _current.customRange ??
+                                  DateTimeRange(
+                                    start: DateTime.now().subtract(const Duration(days: 7)),
+                                    end: DateTime.now(),
+                                  ),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: const ColorScheme.light(
+                                      primary: Color(0xFF0F172A),
+                                      onPrimary: Colors.white,
+                                      surface: Colors.white,
+                                      onSurface: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                _current.datePreset = 'custom';
+                                _current.customRange = picked;
+                              });
+                            }
+                          },
+                        );
+                      },
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),

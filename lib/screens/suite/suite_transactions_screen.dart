@@ -434,9 +434,7 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
       else if (_filterState.datePreset == 'this_week') dateLabel = 'This Week';
       else if (_filterState.datePreset == 'this_month') dateLabel = 'This Month';
       else if (_filterState.datePreset == 'custom' && _filterState.customRange != null) {
-        final start = '${_filterState.customRange!.start.day}/${_filterState.customRange!.start.month}/${_filterState.customRange!.start.year}';
-        final end = '${_filterState.customRange!.end.day}/${_filterState.customRange!.end.month}/${_filterState.customRange!.end.year}';
-        dateLabel = '$start - $end';
+        dateLabel = '${DateFormat('dd MMM').format(_filterState.customRange!.start)} - ${DateFormat('dd MMM yyyy').format(_filterState.customRange!.end)}';
       }
       chips.add(_buildFilterChip(dateLabel, () {
         setState(() {
@@ -586,9 +584,20 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
           } else if (_filterState.datePreset == 'this_month') {
             if (dt.year != now.year || dt.month != now.month) return false;
           } else if (_filterState.datePreset == 'custom' && _filterState.customRange != null) {
-            final start = _filterState.customRange!.start;
-            final end = _filterState.customRange!.end.add(const Duration(days: 1));
-            if (dt.isBefore(start) || dt.isAfter(end)) return false;
+            final localTx = dt.toLocal();
+            final start = DateTime(
+              _filterState.customRange!.start.year,
+              _filterState.customRange!.start.month,
+              _filterState.customRange!.start.day,
+              0, 0, 0,
+            );
+            final end = DateTime(
+              _filterState.customRange!.end.year,
+              _filterState.customRange!.end.month,
+              _filterState.customRange!.end.day,
+              23, 59, 59, 999,
+            );
+            if (localTx.isBefore(start) || localTx.isAfter(end)) return false;
           }
         } catch (_) {}
       }
