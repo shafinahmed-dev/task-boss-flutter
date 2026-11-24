@@ -605,27 +605,93 @@ export class ManagerService {
       where,
       include: {
         category: { select: { id: true, name: true, type: true } },
-        segment: { select: { id: true, name: true } },
+        segment: {
+          select: {
+            id: true,
+            name: true,
+            ledger: { select: { id: true, name: true, code: true } },
+          },
+        },
+        ledger: { select: { id: true, name: true, code: true } },
         collector: { select: { id: true, name: true, handle: true, role: true } },
         custodian: { select: { id: true, name: true, type: true } },
         wallet: { select: { id: true, name: true, type: true } },
+        digitalReceipt: { select: { id: true, receiptNumber: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     const serialized = movements.map((m: any) => {
       const meta = (m.metadata as any) || {};
       const isOut = (m.direction || '').toString().toLowerCase().includes('out');
+
+      let resolvedLedger =
+        m.ledger?.name ||
+        m.segment?.ledger?.name ||
+        meta.ledgerName ||
+        '';
+      if (!resolvedLedger || resolvedLedger === 'General') {
+        resolvedLedger = m.ledger?.name || meta.ledgerName || 'General Operations';
+      }
+
+      let resolvedSegment = '';
+      if (meta.isHandover || m.entryTag === 'HANDOVER' || !!meta.recipientName) {
+        resolvedSegment = 'Cash Handover';
+      } else if (
+        m.segment?.name &&
+        m.segment.name !== 'General' &&
+        m.segment.name !== 'Operational Expense'
+      ) {
+        resolvedSegment = m.segment.name;
+      } else if (meta.segmentName && !uuidRegex.test(meta.segmentName)) {
+        resolvedSegment = meta.segmentName;
+      } else if (m.category?.name && !uuidRegex.test(m.category.name)) {
+        resolvedSegment = m.category.name;
+      } else if (meta.category && !uuidRegex.test(meta.category)) {
+        resolvedSegment = meta.category;
+      } else {
+        resolvedSegment =
+          m.segment?.name ||
+          (m.category?.name && !uuidRegex.test(m.category.name)
+            ? m.category.name
+            : 'General');
+      }
+
+      const rawNote = (m.notes || meta.note || meta.notes || '').toString().trim();
+      const title =
+        rawNote.length > 0 && !uuidRegex.test(rawNote)
+          ? rawNote
+          : resolvedSegment !== 'General'
+            ? resolvedSegment
+            : resolvedLedger;
+
+      const actor = m.collector?.name || m.custodian?.name || meta.actorName || 'Staff';
+      const role = m.collector?.role || 'EMPLOYEE';
+
+      const receiptUrl = m.photoUrl || meta.receiptUrl || meta.photoUrl || '';
+      const paymentMethod = meta.paymentMethod || m.wallet?.type || meta.channel || m.channel || 'CASH';
+
       return {
         id: m.id,
         amount: Number(m.amount || 0),
         direction: m.direction,
-        movementType: m.segment?.name || m.category?.name || m.movementType || meta.movementType || (isOut ? 'Outflow' : 'Inflow'),
-        note: m.notes || meta.note || '',
-        voucherNumber: m.receiptNo || m.voucherNumber || meta.voucherNumber || '',
-        userName: m.collector?.name || meta.actorName || 'Staff',
-        userRole: m.collector?.role || 'EMPLOYEE',
+        movementType: m.movementType || meta.movementType || (isOut ? 'Outflow' : 'Inflow'),
+        title,
+        note: rawNote.length > 0 ? rawNote : resolvedSegment,
+        segmentName: resolvedSegment,
+        ledgerName: resolvedLedger,
+        voucherNumber: m.receiptNo || m.digitalReceipt?.receiptNumber || meta.voucherNumber || '',
+        receiptNo: m.receiptNo || m.digitalReceipt?.receiptNumber || meta.voucherNumber || '',
+        receiptUrl,
+        photoUrl: receiptUrl,
+        paymentMethod,
+        userName: actor,
+        actorName: actor,
+        userRole: role,
+        actorRole: role,
         walletName: m.wallet?.name || meta.channel || '',
         createdAt: m.createdAt.toISOString(),
       };
@@ -679,8 +745,10 @@ export class ManagerService {
     // 2. Build where clause matching getConcernTransactions
     const where: any = {
       OR: [
+        { custodian: { companyId: targetCompanyId } },
         { wallet: { companyId: targetCompanyId } },
         { category: { companyId: targetCompanyId } },
+        { ledger: { companyId: targetCompanyId } },
       ],
     };
 
@@ -702,10 +770,18 @@ export class ManagerService {
       where,
       include: {
         category: { select: { id: true, name: true, type: true } },
-        segment: { select: { id: true, name: true } },
+        segment: {
+          select: {
+            id: true,
+            name: true,
+            ledger: { select: { id: true, name: true, code: true } },
+          },
+        },
+        ledger: { select: { id: true, name: true, code: true } },
         collector: { select: { id: true, name: true, handle: true, role: true } },
         custodian: { select: { id: true, name: true, type: true } },
         wallet: { select: { id: true, name: true, type: true } },
+        digitalReceipt: { select: { id: true, receiptNumber: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -741,7 +817,12 @@ export class ManagerService {
         title,
         note: rawNote.length > 0 ? rawNote : resolvedSegment,
         segmentName: resolvedSegment,
-        voucherNumber: m.receiptNo || m.voucherNumber || meta.voucherNumber || '',
+        ledgerName: m.ledger?.name || m.segment?.ledger?.name || meta.ledgerName || 'General Operations',
+        voucherNumber: m.receiptNo || m.digitalReceipt?.receiptNumber || meta.voucherNumber || '',
+        receiptNo: m.receiptNo || m.digitalReceipt?.receiptNumber || meta.voucherNumber || '',
+        receiptUrl: m.photoUrl || meta.receiptUrl || meta.photoUrl || '',
+        photoUrl: m.photoUrl || meta.receiptUrl || meta.photoUrl || '',
+        paymentMethod: meta.paymentMethod || m.wallet?.type || meta.channel || m.channel || 'CASH',
         actorName: actor,
         actorRole: role,
         userName: actor,

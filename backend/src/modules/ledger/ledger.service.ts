@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   Injectable,
   ConflictException,
@@ -27,6 +29,10 @@ export interface RecordMovementDto {
   walletId?: string;
   paymentMethod?: string;
   photoUrl?: string;
+  receiptUrl?: string;
+  ledgerName?: string;
+  segmentName?: string;
+  categoryName?: string;
   collectorId: string;
   custodianId: string;
   entryTag:
@@ -322,6 +328,13 @@ export class LedgerService {
         }
       }
 
+      let effectiveLedger: any = null;
+      if (effectiveLedgerId) {
+        effectiveLedger = await this.prisma.ledger.findUnique({
+          where: { id: effectiveLedgerId },
+        }).catch(() => null);
+      }
+
       // 2. Safely Resolve Segment ID
       let effectiveSegmentId: string | null = null;
       const rawSegment =
@@ -434,6 +447,31 @@ export class LedgerService {
         approvalStatus = 'pending';
       }
 
+            // Persist base64 receipt to disk if provided
+      let resolvedPhotoUrl = dto.photoUrl ?? (dto as any).receiptUrl ?? metadata.receiptUrl ?? null;
+      if (resolvedPhotoUrl && typeof resolvedPhotoUrl === "string" && resolvedPhotoUrl.startsWith("data:image")) {
+        try {
+          const uploadsDir = path.join(process.cwd(), "uploads", "receipts");
+          if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+          }
+          const commaIdx = resolvedPhotoUrl.indexOf(",");
+          if (commaIdx !== -1) {
+            const mimePart = resolvedPhotoUrl.substring(0, commaIdx);
+            const base64Data = resolvedPhotoUrl.substring(commaIdx + 1);
+            const ext = mimePart.includes("png") ? "png" : mimePart.includes("webp") ? "webp" : "jpg";
+            const filename = "receipt_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8) + "." + ext;
+            const filepath = path.join(uploadsDir, filename);
+            fs.writeFileSync(filepath, Buffer.from(base64Data, "base64"));
+            resolvedPhotoUrl = "/uploads/receipts/" + filename;
+            metadata.receiptUrl = resolvedPhotoUrl;
+            metadata.photoUrl = resolvedPhotoUrl;
+          }
+        } catch (e) {
+          // If write fails, keep the original url
+        }
+      }
+
       const movement = await this.prisma.moneyMovement.create({
         data: {
           fee: feeVal > 0 ? new Decimal(feeVal) : null,
@@ -445,7 +483,7 @@ export class LedgerService {
           amount: new Decimal(amountNum),
           currency: dto.currency ?? 'BDT',
           channel: channelVal,
-          photoUrl: dto.photoUrl ?? (dto as any).receiptUrl ?? metadata.receiptUrl ?? null,
+          photoUrl: resolvedPhotoUrl,
           collectorId: dto.collectorId,
           custodianId: dto.custodianId,
           entryTag: dto.entryTag,
