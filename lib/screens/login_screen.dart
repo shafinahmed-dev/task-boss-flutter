@@ -18,6 +18,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _handleCtl = TextEditingController();
   final _passCtl = TextEditingController();
+  final _serverUrlCtl = TextEditingController();
+  bool _showServerConfig = false;
   bool _loading = false;
   String? _error;
   bool _obscurePass = true;
@@ -26,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _handleCtl.dispose();
     _passCtl.dispose();
+    _serverUrlCtl.dispose();
     super.dispose();
   }
 
@@ -245,6 +248,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                _buildServerConfig(context),
+
                 if (_error != null && _error!.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   Container(
@@ -285,6 +291,138 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+  Widget _buildServerConfig(BuildContext context) {
+    return Consumer<AppState>(
+      builder: (context, appState, _) {
+        final currentBaseUrl = appState.apiBaseUrl;
+        final displayHost = currentBaseUrl.replaceFirst(RegExp(r'^https?://'), '');
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () {
+                setState(() {
+                  _showServerConfig = !_showServerConfig;
+                  if (_showServerConfig && _serverUrlCtl.text.isEmpty) {
+                    _serverUrlCtl.text = currentBaseUrl;
+                  }
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.dns_outlined,
+                      size: 15,
+                      color: AppTheme.mutedText.withValues(alpha: 0.8),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Server: $displayHost',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.mutedText.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _showServerConfig ? Icons.keyboard_arrow_up : Icons.edit_outlined,
+                      size: 14,
+                      color: AppTheme.mutedText.withValues(alpha: 0.8),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_showServerConfig) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.inputBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.inputBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Backend Server URL',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.mutedText,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _serverUrlCtl,
+                            style: const TextStyle(fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: 'e.g. http://192.168.1.33:3000',
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppTheme.inputBorder),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppTheme.inputBorder),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryGradientFallback,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () async {
+                            final newUrl = _serverUrlCtl.text.trim();
+                            if (newUrl.isNotEmpty) {
+                              final formatted = (!newUrl.startsWith('http://') && !newUrl.startsWith('https://'))
+                                  ? 'http://$newUrl'
+                                  : newUrl;
+                              final scaffoldMessenger = ScaffoldMessenger.of(context);
+                              await appState.setCustomBaseUrl(formatted);
+                              _serverUrlCtl.text = formatted;
+                              if (mounted) {
+                                scaffoldMessenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text('Server URL set to: $formatted'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                                setState(() => _showServerConfig = false);
+                              }
+                            }
+                          },
+                          child: const Text('Save', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
 }
 
 class _RegisterCompanyForm extends StatefulWidget {

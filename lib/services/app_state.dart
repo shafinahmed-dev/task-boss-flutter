@@ -734,14 +734,34 @@ class AppState extends ChangeNotifier {
 
   static const String _defaultApiUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: kIsWeb ? 'http://localhost:3000' : 'http://192.168.1.45:3000',
+    defaultValue: kIsWeb ? 'http://localhost:3000' : 'http://192.168.1.33:3000',
   );
 
-  static const String defaultApiUrl = _defaultApiUrl;
-  final String apiBaseUrl = _defaultApiUrl;
+  static String defaultApiUrl = _defaultApiUrl;
+  String _apiBaseUrl = _defaultApiUrl;
+  String get apiBaseUrl => _apiBaseUrl;
+
+  Future<void> setCustomBaseUrl(String url) async {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return;
+    _apiBaseUrl = trimmed;
+    defaultApiUrl = trimmed;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('@custom_api_url', trimmed);
+    } catch (e) {
+      debugPrint('Failed to save custom api url: $e');
+    }
+    notifyListeners();
+  }
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
+    final savedApiUrl = prefs.getString('@custom_api_url');
+    if (savedApiUrl != null && savedApiUrl.trim().isNotEmpty) {
+      _apiBaseUrl = savedApiUrl.trim();
+      defaultApiUrl = savedApiUrl.trim();
+    }
     final storedToken = prefs.getString('@auth_token');
     final storedUserStr = prefs.getString('@auth_user');
 
