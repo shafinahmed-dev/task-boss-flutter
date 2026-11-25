@@ -1,7 +1,5 @@
 import 'dart:convert';
 import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -1366,28 +1364,8 @@ class _CaptureState extends State<CaptureMovementScreen> {
                     ),
                   )
                 : InkWell(
-                    onTap: () async {
-                      if (kIsWeb) {
-                        final uploadInput = html.FileUploadInputElement();
-                        uploadInput.accept = 'image/*';
-                        uploadInput.click();
-                        uploadInput.onChange.listen((e) {
-                          final files = uploadInput.files;
-                          if (files != null && files.isNotEmpty) {
-                            final file = files[0];
-                            final reader = html.FileReader();
-                            reader.readAsArrayBuffer(file);
-                            reader.onLoadEnd.listen((e) {
-                              setState(() {
-                                _selectedReceiptBytes = reader.result as Uint8List?;
-                                _selectedReceiptName = file.name;
-                              });
-                            });
-                          }
-                        });
-                      } else {
-                        _showImageSourceSheet();
-                      }
+                    onTap: () {
+                      _showImageSourceSheet();
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(

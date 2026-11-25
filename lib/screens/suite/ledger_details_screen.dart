@@ -1,7 +1,5 @@
 import 'dart:ui';
 import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:task_boss/services/app_state.dart';
+import 'package:task_boss/utils/platform_file_helper.dart';
 
 String formatBdt(num value) {
   final formatter = NumberFormat.currency(
@@ -52,24 +51,6 @@ String _formatPdfCurrency(num? amount, {bool showSign = false, bool isInflow = t
 
   final prefix = showSign ? (isInflow ? '+ ' : '- ') : '';
   return '${prefix}BDT $integer.$decimal';
-}
-
-void downloadPdfWeb(Uint8List bytes, String fileName) {
-  if (kIsWeb) {
-    final blob = html.Blob([bytes], 'application/pdf');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', fileName)
-      ..style.display = 'none';
-    
-    html.document.body?.children.add(anchor);
-    anchor.click();
-    
-    html.document.body?.children.remove(anchor);
-    html.Url.revokeObjectUrl(url);
-  } else {
-    debugPrint('PDF download saved: $fileName');
-  }
 }
 
 class LedgerDetailsScreen extends StatefulWidget {
@@ -891,13 +872,13 @@ class _LedgerDetailsScreenState extends State<LedgerDetailsScreen> {
       );
 
       final Uint8List pdfBytes = await pdf.save();
-      downloadPdfWeb(pdfBytes, '${ledgerName.replaceAll(RegExp(r'\s+'), '_')}_Statement_${DateTime.now().millisecondsSinceEpoch}.pdf');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Statement PDF downloaded successfully')),
-        );
-      }
+      final fileName = '${ledgerName.replaceAll(RegExp(r'\s+'), '_')}_Statement_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      await deliverFile(
+        bytes: pdfBytes,
+        fileName: fileName,
+        mimeType: 'application/pdf',
+        context: mounted ? context : null,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

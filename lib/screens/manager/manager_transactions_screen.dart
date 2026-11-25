@@ -1,7 +1,5 @@
 import 'dart:typed_data';
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +8,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../services/app_state.dart';
 import '../../services/transaction_export_service.dart';
+import '../../utils/platform_file_helper.dart';
 import '../suite/suite_transaction_filter_modal.dart';
 import '../../widgets/transaction_detail_sheet.dart';
 
@@ -726,20 +725,12 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
 
     final bytes = await pdf.save();
 
-    if (kIsWeb) {
-      final blob = html.Blob([bytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      html.AnchorElement(href: url)
-        ..setAttribute('download', 'manager_transactions_statement.pdf')
-        ..click();
-      html.Url.revokeObjectUrl(url);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF Statement generated successfully')),
-        );
-      }
-    }
+    await deliverFile(
+      bytes: bytes,
+      fileName: 'manager_transactions_statement.pdf',
+      mimeType: 'application/pdf',
+      context: mounted ? context : null,
+    );
   }
 
   Widget _buildFloatingDock(List<dynamic> filtered) {

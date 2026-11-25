@@ -1,13 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xls;
-import 'file_download_helper.dart'
-    if (dart.library.html) 'file_download_helper_web.dart';
+import '../utils/platform_file_helper.dart';
 
 class TransactionExportService {
   static double _toDouble(dynamic val) {
@@ -283,31 +279,12 @@ class TransactionExportService {
     required String mimeType,
     required BuildContext context,
   }) async {
-    if (kIsWeb) {
-      triggerWebDownload(bytes, fileName, mimeType);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$fileName downloaded successfully')),
-        );
-      }
-    } else {
-      final tempDir = await getTemporaryDirectory();
-      final filePath = '${tempDir.path}/$fileName';
-      final file = XFile.fromData(bytes, name: fileName, mimeType: mimeType);
-      await file.saveTo(filePath);
-
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(filePath, mimeType: mimeType, name: fileName)],
-          subject: 'Exported transactions statement: $fileName',
-        ),
-      );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$fileName ready for share/save')),
-        );
-      }
-    }
+    await deliverFile(
+      bytes: bytes,
+      fileName: fileName,
+      mimeType: mimeType,
+      context: context,
+    );
   }
 
   /// Sleek modal bottom sheet offering PDF, Excel (.xlsx), and CSV (.csv) exports.
