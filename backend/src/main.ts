@@ -2,13 +2,28 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import express, { json, urlencoded } from 'express';
 import { join } from 'path';
+import { existsSync } from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.use(json({ limit: '15mb' }));
   app.use(urlencoded({ extended: true, limit: '15mb' }));
-  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+
+  const uploadsCandidateDirs = [
+    join(process.cwd(), 'uploads'),
+    join(process.cwd(), 'backend', 'uploads'),
+  ];
+  for (const dir of uploadsCandidateDirs) {
+    if (existsSync(dir)) {
+      app.use('/uploads', express.static(dir, {
+        setHeaders: (res) => {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        },
+      }));
+    }
+  }
 
   app.enableCors({
     origin: true,

@@ -463,18 +463,6 @@ class _CaptureState extends State<CaptureMovementScreen> {
               onChanged: (val) => name = val,
               decoration: InputDecoration(labelText: 'Segment Name', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
             ),
-            const SizedBox(height: 16),
-            const Text('Applies To', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                ChoiceChip(label: const Text('Both'), selected: type == 'BOTH', onSelected: (s) => setModalState(() => type = 'BOTH')),
-                const SizedBox(width: 8),
-                ChoiceChip(label: const Text('Inflow Only'), selected: type == 'INFLOW', onSelected: (s) => setModalState(() => type = 'INFLOW')),
-                const SizedBox(width: 8),
-                ChoiceChip(label: const Text('Outflow Only'), selected: type == 'OUTFLOW', onSelected: (s) => setModalState(() => type = 'OUTFLOW')),
-              ],
-            ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity, height: 48,

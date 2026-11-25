@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../services/app_state.dart';
 
 
@@ -10,7 +11,7 @@ class TransactionDetailSheet extends StatelessWidget {
 
   const TransactionDetailSheet({super.key, required this.transaction});
 
-  String _resolveReceiptUrl(String rawUrl) {
+  String _resolveReceiptUrl(String rawUrl, {String? runtimeBaseUrl}) {
     final trimmed = rawUrl.trim();
     if (trimmed.isEmpty) return '';
     if (trimmed.startsWith('data:image') ||
@@ -18,8 +19,11 @@ class TransactionDetailSheet extends StatelessWidget {
         trimmed.startsWith('https://')) {
       return trimmed;
     }
-    // Extract scheme + host + port (e.g., http://localhost:3000) without '/api'
-    final apiUri = Uri.parse(AppState.defaultApiUrl);
+    // Extract scheme + host + port (e.g., http://localhost:3000)
+    final base = (runtimeBaseUrl != null && runtimeBaseUrl.trim().isNotEmpty)
+        ? runtimeBaseUrl.trim()
+        : AppState.defaultApiUrl;
+    final apiUri = Uri.parse(base);
     final origin =
         '${apiUri.scheme}://${apiUri.host}${apiUri.hasPort ? ':${apiUri.port}' : ''}';
     final normalizedPath = trimmed.startsWith('/') ? trimmed : '/$trimmed';
@@ -31,8 +35,9 @@ class TransactionDetailSheet extends StatelessWidget {
       try {
         final commaIdx = url.indexOf(',');
         if (commaIdx != -1) {
-          final base64Str = url.substring(commaIdx + 1);
-          return base64Decode(base64Str);
+          final rawBase64 = url.substring(commaIdx + 1);
+          final sanitized = rawBase64.replaceAll(RegExp(r's+'), '');
+          return base64Decode(sanitized);
         }
       } catch (_) {}
     }
@@ -56,12 +61,19 @@ class TransactionDetailSheet extends StatelessWidget {
         ? DateFormat('MMM d, yyyy • h:mm a').format(parsedDate.toLocal())
         : rawDate;
     final note = transaction['notes']?.toString() ?? transaction['note']?.toString() ?? transaction['description']?.toString() ?? '';
+    String? activeBaseUrl;
+    try {
+      activeBaseUrl = context.read<AppState>().apiBaseUrl;
+    } catch (_) {
+      activeBaseUrl = AppState.activeInstance?.apiBaseUrl;
+    }
+
     final rawReceiptUrl = transaction['receiptUrl']?.toString() ??
         transaction['photoUrl']?.toString() ??
         transaction['metadata']?['receiptUrl']?.toString() ??
         transaction['metadata']?['photoUrl']?.toString() ??
         '';
-    final receiptUrl = _resolveReceiptUrl(rawReceiptUrl);
+    final receiptUrl = _resolveReceiptUrl(rawReceiptUrl, runtimeBaseUrl: activeBaseUrl);
 
     final receiptBytes = _parseReceiptBytes(receiptUrl);
 
@@ -169,12 +181,16 @@ class TransactionDetailSheet extends StatelessWidget {
                                   minScale: 0.5,
                                   maxScale: 4.0,
                                   child: receiptBytes != null
-                                      ? Image.memory(receiptBytes)
+                                      ? Image.memory(receiptBytes, fit: BoxFit.contain)
                                       : Image.network(
                                           receiptUrl,
-                                          errorBuilder: (context, error, stackTrace) => const Center(
-                                            child: Text('Failed to load receipt image', style: TextStyle(color: Colors.white, fontSize: 13)),
-                                          ),
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            debugPrint('Receipt load failed for $receiptUrl: $error');
+                                            return const Center(
+                                              child: Text('Failed to load receipt image', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                            );
+                                          },
                                         ),
                                 ),
                               ),
@@ -205,9 +221,12 @@ class TransactionDetailSheet extends StatelessWidget {
                             : Image.network(
                                 receiptUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => const Center(
-                                  child: Text('Failed to load receipt image', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                                ),
+                                errorBuilder: (context, error, stackTrace) {
+                                  debugPrint('Receipt load failed for $receiptUrl: $error');
+                                  return const Center(
+                                    child: Text('Failed to load receipt image', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                                  );
+                                },
                               ),
                       ),
                     ),

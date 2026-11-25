@@ -12,6 +12,11 @@ double _toDouble(dynamic val) {
 }
 
 class AppState extends ChangeNotifier {
+  static AppState? activeInstance;
+
+  AppState() {
+    activeInstance = this;
+  }
   String? token;
   AuthUser? user;
   AuthUser? get currentUser => user;

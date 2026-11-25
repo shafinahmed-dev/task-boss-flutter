@@ -447,12 +447,19 @@ export class LedgerService {
         approvalStatus = 'pending';
       }
 
-            // Persist base64 receipt to disk if provided
+      // Persist base64 receipt to disk if provided
       let resolvedPhotoUrl = dto.photoUrl ?? (dto as any).receiptUrl ?? metadata.receiptUrl ?? null;
       if (resolvedPhotoUrl && typeof resolvedPhotoUrl === "string" && resolvedPhotoUrl.startsWith("data:image")) {
         try {
-          const uploadsDir = path.join(process.cwd(), "uploads", "receipts");
-          if (!fs.existsSync(uploadsDir)) {
+          const uploadsCandidateDirs = [
+            path.join(process.cwd(), "uploads", "receipts"),
+            path.join(process.cwd(), "backend", "uploads", "receipts"),
+          ];
+          let uploadsDir = uploadsCandidateDirs.find((d) => fs.existsSync(d));
+          if (!uploadsDir) {
+            uploadsDir = fs.existsSync(path.join(process.cwd(), "backend"))
+              ? path.join(process.cwd(), "backend", "uploads", "receipts")
+              : path.join(process.cwd(), "uploads", "receipts");
             fs.mkdirSync(uploadsDir, { recursive: true });
           }
           const commaIdx = resolvedPhotoUrl.indexOf(",");

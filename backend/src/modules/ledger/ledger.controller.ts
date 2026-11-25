@@ -1,5 +1,11 @@
+import { existsSync } from 'fs';
+import path from 'path';
+import type { Response } from 'express';
+import { Public } from '../auth/public.decorator.js';
 import {
   Controller,
+  Res,
+  NotFoundException,
   Get,
   Post,
   Put,
@@ -220,5 +226,34 @@ export class LedgerController {
   ) {
     const cid = companyId ?? req.user?.companyId ?? '';
     return this.ledgerService.fetchManagerTransactions(cid, search);
+  }
+
+  @Public()
+  @Get('uploads/receipts/:filename')
+  serveReceipt(
+    @Param('filename') filename: string,
+    @Res() res: Response,
+  ) {
+    const safeName = path.basename(filename);
+    const candidatePaths = [
+      path.join(process.cwd(), 'uploads', 'receipts', safeName),
+      path.join(process.cwd(), 'backend', 'uploads', 'receipts', safeName),
+    ];
+    const filePath = candidatePaths.find((p) => existsSync(p));
+    if (!filePath) {
+      throw new NotFoundException('Receipt file not found');
+    }
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    return res.sendFile(filePath);
+  }
+
+  @Public()
+  @Get('receipts/file/:filename')
+  serveReceiptAlias(
+    @Param('filename') filename: string,
+    @Res() res: Response,
+  ) {
+    return this.serveReceipt(filename, res);
   }
 }
