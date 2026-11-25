@@ -1,11 +1,30 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../services/app_state.dart';
+
 
 class TransactionDetailSheet extends StatelessWidget {
   final Map<String, dynamic> transaction;
 
   const TransactionDetailSheet({super.key, required this.transaction});
+
+  String _resolveReceiptUrl(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('data:image') ||
+        trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    // Extract scheme + host + port (e.g., http://localhost:3000) without '/api'
+    final apiUri = Uri.parse(AppState.defaultApiUrl);
+    final origin =
+        '${apiUri.scheme}://${apiUri.host}${apiUri.hasPort ? ':${apiUri.port}' : ''}';
+    final normalizedPath = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    return '$origin$normalizedPath';
+  }
 
   Uint8List? _parseReceiptBytes(String url) {
     if (url.startsWith('data:image')) {
@@ -31,9 +50,18 @@ class TransactionDetailSheet extends StatelessWidget {
     final segment = transaction['segmentName']?.toString() ?? transaction['segment']?['name']?.toString() ?? transaction['category']?['name']?.toString() ?? 'General';
     final member = transaction['userName']?.toString() ?? transaction['actorName']?.toString() ?? 'Staff';
     final paymentMethod = transaction['paymentMethod']?.toString() ?? transaction['walletName']?.toString() ?? 'Cash';
-    final dateTime = transaction['createdAt']?.toString() ?? transaction['date']?.toString() ?? '';
+    final rawDate = transaction['createdAt']?.toString() ?? transaction['date']?.toString() ?? '';
+    final parsedDate = DateTime.tryParse(rawDate);
+    final dateTime = parsedDate != null
+        ? DateFormat('MMM d, yyyy • h:mm a').format(parsedDate.toLocal())
+        : rawDate;
     final note = transaction['notes']?.toString() ?? transaction['note']?.toString() ?? transaction['description']?.toString() ?? '';
-    final receiptUrl = transaction['receiptUrl']?.toString() ?? transaction['photoUrl']?.toString() ?? transaction['metadata']?['receiptUrl']?.toString() ?? '';
+    final rawReceiptUrl = transaction['receiptUrl']?.toString() ??
+        transaction['photoUrl']?.toString() ??
+        transaction['metadata']?['receiptUrl']?.toString() ??
+        transaction['metadata']?['photoUrl']?.toString() ??
+        '';
+    final receiptUrl = _resolveReceiptUrl(rawReceiptUrl);
 
     final receiptBytes = _parseReceiptBytes(receiptUrl);
 
@@ -142,7 +170,12 @@ class TransactionDetailSheet extends StatelessWidget {
                                   maxScale: 4.0,
                                   child: receiptBytes != null
                                       ? Image.memory(receiptBytes)
-                                      : Image.network(receiptUrl),
+                                      : Image.network(
+                                          receiptUrl,
+                                          errorBuilder: (context, error, stackTrace) => const Center(
+                                            child: Text('Failed to load receipt image', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                          ),
+                                        ),
                                 ),
                               ),
                               Positioned(

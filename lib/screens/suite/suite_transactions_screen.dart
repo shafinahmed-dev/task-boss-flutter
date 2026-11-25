@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../services/app_state.dart';
+import '../../services/transaction_export_service.dart';
 import '../../widgets/transaction_detail_sheet.dart';
 import 'suite_transaction_filter_modal.dart';
 
@@ -944,7 +945,23 @@ class _SuiteTransactionsScreenState extends State<SuiteTransactionsScreen> {
             child: _buildFloatingSummaryDeck(
               inflow: liveInflow,
               outflow: liveOutflow,
-              onExport: () => _exportPdf(filteredTransactions, liveInflow, liveOutflow),
+              onExport: () {
+                String filterSummary = "All Time";
+                if (_filterState.datePreset == "today") filterSummary = "Today";
+                else if (_filterState.datePreset == "yesterday") filterSummary = "Yesterday";
+                else if (_filterState.datePreset == "this_week") filterSummary = "This Week";
+                else if (_filterState.datePreset == "this_month") filterSummary = "This Month";
+                else if (_filterState.datePreset == "custom" && _filterState.customRange != null) {
+                  filterSummary = "${DateFormat("dd MMM").format(_filterState.customRange!.start)} - ${DateFormat("dd MMM yyyy").format(_filterState.customRange!.end)}";
+                }
+                TransactionExportService.showExportOptionsSheet(
+                  context: context,
+                  transactions: filteredTransactions,
+                  title: "Suite Transactions Statement",
+                  filterSummary: filterSummary,
+                  onExportPdf: () => _exportPdf(filteredTransactions, liveInflow, liveOutflow),
+                );
+              },
             ),
           ),
         ],

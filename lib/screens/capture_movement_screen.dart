@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:task_boss/theme.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:task_boss/models/models.dart';
 import 'package:task_boss/services/app_state.dart';
 import 'package:task_boss/utils/show_receipt_modal.dart';
@@ -114,6 +115,112 @@ class _CaptureState extends State<CaptureMovementScreen> {
         });
       }
     }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 80,
+      );
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _selectedReceiptBytes = bytes;
+          _selectedReceiptName = pickedFile.name;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking receipt image: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to select image: $e")),
+        );
+      }
+    }
+  }
+
+  void _showImageSourceSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const Text(
+                "Attach Receipt / Voucher",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF0F172A), size: 20),
+                ),
+                title: const Text("Take Photo", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: const Text("Capture memo or bill using camera", style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              const Divider(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFF0F172A), size: 20),
+                ),
+                title: const Text("Choose from Gallery", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: const Text("Select image from device photos", style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildHandoverRecipientSection() {
@@ -644,7 +751,11 @@ class _CaptureState extends State<CaptureMovementScreen> {
 
       String? base64ReceiptUrl;
       if (_selectedReceiptBytes != null) {
-        base64ReceiptUrl = 'data:image/png;base64,' + base64Encode(_selectedReceiptBytes!);
+        final name = (_selectedReceiptName ?? "").toLowerCase();
+        final mime = name.endsWith(".jpg") || name.endsWith(".jpeg")
+            ? "jpeg"
+            : (name.endsWith(".webp") ? "webp" : "png");
+        base64ReceiptUrl = "data:image/$mime;base64,${base64Encode(_selectedReceiptBytes!)}";
       }
 
       final payload = {
@@ -1286,6 +1397,8 @@ class _CaptureState extends State<CaptureMovementScreen> {
                             });
                           }
                         });
+                      } else {
+                        _showImageSourceSheet();
                       }
                     },
                     borderRadius: BorderRadius.circular(12),

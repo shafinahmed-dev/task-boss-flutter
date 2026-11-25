@@ -732,6 +732,7 @@ class AppState extends ChangeNotifier {
     defaultValue: kIsWeb ? 'http://localhost:3000' : 'http://192.168.1.45:3000',
   );
 
+  static const String defaultApiUrl = _defaultApiUrl;
   final String apiBaseUrl = _defaultApiUrl;
 
   Future<void> init() async {

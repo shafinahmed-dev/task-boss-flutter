@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../services/app_state.dart';
+import '../../services/transaction_export_service.dart';
 import '../suite/suite_transaction_filter_modal.dart';
 import '../../widgets/transaction_detail_sheet.dart';
 
@@ -806,7 +807,24 @@ class _ManagerTransactionsScreenState extends State<ManagerTransactionsScreen> {
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => _exportPdf(filtered, inflow, outflow),
+                    onTap: () {
+                      String filterSummary = "All Time";
+                      if (_filter.datePreset == "today") filterSummary = "Today";
+                      else if (_filter.datePreset == "yesterday") filterSummary = "Yesterday";
+                      else if (_filter.datePreset == "this_week") filterSummary = "This Week";
+                      else if (_filter.datePreset == "this_month") filterSummary = "This Month";
+                      else if (_filter.datePreset == "custom" && _filter.customRange != null) {
+                        filterSummary = "${DateFormat("dd MMM").format(_filter.customRange!.start)} - ${DateFormat("dd MMM yyyy").format(_filter.customRange!.end)}";
+                      }
+                      final companyTitle = widget.companyName ?? "Manager Transactions";
+                      TransactionExportService.showExportOptionsSheet(
+                        context: context,
+                        transactions: filtered,
+                        title: "$companyTitle Statement",
+                        filterSummary: filterSummary,
+                        onExportPdf: () => _exportPdf(filtered, inflow, outflow),
+                      );
+                    },
                     borderRadius: BorderRadius.circular(22),
                     child: Container(
                       width: 44,
